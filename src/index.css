@@ -1,0 +1,51 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { scroll-behavior: smooth; }
+
+body {
+  background:
+    radial-gradient(circle at 1px 1px, rgba(244,237,223,0.045) 1px, transparent 0) 0 0/24px 24px,
+    #14110E;
+  color: #F4EDDF;
+}
+
+::selection { background: #C79A3C; color: #14110E; }
+
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+.animate-ticker { animation: ticker 34s linear infinite; }
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-fadein { animation: fadein .3s ease; }
+
+@keyframes popin {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.animate-popin { animation: popin .25s ease; }
+
+@keyframes slidein {
+  from { transform: translateX(100%); }
+  to { transform: none; }
+}
+.animate-slidein { animation: slidein .3s ease; }
+
+@keyframes stampin {
+  from { opacity: 0; letter-spacing: 2.5px; }
+  to { opacity: 1; letter-spacing: .5px; }
+}
+.animate-stampin { animation: stampin .5s ease; }
+
+@keyframes rise {
+  0% { opacity: 0; transform: translateY(0) scale(.6); }
+  30% { opacity: .6; }
+  100% { opacity: 0; transform: translateY(-34px) scale(1.3); }
+}
+.group:hover .steam-span { animation: rise 1.8s ease-in infinite; }
