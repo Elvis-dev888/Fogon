@@ -93,6 +93,18 @@ export async function deleteProducto(id) {
   if (error) throw error
 }
 
+// Sube la foto a Storage dentro de una carpeta con el id del negocio
+// (así las políticas de seguridad saben de quién es cada foto) y
+// devuelve la URL pública para guardarla en productos.imagen_url.
+export async function subirFotoProducto(negocioId, file) {
+  const ext = file.name.split('.').pop()
+  const path = `${negocioId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from('productos').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data } = supabase.storage.from('productos').getPublicUrl(path)
+  return data.publicUrl
+}
+
 /* =========================================================
    INGREDIENTES / INVENTARIO
    ========================================================= */

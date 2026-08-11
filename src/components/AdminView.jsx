@@ -7,6 +7,9 @@ import {
   TabDashboard, TabProductos, TabCategorias, TabInventario, TabCompras,
   TabPedidos, TabVentas, TabTrabajadores, TabFinanzas, TabEstadisticas,
 } from './AdminTabs'
+import { supabase } from '../lib/supabaseClient'
+import { playPedidoNuevo, fmt$ } from '../lib/helpers'
+import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
 
 const TABS = [
   ['dashboard', '📊', 'Dashboard'],
@@ -48,6 +51,30 @@ export default function AdminView({ negocio, onExit, notify }) {
     reload()
   }, [reload])
 
+  // Timbre + registro en vivo: cuando un cliente confirma un pedido, le suena
+  // y le aparece de una vez al que esté administrando este negocio — sin
+  // necesidad de recargar la página ni cambiar de pestaña.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin-pedidos-${negocio.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `negocio_id=eq.${negocio.id}` },
+        (payload) => {
+          playPedidoNuevo()
+          notify(`🔔 Pedido nuevo de ${payload.new.cliente} — ${fmt$(payload.new.total)}`)
+          reload()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `negocio_id=eq.${negocio.id}` },
+        () => reload()
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [negocio.id, reload, notify])
+
   if (loading || !data) {
     return <p className="text-creamsoft text-sm">Cargando información de {negocio.nombre}…</p>
   }
@@ -60,22 +87,31 @@ export default function AdminView({ negocio, onExit, notify }) {
         <div className="text-gold font-serif font-semibold text-base pb-3.5 mb-2.5 border-b border-line max-[820px]:hidden">
           {negocio.emoji} {negocio.nombre}
         </div>
-        {TABS.map(([k, icon, label]) => (
-          <button
-            key={k}
-            onClick={() => setTab(k)}
-            className={`text-left px-3 py-2.5 rounded-sm text-[13px] flex items-center gap-2.5 whitespace-nowrap transition-colors ${
-              tab === k ? 'bg-gold/15 text-gold font-semibold' : 'text-creamsoft hover:bg-white/5 hover:text-cream'
-            }`}
-          >
-            {icon} {label}
-          </button>
-        ))}
+        <CodigoEmpleado negocioId={negocio.id} notify={notify} />
+        {TABS.map(([k, icon, label]) => {
+          const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado').length : 0
+          return (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`text-left px-3 py-2.5 rounded-sm text-[13px] flex items-center gap-2.5 whitespace-nowrap transition-colors ${
+                tab === k ? 'bg-gold/15 text-gold font-semibold' : 'text-creamsoft hover:bg-white/5 hover:text-cream'
+              }`}
+            >
+              {icon} {label}
+              {pendientesPedidos > 0 && (
+                <span className="ml-auto bg-gold text-paper text-[10px] font-bold rounded-full w-5 h-5 grid place-items-center animate-pulse">
+                  {pendientesPedidos}
+                </span>
+              )}
+            </button>
+          )
+        })}
         <button
           onClick={onExit}
           className="mt-2.5 pt-3 border-t border-line text-left px-3 py-2.5 text-[13px] text-creamsoft hover:text-cream"
         >
-          ↩ Cambiar de negocio
+          ⏻ Cerrar sesión
         </button>
       </nav>
       <div className="animate-fadein">
@@ -90,6 +126,46 @@ export default function AdminView({ negocio, onExit, notify }) {
         {tab === 'finanzas' && <TabFinanzas {...props} />}
         {tab === 'estadisticas' && <TabEstadisticas {...props} />}
       </div>
+    </div>
+  )
+}
+
+function CodigoEmpleado({ negocioId, notify }) {
+  const [codigo, setCodigo] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [regenerando, setRegenerando] = useState(false)
+
+  useEffect(() => {
+    fetchCodigoNegocio(negocioId).then(setCodigo).finally(() => setLoading(false))
+  }, [negocioId])
+
+  async function copiar() {
+    await navigator.clipboard.writeText(codigo)
+    notify('Código copiado — pásaselo a tu empleado')
+  }
+
+  async function regenerar() {
+    setRegenerando(true)
+    try {
+      const nuevo = await regenerarCodigoNegocio()
+      setCodigo(nuevo)
+      notify('Código nuevo generado — el anterior ya no sirve')
+    } finally {
+      setRegenerando(false)
+    }
+  }
+
+  if (loading) return null
+
+  return (
+    <div className="mb-3 pb-3 border-b border-line max-[820px]:hidden">
+      <p className="text-[10px] uppercase tracking-wide text-creamsoft mb-1">Código para tu empleado</p>
+      <button onClick={copiar} className="font-mono text-sm tracking-[0.25em] text-cream bg-paper border border-line rounded-sm px-2.5 py-1.5 w-full text-center hover:border-gold">
+        {codigo}
+      </button>
+      <button onClick={regenerar} disabled={regenerando} className="text-[11px] text-creamsoft hover:text-gold mt-1.5 w-full text-center">
+        {regenerando ? 'Generando…' : 'Generar uno nuevo'}
+      </button>
     </div>
   )
 }

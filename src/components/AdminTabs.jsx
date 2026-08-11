@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
 import { fmt$, fmtDate, sameMonth, ESTADOS, thumbFor } from '../lib/helpers'
 import {
-  createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto,
+  createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
   createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido,
   createTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso,
 } from '../lib/api'
@@ -97,8 +97,8 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
   return (
     <div className="group border border-line rounded overflow-hidden bg-paper2 hover:border-gold transition-colors relative">
       {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotado</span>}
-      <div className="h-24 flex items-center justify-center text-4xl relative border-b border-line" style={{ background: thumbFor(p.emoji) }}>
-        {p.emoji}
+      <div className="h-24 flex items-center justify-center text-4xl relative border-b border-line overflow-hidden" style={{ background: thumbFor(p.emoji) }}>
+        {p.imagen_url ? <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" /> : p.emoji}
         <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none">
           <span className="steam-span absolute bottom-[70%] left-[45%] w-[5px] h-5 rounded-full bg-cream/40 blur-[3px] opacity-0" />
         </div>
@@ -123,13 +123,30 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
   const [precio, setPrecio] = useState(producto?.precio || '')
   const [desc, setDesc] = useState(producto?.desc || '')
   const [emoji, setEmoji] = useState(producto?.emoji || '🍽️')
+  const [imagenUrl, setImagenUrl] = useState(producto?.imagen_url || '')
+  const [archivo, setArchivo] = useState(null)
+  const [preview, setPreview] = useState(producto?.imagen_url || null)
+  const [subiendo, setSubiendo] = useState(false)
   const [saving, setSaving] = useState(false)
+
+  function onPickFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setArchivo(file)
+    setPreview(URL.createObjectURL(file))
+  }
 
   async function submit(e) {
     e.preventDefault()
     setSaving(true)
-    const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji }
     try {
+      let urlFinal = imagenUrl
+      if (archivo) {
+        setSubiendo(true)
+        urlFinal = await subirFotoProducto(negocio.id, archivo)
+        setSubiendo(false)
+      }
+      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null }
       if (producto) await updateProducto(producto.id, payload)
       else await createProducto(negocio.id, { ...payload, disponible: true, adiciones: [] })
       onSaved()
@@ -142,6 +159,17 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
     <Modal onClose={onClose}>
       <h2 className="font-serif text-xl font-semibold mb-4">{producto ? 'Editar producto' : 'Nuevo producto'}</h2>
       <form onSubmit={submit}>
+        <Field label="Foto del producto (opcional)">
+          <div className="flex items-center gap-3">
+            <div className="w-16 h-16 rounded border border-line overflow-hidden flex items-center justify-center text-2xl bg-paper shrink-0">
+              {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : emoji}
+            </div>
+            <label className="text-[12.5px] text-gold cursor-pointer hover:text-champagne">
+              {preview ? 'Cambiar foto' : 'Subir foto'}
+              <input type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+            </label>
+          </div>
+        </Field>
         <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Categoría">
@@ -152,8 +180,10 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
           <Field label="Precio (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
         </div>
         <Field label="Descripción"><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
-        <Field label="Emoji / ícono"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center" disabled={saving}>{producto ? 'Guardar cambios' : 'Crear producto'}</Btn>
+        <Field label="Emoji / ícono (se usa si no hay foto)"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
+        <Btn variant="primary" className="w-full justify-center" disabled={saving}>
+          {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear producto'}
+        </Btn>
       </form>
     </Modal>
   )

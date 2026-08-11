@@ -50,7 +50,9 @@ export default function ClienteView({ negocio, onExit, notify }) {
           <button key={p.id} disabled={!p.disponible} onClick={() => setDetalle(p)}
             className={`text-left border border-line rounded overflow-hidden bg-paper2 hover:border-gold transition-colors relative ${!p.disponible ? 'opacity-50' : ''}`}>
             {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotado</span>}
-            <div className="h-24 flex items-center justify-center text-4xl border-b border-line" style={{ background: thumbFor(p.emoji) }}>{p.emoji}</div>
+            <div className="h-24 flex items-center justify-center text-4xl border-b border-line overflow-hidden" style={{ background: thumbFor(p.emoji) }}>
+              {p.imagen_url ? <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" /> : p.emoji}
+            </div>
             <div className="p-3.5">
               <span className="text-[10.5px] text-creamsoft font-semibold uppercase tracking-wide">{p.categoria}</span>
               <h4 className="font-serif font-semibold text-[15px] mb-0.5">{p.nombre}</h4>
@@ -116,7 +118,9 @@ function ProductoDetalleModal({ producto, onClose, onAdd }) {
 
   return (
     <Modal onClose={onClose}>
-      <div className="text-5xl text-center mb-1.5">{producto.emoji}</div>
+      {producto.imagen_url
+        ? <img src={producto.imagen_url} alt={producto.nombre} className="w-full h-40 object-cover rounded mb-3" />
+        : <div className="text-5xl text-center mb-1.5">{producto.emoji}</div>}
       <h2 className="font-serif text-xl font-semibold text-center mb-0.5">{producto.nombre}</h2>
       <p className="text-creamsoft text-center text-sm mb-3.5">{producto.desc}</p>
       <p className="font-mono font-bold text-gold text-center text-lg mb-4">{fmt$(producto.precio)}</p>
