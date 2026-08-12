@@ -170,8 +170,9 @@ export async function crearPedido(negocioId, { cliente, items, total }) {
     .single()
   if (e1) throw e1
 
-  const itemsPayload = items.map((it) => ({
+    const itemsPayload = items.map((it) => ({
     pedido_id: pedido.id,
+    producto_id: it.productId,
     nombre: it.nombre,
     cantidad: it.cantidad,
     adiciones: it.adiciones,

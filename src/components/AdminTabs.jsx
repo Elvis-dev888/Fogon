@@ -107,6 +107,11 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
         <span className="text-[10.5px] text-creamsoft font-semibold uppercase tracking-wide">{p.categoria}</span>
         <h4 className="font-serif font-semibold text-[15px] mb-0.5">{p.nombre}</h4>
         <div className="font-mono font-bold text-gold my-2">{fmt$(p.precio)}</div>
+        {p.stock !== null && p.stock !== undefined && (
+          <div className={`text-[11.5px] font-semibold mb-1.5 ${p.stock === 0 ? 'text-wine' : 'text-creamsoft'}`}>
+            {p.stock === 0 ? 'Sin stock' : `Quedan ${p.stock}`}
+          </div>
+        )}
         <div className="flex gap-1.5 flex-wrap">
           <Btn size="sm" variant="ghost" onClick={onToggle}>{p.disponible ? 'Marcar agotado' : 'Reactivar'}</Btn>
           <Btn size="sm" variant="ghost" onClick={onEdit}>Editar</Btn>
@@ -123,6 +128,7 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
   const [precio, setPrecio] = useState(producto?.precio || '')
   const [desc, setDesc] = useState(producto?.desc || '')
   const [emoji, setEmoji] = useState(producto?.emoji || '🍽️')
+  const [stock, setStock] = useState(producto?.stock ?? '')
   const [imagenUrl, setImagenUrl] = useState(producto?.imagen_url || '')
   const [archivo, setArchivo] = useState(null)
   const [preview, setPreview] = useState(producto?.imagen_url || null)
@@ -146,7 +152,7 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
         urlFinal = await subirFotoProducto(negocio.id, archivo)
         setSubiendo(false)
       }
-      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null }
+      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null, stock: stock === '' ? null : parseInt(stock, 10) }
       if (producto) await updateProducto(producto.id, payload)
       else await createProducto(negocio.id, { ...payload, disponible: true, adiciones: [] })
       onSaved()
@@ -181,6 +187,9 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
         </div>
         <Field label="Descripción"><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
         <Field label="Emoji / ícono (se usa si no hay foto)"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
+        <Field label="Stock (cantidad disponible — déjalo vacío para no controlar cantidad)">
+          <Input type="number" min="0" placeholder="Sin límite" value={stock} onChange={(e) => setStock(e.target.value)} />
+        </Field>
         <Btn variant="primary" className="w-full justify-center" disabled={saving}>
           {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear producto'}
         </Btn>
