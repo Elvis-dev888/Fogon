@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Toast, Btn } from './components/ui'
+import { Toast, Btn, NegocioLogo, NegocioBanner } from './components/ui'
 import SuperadminView from './components/SuperadminView'
 import AdminView from './components/AdminView'
 import EmpleadoView from './components/EmpleadoView'
@@ -149,8 +149,17 @@ export default function App() {
           !perfil ? <p className="text-creamsoft text-sm text-center mt-10">Cargando tu perfil…</p> :
           perfil.rol === 'pendiente' ? <CrearNegocioForm notify={notify} onCreated={() => { loadPerfil(); loadNegocios() }} /> :
           perfil.rol === 'superadmin' ? <SinPermiso mensaje="Esta cuenta es de superadministrador, no administra un negocio individual." /> :
+          perfil.rol !== 'admin' ? <SinPermiso mensaje="Esta cuenta no está registrada como administradora de un negocio." /> :
           !miNegocio ? <p className="text-creamsoft text-sm text-center mt-10">Cargando tu negocio…</p> :
-          <AdminView negocio={miNegocio} onExit={handleSignOut} notify={notify} />
+          <AdminView
+            negocio={miNegocio}
+            onExit={handleSignOut}
+            notify={notify}
+            onNegocioUpdated={(logoUrl) => {
+              setMiNegocio((prev) => (prev ? { ...prev, logo_url: logoUrl } : prev))
+              loadNegocios() // así el logo también se refresca de una en la vista de Cliente
+            }}
+          />
         )}
 
         {/* ---------------- EMPLEADO (atiende pedidos) ---------------- */}
@@ -190,9 +199,9 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
         {negocios.map((n) => (
           <div key={n.id} className="rounded border border-line bg-paper2 overflow-hidden">
-            <div className="h-[74px] bg-gradient-to-br from-paper3 to-paper2 border-b border-line" />
+            <NegocioBanner negocio={n} />
             <div className="p-5">
-              <h3 className="font-serif text-lg font-semibold mb-0.5">{n.emoji} {n.nombre}</h3>
+              <h3 className="font-serif text-lg font-semibold mb-0.5 flex items-center gap-1.5"><NegocioLogo negocio={n} size={20} /> {n.nombre}</h3>
               <p className="text-[12.5px] text-creamsoft mb-3">{n.slogan}</p>
               <button onClick={onEntrar}
                 className="w-full bg-paper3 border border-line text-cream font-semibold text-[13px] rounded py-2.5 hover:border-gold hover:text-gold">
@@ -217,9 +226,9 @@ function PickNegocio({ negocios, onEnter }) {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
         {negocios.filter((n) => n.estado === 'Activo').map((n) => (
           <div key={n.id} className="rounded border border-line bg-paper2 overflow-hidden">
-            <div className="h-[74px] bg-gradient-to-br from-paper3 to-paper2 border-b border-line" />
+            <NegocioBanner negocio={n} />
             <div className="p-5">
-              <h3 className="font-serif text-lg font-semibold mb-0.5">{n.emoji} {n.nombre}</h3>
+              <h3 className="font-serif text-lg font-semibold mb-0.5 flex items-center gap-1.5"><NegocioLogo negocio={n} size={20} /> {n.nombre}</h3>
               <p className="text-[12.5px] text-creamsoft mb-3">{n.slogan}</p>
               <button onClick={() => onEnter(n.id)}
                 className="w-full bg-gold text-paper font-semibold text-[13px] rounded py-2.5 hover:bg-golddark">

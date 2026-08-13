@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Btn } from './ui'
+import { Btn, NegocioLogo } from './ui'
 import { TabPedidos } from './AdminTabs'
 import { fetchPedidos } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
@@ -39,7 +39,7 @@ export default function EmpleadoView({ negocio, onExit, notify }) {
     <div>
       <div className="flex items-center justify-between mb-6 pb-4 border-b border-line">
         <div>
-          <h2 className="font-serif text-2xl font-semibold">{negocio.emoji} {negocio.nombre}</h2>
+          <h2 className="font-serif text-2xl font-semibold flex items-center gap-2"><NegocioLogo negocio={negocio} size={30} /> {negocio.nombre}</h2>
           <p className="text-creamsoft text-sm">Estás atendiendo pedidos — se actualizan solos.</p>
         </div>
         <Btn variant="ghost" onClick={onExit}>⏻ Cerrar sesión</Btn>

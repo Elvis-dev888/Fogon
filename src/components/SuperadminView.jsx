@@ -1,4 +1,4 @@
-import { Btn, StatCard, Pill } from './ui'
+import { Btn, StatCard, Pill, NegocioLogo } from './ui'
 import { fmt$ } from '../lib/helpers'
 import { toggleNegocioEstado } from '../lib/api'
 
@@ -46,15 +46,17 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
 function NegocioCard({ n, onToggle }) {
   return (
     <div className="rounded border border-line bg-paper2 overflow-hidden">
-      <div className="h-[74px] bg-gradient-to-br from-paper3 to-paper2 border-b border-line relative">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(199,154,60,.18)_0%,transparent_60%)]" />
+      <div className="h-[74px] bg-gradient-to-br from-paper3 to-paper2 border-b border-line relative overflow-hidden">
+        {n.logo_url
+          ? <img src={n.logo_url} alt={n.nombre} className="w-full h-full object-cover" />
+          : <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(199,154,60,.18)_0%,transparent_60%)]" />}
       </div>
       <div className="p-5">
         <div className="mb-2.5">
           <Pill tone={n.estado === 'Activo' ? 'activo' : 'pausado'}>{n.estado}</Pill>
         </div>
-        <h3 className="font-serif text-lg font-semibold mb-0.5">
-          {n.emoji} {n.nombre}
+        <h3 className="font-serif text-lg font-semibold mb-0.5 flex items-center gap-1.5">
+          <NegocioLogo negocio={n} size={20} /> {n.nombre}
         </h3>
         <p className="text-[12.5px] text-creamsoft mb-3">{n.slogan}</p>
         <div className="flex gap-4 mb-4 font-mono text-[11.5px] text-creamsoft">

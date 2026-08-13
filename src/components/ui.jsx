@@ -109,6 +109,33 @@ export function Empty({ icon = '🧾', children }) {
   )
 }
 
+// Muestra el logo del negocio si tiene logo_url; si no, cae al emoji de siempre.
+export function NegocioLogo({ negocio, size = 22, className = '' }) {
+  if (negocio?.logo_url) {
+    return (
+      <img
+        src={negocio.logo_url}
+        alt={negocio.nombre}
+        className={`inline-block rounded-full object-cover align-middle shrink-0 ${className}`}
+        style={{ width: size, height: size }}
+      />
+    )
+  }
+  return <span className={className}>{negocio?.emoji || '🍴'}</span>
+}
+
+// Igual, pero para el banner rectangular de las tarjetas de negocio.
+export function NegocioBanner({ negocio, className = '' }) {
+  if (negocio?.logo_url) {
+    return (
+      <div className={`h-[74px] bg-paper3 border-b border-line overflow-hidden ${className}`}>
+        <img src={negocio.logo_url} alt={negocio.nombre} className="w-full h-full object-cover" />
+      </div>
+    )
+  }
+  return <div className={`h-[74px] bg-gradient-to-br from-paper3 to-paper2 border-b border-line ${className}`} />
+}
+
 export function Pill({ children, tone = 'default' }) {
   const tones = {
     default: 'bg-paper3 text-creamsoft',

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import {
   fetchCategorias, fetchProductos, fetchIngredientes, fetchCompras,
   fetchPedidos, fetchVentas, fetchTrabajadores, fetchIngresos, fetchEgresos,
+  subirLogoNegocio, updateNegocioLogo,
 } from '../lib/api'
 import {
   TabDashboard, TabProductos, TabCategorias, TabInventario, TabCompras,
@@ -10,6 +11,7 @@ import {
 import { supabase } from '../lib/supabaseClient'
 import { playPedidoNuevo, fmt$ } from '../lib/helpers'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
+import { NegocioLogo } from './ui'
 
 const TABS = [
   ['dashboard', '📊', 'Dashboard'],
@@ -24,7 +26,7 @@ const TABS = [
   ['estadisticas', '📉', 'Estadísticas'],
 ]
 
-export default function AdminView({ negocio, onExit, notify }) {
+export default function AdminView({ negocio, onExit, notify, onNegocioUpdated }) {
   const [tab, setTab] = useState('dashboard')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -84,8 +86,9 @@ export default function AdminView({ negocio, onExit, notify }) {
   return (
     <div className="grid grid-cols-[220px_1fr] gap-5 items-start max-[820px]:grid-cols-1">
       <nav className="bg-paper2 border border-line rounded p-4 sticky top-[78px] flex flex-col gap-0.5 max-[820px]:static max-[820px]:flex-row max-[820px]:overflow-x-auto">
-        <div className="text-gold font-serif font-semibold text-base pb-3.5 mb-2.5 border-b border-line max-[820px]:hidden">
-          {negocio.emoji} {negocio.nombre}
+        <div className="text-gold font-serif font-semibold text-base pb-3.5 mb-2.5 border-b border-line max-[820px]:hidden flex items-center gap-2">
+          <LogoUploader negocio={negocio} notify={notify} onNegocioUpdated={onNegocioUpdated} />
+          {negocio.nombre}
         </div>
         <CodigoEmpleado negocioId={negocio.id} notify={notify} />
         {TABS.map(([k, icon, label]) => {
@@ -127,6 +130,45 @@ export default function AdminView({ negocio, onExit, notify }) {
         {tab === 'estadisticas' && <TabEstadisticas {...props} />}
       </div>
     </div>
+  )
+}
+
+// Logo del negocio, con un botoncito de cámara encima para que el dueño
+// suba o cambie su imagen. Se ve tanto en Admin negocio como en Cliente,
+// porque ambos leen el mismo campo logo_url del negocio.
+function LogoUploader({ negocio, notify, onNegocioUpdated }) {
+  const [subiendo, setSubiendo] = useState(false)
+
+  async function onPickFile(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite volver a elegir el mismo archivo después
+    if (!file) return
+    setSubiendo(true)
+    try {
+      const url = await subirLogoNegocio(negocio.id, file)
+      await updateNegocioLogo(negocio.id, url)
+      onNegocioUpdated?.(url)
+      notify('Logo actualizado')
+    } catch (err) {
+      console.error('[Fogón] Error subiendo el logo:', err)
+      notify('No se pudo subir el logo — intenta de nuevo')
+    } finally {
+      setSubiendo(false)
+    }
+  }
+
+  return (
+    <label
+      className="relative group inline-flex items-center justify-center shrink-0 cursor-pointer"
+      style={{ width: 26, height: 26 }}
+      title="Cambiar el logo del negocio"
+    >
+      <NegocioLogo negocio={negocio} size={26} />
+      <span className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[11px]">
+        {subiendo ? '…' : '📷'}
+      </span>
+      <input type="file" accept="image/*" className="hidden" disabled={subiendo} onChange={onPickFile} />
+    </label>
   )
 }
 

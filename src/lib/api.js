@@ -49,9 +49,17 @@ export async function createNegocio({ nombre, slogan, emoji }) {
   return data
 }
 
-export async function toggleNegocioEstado(negocio) {
-  const nuevoEstado = negocio.estado === 'Activo' ? 'Pausado' : 'Activo'
-  const { error } = await supabase.from('negocios').update({ estado: nuevoEstado }).eq('id', negocio.id)
+export async function subirLogoNegocio(negocioId, file) {
+  const ext = file.name.split('.').pop()
+  const path = `${negocioId}/logo-${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from('productos').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data } = supabase.storage.from('productos').getPublicUrl(path)
+  return data.publicUrl
+}
+
+export async function updateNegocioLogo(negocioId, logoUrl) {
+  const { error } = await supabase.from('negocios').update({ logo_url: logoUrl }).eq('id', negocioId)
   if (error) throw error
 }
 
