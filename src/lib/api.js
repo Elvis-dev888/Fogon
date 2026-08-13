@@ -63,6 +63,12 @@ export async function updateNegocioLogo(negocioId, logoUrl) {
   if (error) throw error
 }
 
+export async function toggleNegocioEstado(negocio) {
+  const nuevoEstado = negocio.estado === 'Activo' ? 'Pausado' : 'Activo'
+  const { error } = await supabase.from('negocios').update({ estado: nuevoEstado }).eq('id', negocio.id)
+  if (error) throw error
+}
+
 /* =========================================================
    CATEGORIAS
    ========================================================= */
