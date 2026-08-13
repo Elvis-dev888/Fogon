@@ -133,9 +133,10 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
   )
 }
 
-// Logo del negocio, con un botoncito de cámara encima para que el dueño
-// suba o cambie su imagen. Se ve tanto en Admin negocio como en Cliente,
-// porque ambos leen el mismo campo logo_url del negocio.
+// Logo del negocio, con un botón de texto siempre visible (no depende de
+// hover, así que funciona igual en computador y en celular) para que el
+// dueño suba o cambie su imagen. Se ve tanto en Admin negocio como en
+// Cliente, porque ambos leen el mismo campo logo_url del negocio.
 function LogoUploader({ negocio, notify, onNegocioUpdated }) {
   const [subiendo, setSubiendo] = useState(false)
 
@@ -158,17 +159,13 @@ function LogoUploader({ negocio, notify, onNegocioUpdated }) {
   }
 
   return (
-    <label
-      className="relative group inline-flex items-center justify-center shrink-0 cursor-pointer"
-      style={{ width: 26, height: 26 }}
-      title="Cambiar el logo del negocio"
-    >
+    <div className="flex items-center gap-2">
       <NegocioLogo negocio={negocio} size={26} />
-      <span className="absolute inset-0 rounded-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-[11px]">
-        {subiendo ? '…' : '📷'}
-      </span>
-      <input type="file" accept="image/*" className="hidden" disabled={subiendo} onChange={onPickFile} />
-    </label>
+      <label className="text-[11px] font-normal text-gold hover:text-champagne cursor-pointer underline underline-offset-2 tracking-normal normal-case">
+        {subiendo ? 'Subiendo…' : negocio?.logo_url ? 'Cambiar logo' : 'Subir logo'}
+        <input type="file" accept="image/*" className="hidden" disabled={subiendo} onChange={onPickFile} />
+      </label>
+    </div>
   )
 }
 
