@@ -69,6 +69,11 @@ export async function toggleNegocioEstado(negocio) {
   if (error) throw error
 }
 
+export async function updateCapitalInicial(negocioId, valor) {
+  const { error } = await supabase.from('negocios').update({ capital_inicial: valor }).eq('id', negocioId)
+  if (error) throw error
+}
+
 /* =========================================================
    CATEGORIAS
    ========================================================= */

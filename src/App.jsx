@@ -155,8 +155,8 @@ export default function App() {
             negocio={miNegocio}
             onExit={handleSignOut}
             notify={notify}
-            onNegocioUpdated={(logoUrl) => {
-              setMiNegocio((prev) => (prev ? { ...prev, logo_url: logoUrl } : prev))
+            onNegocioUpdated={(cambios) => {
+              setMiNegocio((prev) => (prev ? { ...prev, ...cambios } : prev))
               loadNegocios() // así el logo también se refresca de una en la vista de Cliente
             }}
           />

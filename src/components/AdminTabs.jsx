@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
-import { fmt$, fmtDate, sameMonth, ESTADOS, thumbFor } from '../lib/helpers'
+import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, dateStr, monthStr, todayStr, sameMonth, ESTADOS, thumbFor } from '../lib/helpers'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
   createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido,
-  createTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso,
+  createTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso, updateCapitalInicial,
 } from '../lib/api'
 
 const estadoTone = (e) => (e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : 'entregado')
@@ -107,6 +107,9 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
         <span className="text-[10.5px] text-creamsoft font-semibold uppercase tracking-wide">{p.categoria}</span>
         <h4 className="font-serif font-semibold text-[15px] mb-0.5">{p.nombre}</h4>
         <div className="font-mono font-bold text-gold my-2">{fmt$(p.precio)}</div>
+        {p.adiciones?.length > 0 && (
+          <div className="text-[11px] text-creamsoft mb-1.5">+ {p.adiciones.length} adición{p.adiciones.length === 1 ? '' : 'es'} disponible{p.adiciones.length === 1 ? '' : 's'}</div>
+        )}
         {p.stock !== null && p.stock !== undefined && (
           <div className={`text-[11.5px] font-semibold mb-1.5 ${p.stock === 0 ? 'text-wine' : 'text-creamsoft'}`}>
             {p.stock === 0 ? 'Sin stock' : `Quedan ${p.stock}`}
@@ -132,6 +135,7 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
   const [imagenUrl, setImagenUrl] = useState(producto?.imagen_url || '')
   const [archivo, setArchivo] = useState(null)
   const [preview, setPreview] = useState(producto?.imagen_url || null)
+  const [adiciones, setAdiciones] = useState(producto?.adiciones?.length ? producto.adiciones : [])
   const [subiendo, setSubiendo] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -140,6 +144,16 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
     if (!file) return
     setArchivo(file)
     setPreview(URL.createObjectURL(file))
+  }
+
+  function addAdicion() {
+    setAdiciones([...adiciones, { nombre: '', precio: 0 }])
+  }
+  function editAdicion(i, campo, valor) {
+    setAdiciones(adiciones.map((a, idx) => (idx === i ? { ...a, [campo]: campo === 'precio' ? valor : valor } : a)))
+  }
+  function removeAdicion(i) {
+    setAdiciones(adiciones.filter((_, idx) => idx !== i))
   }
 
   async function submit(e) {
@@ -152,9 +166,13 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
         urlFinal = await subirFotoProducto(negocio.id, archivo)
         setSubiendo(false)
       }
-      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null, stock: stock === '' ? null : parseInt(stock, 10) }
+      // Solo se guardan las adiciones que sí tienen nombre (evita filas vacías a medio llenar).
+      const adicionesFinal = adiciones
+        .filter((a) => a.nombre.trim() !== '')
+        .map((a) => ({ nombre: a.nombre.trim(), precio: parseFloat(a.precio) || 0 }))
+      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null, stock: stock === '' ? null : parseInt(stock, 10), adiciones: adicionesFinal }
       if (producto) await updateProducto(producto.id, payload)
-      else await createProducto(negocio.id, { ...payload, disponible: true, adiciones: [] })
+      else await createProducto(negocio.id, { ...payload, disponible: true })
       onSaved()
     } finally {
       setSaving(false)
@@ -190,7 +208,22 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
         <Field label="Stock (cantidad disponible — déjalo vacío para no controlar cantidad)">
           <Input type="number" min="0" placeholder="Sin límite" value={stock} onChange={(e) => setStock(e.target.value)} />
         </Field>
-        <Btn variant="primary" className="w-full justify-center" disabled={saving}>
+
+        <Field label="Adiciones (opcional — ej: una bolita de helado extra, doble carne, etc.)">
+          {adiciones.length === 0 && (
+            <p className="text-creamsoft text-[12px] mb-2">Este producto no tiene adiciones todavía. El cliente solo verá esta opción si agregas al menos una.</p>
+          )}
+          {adiciones.map((a, i) => (
+            <div key={i} className="flex gap-2 items-center mb-2">
+              <Input placeholder="Nombre — ej: bolita extra" value={a.nombre} onChange={(e) => editAdicion(i, 'nombre', e.target.value)} className="flex-[2]" />
+              <Input placeholder="Precio" type="number" value={a.precio} onChange={(e) => editAdicion(i, 'precio', e.target.value)} className="flex-1" />
+              <button type="button" onClick={() => removeAdicion(i)} className="text-wine font-bold px-1.5 shrink-0">✕</button>
+            </div>
+          ))}
+          <Btn type="button" size="sm" variant="ghost" onClick={addAdicion}>➕ Agregar adición</Btn>
+        </Field>
+
+        <Btn variant="primary" className="w-full justify-center mt-1" disabled={saving}>
           {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear producto'}
         </Btn>
       </form>
@@ -399,7 +432,7 @@ export function TabPedidos({ data, reload, notify }) {
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
                   <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
-                  <div className="my-1.5 text-creamsoft">{p.pedido_items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                  <div className="my-1.5 text-creamsoft">{p.pedido_items.map((it) => `${it.cantidad}× ${it.nombre}${it.adiciones?.length ? ` (${it.adiciones.join(', ')})` : ''}`).join(', ')}</div>
                   <div className="flex justify-between items-center mt-2">
                     <span className="font-mono">{fmt$(p.total)}</span>
                     {est !== 'Entregado'
@@ -526,54 +559,221 @@ function PagoModal({ negocio, trabajador, onClose, onSaved }) {
 }
 
 /* ---------------- Finanzas ---------------- */
-export function TabFinanzas({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // 'ingreso' | 'egreso'
-  const ingresosVentas = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
-  const ingresosExtra = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + i.valor, 0)
-  const egresosCompras = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + c.valor, 0)
-  const egresosPagos = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + p.valor, 0)
-  const egresosOtros = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + e.valor, 0)
+// Libro de caja del negocio: junta ventas, compras, pagos a trabajadores e
+// ingresos/egresos manuales en una sola línea de tiempo, calcula el saldo
+// acumulado a partir de la base inicial, y permite verlo por día o por mes
+// (con comparativo entre meses) e imprimirlo.
+export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated }) {
+  const [modal, setModal] = useState(null) // 'ingreso' | 'egreso' | 'capital'
+  const [vista, setVista] = useState('dia') // 'dia' | 'mes'
+  const [fecha, setFecha] = useState(todayStr())
+  const [mes, setMes] = useState(monthStr(new Date()))
+
+  const capitalInicial = negocio.capital_inicial || 0
+
+  const movimientos = useMemo(() => {
+    const list = []
+    data.ventas.forEach((v) => list.push({ id: `venta-${v.id}`, fecha: v.creado_en, tipo: 'Venta', concepto: 'Venta de pedido', valor: v.total, signo: 1 }))
+    data.ingresos.forEach((i) => list.push({ id: `ingreso-${i.id}`, fecha: i.creado_en, tipo: 'Ingreso extra', concepto: i.concepto, valor: i.valor, signo: 1 }))
+    data.compras.forEach((c) => list.push({ id: `compra-${c.id}`, fecha: c.creado_en, tipo: 'Compra', concepto: c.ingredientes?.nombre ? `${c.ingredientes.nombre} × ${c.cantidad}` : 'Compra de insumo', valor: c.valor, signo: -1 }))
+    data.trabajadores.forEach((w) => (w.pagos || []).forEach((p) => list.push({ id: `pago-${p.id}`, fecha: p.creado_en, tipo: 'Pago personal', concepto: `${w.nombre} — ${p.periodo}`, valor: p.valor, signo: -1 })))
+    data.egresos.forEach((e) => list.push({ id: `egreso-${e.id}`, fecha: e.creado_en, tipo: 'Otro gasto', concepto: e.concepto, valor: e.valor, signo: -1 }))
+    list.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+    let saldo = capitalInicial
+    return list.map((m) => { saldo += m.signo * m.valor; return { ...m, saldo } })
+  }, [data, capitalInicial])
+
+  const saldoActual = movimientos.length ? movimientos[movimientos.length - 1].saldo : capitalInicial
+  const ingresosHoy = movimientos.filter((m) => dateStr(m.fecha) === todayStr() && m.signo === 1).reduce((a, m) => a + m.valor, 0)
+  const egresosHoy = movimientos.filter((m) => dateStr(m.fecha) === todayStr() && m.signo === -1).reduce((a, m) => a + m.valor, 0)
+
+  // ---- Vista por día ----
+  const movimientosDia = movimientos.filter((m) => dateStr(m.fecha) === fecha)
+  const ingresosDia = movimientosDia.filter((m) => m.signo === 1).reduce((a, m) => a + m.valor, 0)
+  const egresosDia = movimientosDia.filter((m) => m.signo === -1).reduce((a, m) => a + m.valor, 0)
+  const hastaEseDia = movimientos.filter((m) => dateStr(m.fecha) <= fecha)
+  const saldoAlCierreDia = hastaEseDia.length ? hastaEseDia[hastaEseDia.length - 1].saldo : capitalInicial
+
+  // ---- Vista por mes ----
+  const movimientosMes = movimientos.filter((m) => monthStr(m.fecha) === mes)
+  const ingresosMes = movimientosMes.filter((m) => m.signo === 1).reduce((a, m) => a + m.valor, 0)
+  const egresosMes = movimientosMes.filter((m) => m.signo === -1).reduce((a, m) => a + m.valor, 0)
+  const diasMap = {}
+  movimientosMes.forEach((m) => {
+    const d = dateStr(m.fecha)
+    if (!diasMap[d]) diasMap[d] = { ingresos: 0, egresos: 0 }
+    if (m.signo === 1) diasMap[d].ingresos += m.valor
+    else diasMap[d].egresos += m.valor
+  })
+  const diasDelMes = Object.entries(diasMap).sort((a, b) => (a[0] < b[0] ? 1 : -1))
+
+  // ---- Comparativo entre todos los meses con movimientos ----
+  const mesesMap = {}
+  movimientos.forEach((m) => {
+    const k = monthStr(m.fecha)
+    if (!mesesMap[k]) mesesMap[k] = { ingresos: 0, egresos: 0 }
+    if (m.signo === 1) mesesMap[k].ingresos += m.valor
+    else mesesMap[k].egresos += m.valor
+  })
+  const mesesArr = Object.entries(mesesMap)
+    .map(([key, v]) => ({ key, label: fmtMonthLabel(key), ingresos: v.ingresos, egresos: v.egresos, neto: v.ingresos - v.egresos }))
+    .sort((a, b) => (a.key < b.key ? -1 : 1))
+  const mejorIngresos = mesesArr.length ? mesesArr.reduce((a, b) => (b.ingresos > a.ingresos ? b : a)) : null
+  const peorIngresos = mesesArr.length > 1 ? mesesArr.reduce((a, b) => (b.ingresos < a.ingresos ? b : a)) : null
 
   return (
     <div>
-      <SectionTitle title="Ingresos y egresos" sub="Compras, pagos y ventas se reflejan aquí automáticamente."
-        action={<div className="flex gap-2">
-          <Btn size="sm" variant="mustard" onClick={() => setModal('ingreso')}>➕ Ingreso</Btn>
-          <Btn size="sm" variant="danger" onClick={() => setModal('egreso')}>➕ Egreso</Btn>
-        </div>} />
+      <SectionTitle title="Ingresos y egresos" sub="Ventas, compras y pagos se suman solos — registra aquí lo demás, día a día."
+        action={
+          <div className="flex gap-2 flex-wrap">
+            <Btn size="sm" variant="ghost" onClick={() => setModal('capital')}>💰 Base inicial</Btn>
+            <Btn size="sm" variant="mustard" onClick={() => setModal('ingreso')}>➕ Ingreso</Btn>
+            <Btn size="sm" variant="danger" onClick={() => setModal('egreso')}>➕ Egreso</Btn>
+          </div>
+        } />
+
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label="Ingresos (ventas + otros)" value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
-        <StatCard label="Egresos (compras)" value={fmt$(egresosCompras)} tone="gold" />
-        <StatCard label="Egresos (personal)" value={fmt$(egresosPagos)} tone="champagne" />
-        <StatCard label="Otros egresos" value={fmt$(egresosOtros)} />
+        <StatCard label="Base inicial" value={fmt$(capitalInicial)} />
+        <StatCard label="Saldo actual del negocio" value={fmt$(saldoActual)} tone="sage" />
+        <StatCard label="Ingresos de hoy" value={fmt$(ingresosHoy)} tone="gold" />
+        <StatCard label="Egresos de hoy" value={fmt$(egresosHoy)} tone="champagne" />
       </div>
-      <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
-        <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Ingresos extra registrados</h3>
-          {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos manuales aún.</p> :
-            data.ingresos.map((i) => (
-              <div key={i.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
-                <span>{i.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(i.creado_en)}</div></span>
-                <b className="font-mono">{fmt$(i.valor)}</b>
-              </div>
-            ))}
-        </Card>
-        <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Otros gastos</h3>
-          {data.egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
-            data.egresos.map((e) => (
-              <div key={e.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
-                <span>{e.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(e.creado_en)}</div></span>
-                <b className="font-mono">{fmt$(e.valor)}</b>
-              </div>
-            ))}
-        </Card>
+
+      <div className="flex gap-2 mb-4 no-print">
+        <Btn size="sm" variant={vista === 'dia' ? 'primary' : 'ghost'} onClick={() => setVista('dia')}>📅 Ver por día</Btn>
+        <Btn size="sm" variant={vista === 'mes' ? 'primary' : 'ghost'} onClick={() => setVista('mes')}>🗓️ Ver por mes</Btn>
       </div>
-      {modal && (
+
+      {vista === 'dia' ? (
+        <div id="finanzas-print-area">
+          <div className="flex items-center gap-3 mb-4 flex-wrap no-print">
+            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-auto" />
+            <Btn size="sm" variant="ghost" onClick={() => setFecha(todayStr())}>Hoy</Btn>
+            <Btn size="sm" variant="ghost" onClick={() => window.print()}>🖨️ Imprimir este día</Btn>
+          </div>
+          <h3 className="font-serif text-lg font-semibold mb-0.5">{fmtDateLong(`${fecha}T12:00:00`)}</h3>
+          <p className="text-creamsoft text-[12.5px] mb-3">{negocio.nombre}</p>
+          <div className="grid grid-cols-3 gap-3 mb-4 max-[600px]:grid-cols-1">
+            <StatCard label="Ingresos del día" value={fmt$(ingresosDia)} tone="sage" />
+            <StatCard label="Egresos del día" value={fmt$(egresosDia)} tone="wine" />
+            <StatCard label="Saldo al cierre" value={fmt$(saldoAlCierreDia)} tone="gold" />
+          </div>
+          <Card className="p-5">
+            {movimientosDia.length === 0 ? <Empty icon="🧾">Sin movimientos registrados este día.</Empty> : (
+              <Table head={['Tipo', 'Concepto', 'Ingreso', 'Egreso']} rows={movimientosDia.map((m) => [
+                <Pill tone={m.signo === 1 ? 'listo' : 'pausado'}>{m.tipo}</Pill>,
+                m.concepto,
+                <span className="font-mono">{m.signo === 1 ? fmt$(m.valor) : '—'}</span>,
+                <span className="font-mono">{m.signo === -1 ? fmt$(m.valor) : '—'}</span>,
+              ])} />
+            )}
+          </Card>
+        </div>
+      ) : (
+        <div id="finanzas-print-area">
+          <div className="flex items-center gap-3 mb-4 flex-wrap no-print">
+            <Input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="w-auto" />
+            <Btn size="sm" variant="ghost" onClick={() => setMes(monthStr(new Date()))}>Este mes</Btn>
+            <Btn size="sm" variant="ghost" onClick={() => window.print()}>🖨️ Imprimir este mes</Btn>
+          </div>
+          <h3 className="font-serif text-lg font-semibold mb-0.5">{fmtMonthLabel(mes)}</h3>
+          <p className="text-creamsoft text-[12.5px] mb-3">{negocio.nombre}</p>
+          <div className="grid grid-cols-3 gap-3 mb-4 max-[600px]:grid-cols-1">
+            <StatCard label="Ingresos del mes" value={fmt$(ingresosMes)} tone="sage" />
+            <StatCard label="Egresos del mes" value={fmt$(egresosMes)} tone="wine" />
+            <StatCard label="Resultado del mes" value={fmt$(ingresosMes - egresosMes)} tone="gold" />
+          </div>
+          <h4 className="font-serif text-base font-semibold mb-2.5">Día a día</h4>
+          <Card className="p-5 mb-6">
+            {diasDelMes.length === 0 ? <Empty icon="🧾">Sin movimientos este mes.</Empty> : (
+              <Table head={['Día', 'Ingresos', 'Egresos', 'Neto del día']} rows={diasDelMes.map(([dia, v]) => [
+                <span className="font-mono">{fmtDateLong(`${dia}T12:00:00`)}</span>,
+                <span className="font-mono text-sage">{fmt$(v.ingresos)}</span>,
+                <span className="font-mono text-wine">{fmt$(v.egresos)}</span>,
+                <span className="font-mono">{fmt$(v.ingresos - v.egresos)}</span>,
+              ])} />
+            )}
+          </Card>
+
+          <h4 className="font-serif text-base font-semibold mb-2.5">Comparativo entre meses</h4>
+          <Card className="p-5">
+            {mesesArr.length === 0 ? <Empty>Aún no hay meses con movimientos para comparar.</Empty> : (
+              <Table head={['Mes', 'Ingresos', 'Egresos', 'Neto', '']} rows={mesesArr.map((m) => [
+                m.label,
+                <span className="font-mono text-sage">{fmt$(m.ingresos)}</span>,
+                <span className="font-mono text-wine">{fmt$(m.egresos)}</span>,
+                <span className="font-mono">{fmt$(m.neto)}</span>,
+                m.key === mejorIngresos?.key
+                  ? <Pill tone="listo">🏆 El que más vendió</Pill>
+                  : (peorIngresos && m.key === peorIngresos.key ? <Pill tone="pausado">El más flojo</Pill> : ''),
+              ])} />
+            )}
+          </Card>
+        </div>
+      )}
+
+      <details className="mt-6 no-print">
+        <summary className="cursor-pointer text-creamsoft text-[12.5px] hover:text-gold mb-2">Ver todos los ingresos y egresos manuales registrados</summary>
+        <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1 mt-3">
+          <Card className="p-5">
+            <h4 className="font-serif text-base font-semibold mb-3">Ingresos extra</h4>
+            {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos manuales aún.</p> :
+              data.ingresos.map((i) => (
+                <div key={i.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
+                  <span>{i.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(i.creado_en)}</div></span>
+                  <b className="font-mono">{fmt$(i.valor)}</b>
+                </div>
+              ))}
+          </Card>
+          <Card className="p-5">
+            <h4 className="font-serif text-base font-semibold mb-3">Otros gastos</h4>
+            {data.egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
+              data.egresos.map((e) => (
+                <div key={e.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
+                  <span>{e.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(e.creado_en)}</div></span>
+                  <b className="font-mono">{fmt$(e.valor)}</b>
+                </div>
+              ))}
+          </Card>
+        </div>
+      </details>
+
+      {modal === 'capital' && (
+        <CapitalModal negocio={negocio} onClose={() => setModal(null)}
+          onSaved={(cambios) => { setModal(null); onNegocioUpdated?.(cambios); notify('Base inicial actualizada') }} />
+      )}
+      {(modal === 'ingreso' || modal === 'egreso') && (
         <MovimientoModal negocio={negocio} tipo={modal} onClose={() => setModal(null)}
           onSaved={() => { setModal(null); notify('Movimiento registrado'); reload() }} />
       )}
     </div>
+  )
+}
+function CapitalModal({ negocio, onClose, onSaved }) {
+  const [valor, setValor] = useState(negocio.capital_inicial || 0)
+  const [saving, setSaving] = useState(false)
+  async function submit(e) {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const monto = parseFloat(valor) || 0
+      await updateCapitalInicial(negocio.id, monto)
+      onSaved({ capital_inicial: monto })
+    } finally {
+      setSaving(false)
+    }
+  }
+  return (
+    <Modal onClose={onClose}>
+      <h2 className="font-serif text-xl font-semibold mb-1">Base inicial del negocio</h2>
+      <p className="text-creamsoft text-[13px] mb-4">
+        El dinero con el que arrancó "{negocio.nombre}" antes de empezar a registrar todo aquí. A partir de este monto se calcula el saldo actual del negocio, sumando y restando cada ingreso y egreso.
+      </p>
+      <form onSubmit={submit}>
+        <Field label="Base inicial (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
+        <Btn variant="primary" className="w-full justify-center" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Btn>
+      </form>
+    </Modal>
   )
 }
 function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
@@ -590,7 +790,7 @@ function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
     <Modal onClose={onClose}>
       <h2 className="font-serif text-xl font-semibold mb-4">{tipo === 'ingreso' ? 'Nuevo ingreso' : 'Nuevo egreso'}</h2>
       <form onSubmit={submit}>
-        <Field label="Concepto"><Input required value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={tipo === 'ingreso' ? 'Ej: venta de excedente' : 'Ej: transporte, servicios'} /></Field>
+        <Field label="Concepto"><Input required value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={tipo === 'ingreso' ? 'Ej: venta de excedente' : 'Ej: carne, pollo, cebolla, transporte'} /></Field>
         <Field label="Valor (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
         <Btn variant="primary" className="w-full justify-center">Guardar</Btn>
       </form>

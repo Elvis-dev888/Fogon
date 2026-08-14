@@ -81,7 +81,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
     return <p className="text-creamsoft text-sm">Cargando información de {negocio.nombre}…</p>
   }
 
-  const props = { negocio, data, reload, notify }
+  const props = { negocio, data, reload, notify, onNegocioUpdated }
 
   return (
     <div className="grid grid-cols-[220px_1fr] gap-5 items-start max-[820px]:grid-cols-1">
@@ -148,7 +148,7 @@ function LogoUploader({ negocio, notify, onNegocioUpdated }) {
     try {
       const url = await subirLogoNegocio(negocio.id, file)
       await updateNegocioLogo(negocio.id, url)
-      onNegocioUpdated?.(url)
+      onNegocioUpdated?.({ logo_url: url })
       notify('Logo actualizado')
     } catch (err) {
       console.error('[Fogón] Error subiendo el logo:', err)

@@ -3,10 +3,37 @@ export const fmt$ = (n) => '$' + Math.round(n || 0).toLocaleString('es-CO')
 export const fmtDate = (d) =>
   new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 
+export const fmtDateLong = (d) =>
+  new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+
 export const sameMonth = (d) => {
   const x = new Date(d)
   const now = new Date()
   return x.getMonth() === now.getMonth() && x.getFullYear() === now.getFullYear()
+}
+
+// 'YYYY-MM-DD' en horario local — para agrupar movimientos por día y para que
+// coincida con lo que devuelve un <input type="date">.
+export const dateStr = (d) => {
+  const x = new Date(d)
+  const y = x.getFullYear()
+  const m = String(x.getMonth() + 1).padStart(2, '0')
+  const day = String(x.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// 'YYYY-MM' en horario local — para agrupar por mes y para que coincida con
+// lo que devuelve un <input type="month">.
+export const monthStr = (d) => dateStr(d).slice(0, 7)
+
+export const todayStr = () => dateStr(new Date())
+
+// 'YYYY-MM' -> "Agosto 2026"
+export const fmtMonthLabel = (ym) => {
+  const [y, m] = ym.split('-').map(Number)
+  const d = new Date(y, m - 1, 1)
+  const label = d.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })
+  return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
 export const ESTADOS = ['Pendiente', 'En preparación', 'Listo', 'Entregado']

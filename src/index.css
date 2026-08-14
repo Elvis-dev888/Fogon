@@ -49,3 +49,26 @@ body {
   100% { opacity: 0; transform: translateY(-34px) scale(1.3); }
 }
 .group:hover .steam-span { animation: rise 1.8s ease-in infinite; }
+
+/* Impresión del reporte de Ingresos y egresos (pestaña Finanzas del admin):
+   al imprimir, solo se muestra el bloque #finanzas-print-area (la tabla del
+   día o del mes que esté abierta), en blanco y negro y sin lo demás de la
+   página — el resto del sitio queda oculto. */
+@media print {
+  body * { visibility: hidden; }
+  #finanzas-print-area, #finanzas-print-area * { visibility: visible; }
+  #finanzas-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 16px;
+  }
+  #finanzas-print-area, #finanzas-print-area * {
+    color: #000 !important;
+    background: #fff !important;
+    border-color: #999 !important;
+    box-shadow: none !important;
+  }
+  #finanzas-print-area .no-print { display: none !important; }
+}
