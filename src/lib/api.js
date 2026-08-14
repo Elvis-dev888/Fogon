@@ -95,12 +95,27 @@ export async function deleteCategoria(id) {
    PRODUCTOS  (adiciones se guardan como jsonb: [{nombre, precio}])
    ========================================================= */
 export async function fetchProductos(negocioId) {
-  const { data, error } = await supabase.from('productos').select('*').eq('negocio_id', negocioId).order('categoria')
+  const { data, error } = await supabase
+    .from('productos')
+    .select('*')
+    .eq('negocio_id', negocioId)
+    .order('orden', { ascending: true, nullsFirst: false })
+    .order('creado_en', { ascending: true })
   if (error) throw error
   return data
 }
 export async function createProducto(negocioId, producto) {
-  const { error } = await supabase.from('productos').insert({ negocio_id: negocioId, ...producto })
+  // Los productos nuevos van al final de su negocio, para no desordenar
+  // lo que el admin ya organizó con las flechas ▲▼.
+  const { data: ultimo } = await supabase
+    .from('productos')
+    .select('orden')
+    .eq('negocio_id', negocioId)
+    .order('orden', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle()
+  const siguienteOrden = (ultimo?.orden ?? -1) + 1
+  const { error } = await supabase.from('productos').insert({ negocio_id: negocioId, orden: siguienteOrden, ...producto })
   if (error) throw error
 }
 export async function updateProducto(id, cambios) {
@@ -110,6 +125,14 @@ export async function updateProducto(id, cambios) {
 export async function deleteProducto(id) {
   const { error } = await supabase.from('productos').delete().eq('id', id)
   if (error) throw error
+}
+// Intercambia el "orden" entre dos productos (usado por las flechas ▲▼ del panel).
+export async function reordenarProductos(pares) {
+  const resultados = await Promise.all(
+    pares.map(({ id, orden }) => supabase.from('productos').update({ orden }).eq('id', id))
+  )
+  const conError = resultados.find((r) => r.error)
+  if (conError) throw conError.error
 }
 
 // Sube la foto a Storage dentro de una carpeta con el id del negocio

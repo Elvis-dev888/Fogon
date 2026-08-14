@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
 import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, dateStr, monthStr, todayStr, sameMonth, ESTADOS, thumbFor } from '../lib/helpers'
 import {
-  createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
+  createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto, reordenarProductos,
   createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido,
   createTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso, updateCapitalInicial,
 } from '../lib/api'
@@ -67,33 +67,70 @@ export function TabDashboard({ negocio, data }) {
 
 /* ---------------- Productos ---------------- */
 export function TabProductos({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // null | 'new' | producto object
+  const [modal, setModal] = useState(null) // null | 'new' | 'new-adicion' | producto object
+
+  // Botón rápido: crea (si hace falta) la categoría "Adicionales" y abre el
+  // formulario ya listo para agregar ahí — así quedan separados de los
+  // productos principales, igual que en el menú impreso.
+  async function nuevaAdicion() {
+    const existe = data.categorias.some((c) => c.nombre.trim().toLowerCase() === 'adicionales')
+    if (!existe) {
+      await createCategoria(negocio.id, 'Adicionales')
+      await reload()
+    }
+    setModal('new-adicion')
+  }
+
+  // Sube/baja un producto intercambiando su "orden" con el vecino de arriba
+  // o de abajo DENTRO DE SU MISMA CATEGORÍA — así el orden que armes acá
+  // queda igual en el catálogo que ve el cliente.
+  async function mover(p, direccion) {
+    const mismaCategoria = data.productos.filter((x) => x.categoria === p.categoria)
+    const idx = mismaCategoria.findIndex((x) => x.id === p.id)
+    const vecino = mismaCategoria[direccion === 'up' ? idx - 1 : idx + 1]
+    if (!vecino) return
+    await reordenarProductos([{ id: p.id, orden: vecino.orden }, { id: vecino.id, orden: p.orden }])
+    reload()
+  }
 
   return (
     <div>
-      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${data.productos.length} productos.`}
-        action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>} />
+      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${data.productos.length} productos. Usa ▲▼ para fijar el orden en que se ven.`}
+        action={
+          <div className="flex gap-2">
+            <Btn variant="ghost" onClick={nuevaAdicion}>➕ Nueva adición</Btn>
+            <Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>
+          </div>
+        } />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-        {data.productos.map((p) => (
-          <ProductoCard key={p.id} p={p}
-            onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
-            onEdit={() => setModal(p)}
-            onDelete={async () => { await deleteProducto(p.id); notify('Producto eliminado'); reload() }}
-          />
-        ))}
+        {data.productos.map((p) => {
+          const mismaCategoria = data.productos.filter((x) => x.categoria === p.categoria)
+          const idx = mismaCategoria.findIndex((x) => x.id === p.id)
+          return (
+            <ProductoCard key={p.id} p={p}
+              onSubir={idx > 0 ? () => mover(p, 'up') : null}
+              onBajar={idx < mismaCategoria.length - 1 ? () => mover(p, 'down') : null}
+              onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
+              onEdit={() => setModal(p)}
+              onDelete={async () => { await deleteProducto(p.id); notify('Producto eliminado'); reload() }}
+            />
+          )
+        })}
       </div>
       {modal && (
         <ProductoModal
-          negocio={negocio} categorias={data.categorias} producto={modal === 'new' ? null : modal}
+          negocio={negocio} categorias={data.categorias}
+          producto={modal === 'new' || modal === 'new-adicion' ? null : modal}
+          categoriaInicial={modal === 'new-adicion' ? 'Adicionales' : undefined}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); notify(modal === 'new' ? 'Producto creado' : 'Producto actualizado'); reload() }}
+          onSaved={() => { setModal(null); notify(modal === 'new' || modal === 'new-adicion' ? 'Producto creado' : 'Producto actualizado'); reload() }}
         />
       )}
     </div>
   )
 }
 
-function ProductoCard({ p, onToggle, onEdit, onDelete }) {
+function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
   return (
     <div className="group border border-line rounded overflow-hidden bg-paper2 hover:border-gold transition-colors relative">
       {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotado</span>}
@@ -115,7 +152,13 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
             {p.stock === 0 ? 'Sin stock' : `Quedan ${p.stock}`}
           </div>
         )}
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap items-center">
+          <div className="flex flex-col leading-none mr-0.5">
+            <button type="button" disabled={!onSubir} onClick={onSubir} title="Subir en el orden"
+              className="text-creamsoft hover:text-gold disabled:opacity-20 disabled:hover:text-creamsoft text-[12px] px-1">▲</button>
+            <button type="button" disabled={!onBajar} onClick={onBajar} title="Bajar en el orden"
+              className="text-creamsoft hover:text-gold disabled:opacity-20 disabled:hover:text-creamsoft text-[12px] px-1">▼</button>
+          </div>
           <Btn size="sm" variant="ghost" onClick={onToggle}>{p.disponible ? 'Marcar agotado' : 'Reactivar'}</Btn>
           <Btn size="sm" variant="ghost" onClick={onEdit}>Editar</Btn>
           <Btn size="sm" variant="danger" onClick={onDelete}>Eliminar</Btn>
@@ -125,9 +168,9 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
   )
 }
 
-function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
+function ProductoModal({ negocio, categorias, producto, categoriaInicial, onClose, onSaved }) {
   const [nombre, setNombre] = useState(producto?.nombre || '')
-  const [categoria, setCategoria] = useState(producto?.categoria || categorias[0]?.nombre || '')
+  const [categoria, setCategoria] = useState(producto?.categoria || categoriaInicial || categorias[0]?.nombre || '')
   const [precio, setPrecio] = useState(producto?.precio || '')
   const [desc, setDesc] = useState(producto?.desc || '')
   const [emoji, setEmoji] = useState(producto?.emoji || '🍽️')
