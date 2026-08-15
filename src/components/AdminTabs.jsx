@@ -67,13 +67,16 @@ export function TabDashboard({ negocio, data }) {
 
 /* ---------------- Productos ---------------- */
 export function TabProductos({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // null | 'new' | producto object
+  const [modal, setModal] = useState(null) // null | 'new' | 'new-adicion' | producto object
 
-  // Se agrupan por categoría para que "subir/bajar" mueva el producto dentro
-  // de su propia categoría (así "las arepas siempre quedan en ese orden",
-  // sin que se les mezcle con hamburguesas o bebidas).
+  // Las adiciones (es_adicion=true) no son platos del menú — no se muestran
+  // en el catálogo con categorías, sino en su propia lista, y luego el
+  // cliente puede sumarlas a cualquier otro producto que esté pidiendo.
+  const menuProductos = data.productos.filter((p) => !p.es_adicion)
+  const adiciones = data.productos.filter((p) => p.es_adicion)
+
   const porCategoria = {}
-  data.productos.forEach((p) => {
+  menuProductos.forEach((p) => {
     if (!porCategoria[p.categoria]) porCategoria[p.categoria] = []
     porCategoria[p.categoria].push(p)
   })
@@ -89,7 +92,7 @@ export function TabProductos({ negocio, data, reload, notify }) {
 
   return (
     <div>
-      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${data.productos.length} productos.`}
+      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${menuProductos.length} productos.`}
         action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>} />
       {Object.entries(porCategoria).map(([categoria, lista]) => (
         <div key={categoria} className="mb-7">
@@ -107,11 +110,52 @@ export function TabProductos({ negocio, data, reload, notify }) {
           </div>
         </div>
       ))}
+
+      <div className="mb-2">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-serif text-base font-semibold text-gold">Adiciones</h3>
+            <p className="text-creamsoft text-[12px] mt-0.5">Opciones extra que el cliente puede sumarle a cualquier producto — ej: una gaseosa, doble carne, una bolita más.</p>
+          </div>
+          <Btn size="sm" variant="mustard" onClick={() => setModal('new-adicion')}>➕ Nueva adición</Btn>
+        </div>
+        <Card className="p-0 overflow-hidden">
+          {adiciones.length === 0 ? (
+            <div className="p-5"><Empty icon="➕">Aún no tienes adiciones creadas.</Empty></div>
+          ) : (
+            <div className="divide-y divide-line">
+              {adiciones.map((a) => (
+                <div key={a.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-lg">{a.imagen_url ? <img src={a.imagen_url} alt="" className="w-6 h-6 rounded object-cover inline-block align-middle" /> : a.emoji}</span>
+                    <span className="text-[13.5px]">{a.nombre}</span>
+                    {!a.disponible && <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotada</span>}
+                  </div>
+                  <div className="flex items-center gap-3.5">
+                    <span className="font-mono text-champagne text-[13px]">{fmt$(a.precio)}</span>
+                    <button onClick={async () => { await updateProducto(a.id, { disponible: !a.disponible }); reload() }} className="text-[11.5px] text-creamsoft hover:text-gold">
+                      {a.disponible ? 'Desactivar' : 'Activar'}
+                    </button>
+                    <button onClick={() => setModal(a)} className="text-[11.5px] text-creamsoft hover:text-gold">Editar</button>
+                    <button onClick={async () => { await deleteProducto(a.id); notify('Adición eliminada'); reload() }} className="text-wine font-bold text-[13px]">✕</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+
       {modal && (
         <ProductoModal
-          negocio={negocio} categorias={data.categorias} producto={modal === 'new' ? null : modal}
+          negocio={negocio} categorias={data.categorias}
+          producto={modal === 'new' || modal === 'new-adicion' ? null : modal}
+          modoAdicionInicial={modal === 'new-adicion'}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); notify(modal === 'new' ? 'Producto creado' : 'Producto actualizado'); reload() }}
+          onSaved={() => {
+            const msg = modal === 'new' ? 'Producto creado' : modal === 'new-adicion' ? 'Adición creada' : 'Cambios guardados'
+            setModal(null); notify(msg); reload()
+          }}
         />
       )}
     </div>
@@ -156,12 +200,13 @@ function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
   )
 }
 
-function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
+function ProductoModal({ negocio, categorias, producto, modoAdicionInicial, onClose, onSaved }) {
+  const esAdicion = producto ? producto.es_adicion : !!modoAdicionInicial
   const [nombre, setNombre] = useState(producto?.nombre || '')
   const [categoria, setCategoria] = useState(producto?.categoria || categorias[0]?.nombre || '')
   const [precio, setPrecio] = useState(producto?.precio || '')
   const [desc, setDesc] = useState(producto?.desc || '')
-  const [emoji, setEmoji] = useState(producto?.emoji || '🍽️')
+  const [emoji, setEmoji] = useState(producto?.emoji || (esAdicion ? '➕' : '🍽️'))
   const [stock, setStock] = useState(producto?.stock ?? '')
   const [imagenUrl, setImagenUrl] = useState(producto?.imagen_url || '')
   const [archivo, setArchivo] = useState(null)
@@ -197,11 +242,15 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
         urlFinal = await subirFotoProducto(negocio.id, archivo)
         setSubiendo(false)
       }
-      // Solo se guardan las adiciones que sí tienen nombre (evita filas vacías a medio llenar).
-      const adicionesFinal = adiciones
-        .filter((a) => a.nombre.trim() !== '')
-        .map((a) => ({ nombre: a.nombre.trim(), precio: parseFloat(a.precio) || 0 }))
-      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null, stock: stock === '' ? null : parseInt(stock, 10), adiciones: adicionesFinal }
+      const payload = esAdicion
+        ? { nombre, categoria: 'Adiciones', precio: parseFloat(precio) || 0, desc: '', emoji, imagen_url: urlFinal || null, stock: null, adiciones: [], es_adicion: true }
+        : {
+            nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null,
+            stock: stock === '' ? null : parseInt(stock, 10),
+            // Solo se guardan las adiciones que sí tienen nombre (evita filas vacías a medio llenar).
+            adiciones: adiciones.filter((a) => a.nombre.trim() !== '').map((a) => ({ nombre: a.nombre.trim(), precio: parseFloat(a.precio) || 0 })),
+            es_adicion: false,
+          }
       if (producto) await updateProducto(producto.id, payload)
       else await createProducto(negocio.id, { ...payload, disponible: true })
       onSaved()
@@ -212,9 +261,11 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{producto ? 'Editar producto' : 'Nuevo producto'}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">
+        {esAdicion ? (producto ? 'Editar adición' : 'Nueva adición') : (producto ? 'Editar producto' : 'Nuevo producto')}
+      </h2>
       <form onSubmit={submit}>
-        <Field label="Foto del producto (opcional)">
+        <Field label={esAdicion ? 'Foto (opcional)' : 'Foto del producto (opcional)'}>
           <div className="flex items-center gap-3">
             <div className="w-16 h-16 rounded border border-line overflow-hidden flex items-center justify-center text-2xl bg-paper shrink-0">
               {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : emoji}
@@ -225,37 +276,50 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
             </label>
           </div>
         </Field>
-        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Categoría">
-            <Select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-              {categorias.map((c) => <option key={c.id}>{c.nombre}</option>)}
-            </Select>
-          </Field>
-          <Field label="Precio (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
-        </div>
-        <Field label="Descripción"><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
-        <Field label="Emoji / ícono (se usa si no hay foto)"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
-        <Field label="Stock (cantidad disponible — déjalo vacío para no controlar cantidad)">
-          <Input type="number" min="0" placeholder="Sin límite" value={stock} onChange={(e) => setStock(e.target.value)} />
-        </Field>
+        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={esAdicion ? 'Ej: Bolita de helado extra' : ''} /></Field>
 
-        <Field label="Adiciones (opcional — ej: una bolita de helado extra, doble carne, etc.)">
-          {adiciones.length === 0 && (
-            <p className="text-creamsoft text-[12px] mb-2">Este producto no tiene adiciones todavía. El cliente solo verá esta opción si agregas al menos una.</p>
-          )}
-          {adiciones.map((a, i) => (
-            <div key={i} className="flex gap-2 items-center mb-2">
-              <Input placeholder="Nombre — ej: bolita extra" value={a.nombre} onChange={(e) => editAdicion(i, 'nombre', e.target.value)} className="flex-[2]" />
-              <Input placeholder="Precio" type="number" value={a.precio} onChange={(e) => editAdicion(i, 'precio', e.target.value)} className="flex-1" />
-              <button type="button" onClick={() => removeAdicion(i)} className="text-wine font-bold px-1.5 shrink-0">✕</button>
+        {esAdicion ? (
+          <Field label="Precio (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Categoría">
+                <Select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+                  {categorias.map((c) => <option key={c.id}>{c.nombre}</option>)}
+                </Select>
+              </Field>
+              <Field label="Precio (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
             </div>
-          ))}
-          <Btn type="button" size="sm" variant="ghost" onClick={addAdicion}>➕ Agregar adición</Btn>
-        </Field>
+            <Field label="Descripción"><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
+          </>
+        )}
+
+        <Field label="Emoji / ícono (se usa si no hay foto)"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
+
+        {!esAdicion && (
+          <>
+            <Field label="Stock (cantidad disponible — déjalo vacío para no controlar cantidad)">
+              <Input type="number" min="0" placeholder="Sin límite" value={stock} onChange={(e) => setStock(e.target.value)} />
+            </Field>
+
+            <Field label="Adiciones propias de este producto (opcional — además de las adiciones generales del negocio)">
+              {adiciones.length === 0 && (
+                <p className="text-creamsoft text-[12px] mb-2">Este producto no tiene adiciones propias. Igual el cliente va a ver las adiciones generales del negocio, si tienes alguna creada.</p>
+              )}
+              {adiciones.map((a, i) => (
+                <div key={i} className="flex gap-2 items-center mb-2">
+                  <Input placeholder="Nombre — ej: bolita extra" value={a.nombre} onChange={(e) => editAdicion(i, 'nombre', e.target.value)} className="flex-[2]" />
+                  <Input placeholder="Precio" type="number" value={a.precio} onChange={(e) => editAdicion(i, 'precio', e.target.value)} className="flex-1" />
+                  <button type="button" onClick={() => removeAdicion(i)} className="text-wine font-bold px-1.5 shrink-0">✕</button>
+                </div>
+              ))}
+              <Btn type="button" size="sm" variant="ghost" onClick={addAdicion}>➕ Agregar adición propia</Btn>
+            </Field>
+          </>
+        )}
 
         <Btn variant="primary" className="w-full justify-center mt-1" disabled={saving}>
-          {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear producto'}
+          {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : esAdicion ? 'Crear adición' : 'Crear producto'}
         </Btn>
       </form>
     </Modal>

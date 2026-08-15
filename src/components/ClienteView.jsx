@@ -25,7 +25,9 @@ export default function ClienteView({ negocio, onExit, notify }) {
 
   if (pedido) return <Tracking negocio={negocio} pedido={pedido} onNuevo={() => { setPedido(null); setCart([]) }} />
 
-  const prods = catActiva === 'Todas' ? productos : productos.filter((p) => p.categoria === catActiva)
+  const catalogo = productos.filter((p) => !p.es_adicion)
+  const adicionesGlobales = productos.filter((p) => p.es_adicion && p.disponible)
+  const prods = catActiva === 'Todas' ? catalogo : catalogo.filter((p) => p.categoria === catActiva)
 
   return (
     <div>
@@ -75,7 +77,7 @@ export default function ClienteView({ negocio, onExit, notify }) {
       )}
 
       {detalle && (
-        <ProductoDetalleModal producto={detalle} onClose={() => setDetalle(null)}
+        <ProductoDetalleModal producto={detalle} adicionesGlobales={adicionesGlobales} onClose={() => setDetalle(null)}
           onAdd={(item) => { setCart((c) => [...c, item]); setDetalle(null); notify(`${detalle.nombre} agregado al pedido`) }} />
       )}
 
@@ -88,12 +90,20 @@ export default function ClienteView({ negocio, onExit, notify }) {
   )
 }
 
-function ProductoDetalleModal({ producto, onClose, onAdd }) {
+function ProductoDetalleModal({ producto, adicionesGlobales, onClose, onAdd }) {
+  // Se combinan las adiciones propias de este producto (las que el admin le
+  // puso solo a él) con las adiciones generales del negocio (bebidas, extras
+  // que aplican a cualquier plato) — el cliente las ve todas juntas, en una
+  // sola lista, sin necesidad de saber cuál es cuál.
+  const opciones = [
+    ...(producto.adiciones || []).map((a) => ({ nombre: a.nombre, precio: a.precio })),
+    ...(adicionesGlobales || []).map((p) => ({ nombre: p.nombre, precio: p.precio })),
+  ]
   const [selected, setSelected] = useState(new Set())
   const [qty, setQty] = useState(1)
   const [obs, setObs] = useState('')
 
-  const adTotal = [...selected].reduce((a, i) => a + producto.adiciones[i].precio, 0)
+  const adTotal = [...selected].reduce((a, i) => a + opciones[i].precio, 0)
   const total = (producto.precio + adTotal) * qty
 
   function toggle(i) {
@@ -110,7 +120,7 @@ function ProductoDetalleModal({ producto, onClose, onAdd }) {
       productId: producto.id,
       nombre: producto.nombre,
       cantidad: qty,
-      adiciones: [...selected].map((i) => producto.adiciones[i].nombre),
+      adiciones: [...selected].map((i) => opciones[i].nombre),
       obs: obs.trim(),
       subtotal: total,
     })
@@ -125,14 +135,20 @@ function ProductoDetalleModal({ producto, onClose, onAdd }) {
       <p className="text-creamsoft text-center text-sm mb-3.5">{producto.desc}</p>
       <p className="font-mono font-bold text-gold text-center text-lg mb-4">{fmt$(producto.precio)}</p>
       <form onSubmit={submit}>
-        {producto.adiciones?.length > 0 && (
+        {opciones.length > 0 && (
           <Field label="Adiciones">
-            <div className="flex flex-wrap gap-2">
-              {producto.adiciones.map((a, i) => (
-                <button type="button" key={i} onClick={() => toggle(i)}
-                  className={`px-3 py-1.5 rounded-full border text-[12px] font-semibold ${selected.has(i) ? 'bg-gold/15 border-gold text-gold' : 'border-line text-creamsoft'}`}>
-                  {a.nombre} (+{fmt$(a.precio)})
-                </button>
+            <div className="border border-line rounded-sm divide-y divide-line">
+              {opciones.map((a, i) => (
+                <label key={i} className="flex items-center justify-between px-3 py-2.5 cursor-pointer">
+                  <span className="flex items-center gap-2.5 text-[13.5px]">
+                    <span className={`w-4 h-4 rounded-sm border flex items-center justify-center text-[10px] shrink-0 ${selected.has(i) ? 'bg-gold border-gold text-paper' : 'border-creamsoft'}`}>
+                      {selected.has(i) ? '✓' : ''}
+                    </span>
+                    {a.nombre}
+                  </span>
+                  <span className="font-mono text-champagne text-[12.5px]">+ {fmt$(a.precio)}</span>
+                  <input type="checkbox" className="hidden" checked={selected.has(i)} onChange={() => toggle(i)} />
+                </label>
               ))}
             </div>
           </Field>
