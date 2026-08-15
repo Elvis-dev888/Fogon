@@ -67,63 +67,51 @@ export function TabDashboard({ negocio, data }) {
 
 /* ---------------- Productos ---------------- */
 export function TabProductos({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // null | 'new' | 'new-adicion' | producto object
+  const [modal, setModal] = useState(null) // null | 'new' | producto object
 
-  // Botón rápido: crea (si hace falta) la categoría "Adicionales" y abre el
-  // formulario ya listo para agregar ahí — así quedan separados de los
-  // productos principales, igual que en el menú impreso.
-  async function nuevaAdicion() {
-    const existe = data.categorias.some((c) => c.nombre.trim().toLowerCase() === 'adicionales')
-    if (!existe) {
-      await createCategoria(negocio.id, 'Adicionales')
-      await reload()
-    }
-    setModal('new-adicion')
-  }
+  // Se agrupan por categoría para que "subir/bajar" mueva el producto dentro
+  // de su propia categoría (así "las arepas siempre quedan en ese orden",
+  // sin que se les mezcle con hamburguesas o bebidas).
+  const porCategoria = {}
+  data.productos.forEach((p) => {
+    if (!porCategoria[p.categoria]) porCategoria[p.categoria] = []
+    porCategoria[p.categoria].push(p)
+  })
 
-  // Sube/baja un producto intercambiando su "orden" con el vecino de arriba
-  // o de abajo DENTRO DE SU MISMA CATEGORÍA — así el orden que armes acá
-  // queda igual en el catálogo que ve el cliente.
-  async function mover(p, direccion) {
-    const mismaCategoria = data.productos.filter((x) => x.categoria === p.categoria)
-    const idx = mismaCategoria.findIndex((x) => x.id === p.id)
-    const vecino = mismaCategoria[direccion === 'up' ? idx - 1 : idx + 1]
-    if (!vecino) return
-    await reordenarProductos([{ id: p.id, orden: vecino.orden }, { id: vecino.id, orden: p.orden }])
+  async function mover(lista, index, direccion) {
+    const otro = index + direccion
+    if (otro < 0 || otro >= lista.length) return
+    const a = lista[index]
+    const b = lista[otro]
+    await reordenarProductos([{ id: a.id, orden: b.orden }, { id: b.id, orden: a.orden }])
     reload()
   }
 
   return (
     <div>
-      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${data.productos.length} productos. Usa ▲▼ para fijar el orden en que se ven.`}
-        action={
-          <div className="flex gap-2">
-            <Btn variant="ghost" onClick={nuevaAdicion}>➕ Nueva adición</Btn>
-            <Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>
+      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${data.productos.length} productos.`}
+        action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>} />
+      {Object.entries(porCategoria).map(([categoria, lista]) => (
+        <div key={categoria} className="mb-7">
+          <h3 className="font-serif text-base font-semibold text-gold mb-3">{categoria}</h3>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+            {lista.map((p, i) => (
+              <ProductoCard key={p.id} p={p}
+                onSubir={i > 0 ? () => mover(lista, i, -1) : null}
+                onBajar={i < lista.length - 1 ? () => mover(lista, i, 1) : null}
+                onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
+                onEdit={() => setModal(p)}
+                onDelete={async () => { await deleteProducto(p.id); notify('Producto eliminado'); reload() }}
+              />
+            ))}
           </div>
-        } />
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-        {data.productos.map((p) => {
-          const mismaCategoria = data.productos.filter((x) => x.categoria === p.categoria)
-          const idx = mismaCategoria.findIndex((x) => x.id === p.id)
-          return (
-            <ProductoCard key={p.id} p={p}
-              onSubir={idx > 0 ? () => mover(p, 'up') : null}
-              onBajar={idx < mismaCategoria.length - 1 ? () => mover(p, 'down') : null}
-              onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
-              onEdit={() => setModal(p)}
-              onDelete={async () => { await deleteProducto(p.id); notify('Producto eliminado'); reload() }}
-            />
-          )
-        })}
-      </div>
+        </div>
+      ))}
       {modal && (
         <ProductoModal
-          negocio={negocio} categorias={data.categorias}
-          producto={modal === 'new' || modal === 'new-adicion' ? null : modal}
-          categoriaInicial={modal === 'new-adicion' ? 'Adicionales' : undefined}
+          negocio={negocio} categorias={data.categorias} producto={modal === 'new' ? null : modal}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); notify(modal === 'new' || modal === 'new-adicion' ? 'Producto creado' : 'Producto actualizado'); reload() }}
+          onSaved={() => { setModal(null); notify(modal === 'new' ? 'Producto creado' : 'Producto actualizado'); reload() }}
         />
       )}
     </div>
@@ -139,6 +127,12 @@ function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
         <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none">
           <span className="steam-span absolute bottom-[70%] left-[45%] w-[5px] h-5 rounded-full bg-cream/40 blur-[3px] opacity-0" />
         </div>
+        <div className="absolute top-2 left-2 flex flex-col gap-1">
+          <button onClick={onSubir} disabled={!onSubir} title="Subir en el orden"
+            className={`w-6 h-6 rounded-full grid place-items-center text-xs font-bold ${onSubir ? 'bg-paper/90 text-cream hover:bg-gold hover:text-paper cursor-pointer' : 'bg-paper/40 text-creamsoft/40 cursor-not-allowed'}`}>▲</button>
+          <button onClick={onBajar} disabled={!onBajar} title="Bajar en el orden"
+            className={`w-6 h-6 rounded-full grid place-items-center text-xs font-bold ${onBajar ? 'bg-paper/90 text-cream hover:bg-gold hover:text-paper cursor-pointer' : 'bg-paper/40 text-creamsoft/40 cursor-not-allowed'}`}>▼</button>
+        </div>
       </div>
       <div className="p-3.5">
         <span className="text-[10.5px] text-creamsoft font-semibold uppercase tracking-wide">{p.categoria}</span>
@@ -152,13 +146,7 @@ function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
             {p.stock === 0 ? 'Sin stock' : `Quedan ${p.stock}`}
           </div>
         )}
-        <div className="flex gap-1.5 flex-wrap items-center">
-          <div className="flex flex-col leading-none mr-0.5">
-            <button type="button" disabled={!onSubir} onClick={onSubir} title="Subir en el orden"
-              className="text-creamsoft hover:text-gold disabled:opacity-20 disabled:hover:text-creamsoft text-[12px] px-1">▲</button>
-            <button type="button" disabled={!onBajar} onClick={onBajar} title="Bajar en el orden"
-              className="text-creamsoft hover:text-gold disabled:opacity-20 disabled:hover:text-creamsoft text-[12px] px-1">▼</button>
-          </div>
+        <div className="flex gap-1.5 flex-wrap">
           <Btn size="sm" variant="ghost" onClick={onToggle}>{p.disponible ? 'Marcar agotado' : 'Reactivar'}</Btn>
           <Btn size="sm" variant="ghost" onClick={onEdit}>Editar</Btn>
           <Btn size="sm" variant="danger" onClick={onDelete}>Eliminar</Btn>
@@ -168,9 +156,9 @@ function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
   )
 }
 
-function ProductoModal({ negocio, categorias, producto, categoriaInicial, onClose, onSaved }) {
+function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
   const [nombre, setNombre] = useState(producto?.nombre || '')
-  const [categoria, setCategoria] = useState(producto?.categoria || categoriaInicial || categorias[0]?.nombre || '')
+  const [categoria, setCategoria] = useState(producto?.categoria || categorias[0]?.nombre || '')
   const [precio, setPrecio] = useState(producto?.precio || '')
   const [desc, setDesc] = useState(producto?.desc || '')
   const [emoji, setEmoji] = useState(producto?.emoji || '🍽️')
@@ -320,18 +308,30 @@ export function TabInventario({ negocio, data, reload, notify }) {
   const [modal, setModal] = useState(false)
   const [ajuste, setAjuste] = useState(null)
 
+  const valorTotal = data.ingredientes.reduce((a, i) => a + i.stock * (i.costo_unitario || 0), 0)
+  const bajos = data.ingredientes.filter((i) => i.stock <= i.minimo && i.stock > 0).length
+  const agotados = data.ingredientes.filter((i) => i.stock === 0).length
+
   return (
     <div>
       <SectionTitle title="Inventario" sub="Existencias de ingredientes y materias primas."
         action={<Btn variant="primary" onClick={() => setModal(true)}>➕ Nuevo ingrediente</Btn>} />
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-5">
+        <StatCard label="Valor del inventario" value={fmt$(valorTotal)} tone="gold" />
+        <StatCard label="Ingredientes registrados" value={data.ingredientes.length} />
+        <StatCard label="Con stock bajo" value={bajos} tone="champagne" />
+        <StatCard label="Agotados" value={agotados} />
+      </div>
       <Card className="p-5">
         <Table
-          head={['Ingrediente', 'Existencias', 'Mínimo', 'Estado', '']}
+          head={['Ingrediente', 'Existencias', 'Mínimo', 'Costo unitario', 'Valor en stock', 'Estado', '']}
           rows={data.ingredientes.map((i) => [
             <b>{i.nombre}</b>,
             <span className="font-mono">{i.stock} {i.unidad}</span>,
             <span className="font-mono">{i.minimo} {i.unidad}</span>,
-            i.stock <= i.minimo ? <Pill tone="pausado">Bajo</Pill> : <Pill tone="listo">OK</Pill>,
+            <span className="font-mono">{i.costo_unitario ? fmt$(i.costo_unitario) : '—'}</span>,
+            <span className="font-mono">{fmt$(i.stock * (i.costo_unitario || 0))}</span>,
+            i.stock === 0 ? <Pill tone="pausado">Agotado</Pill> : i.stock <= i.minimo ? <Pill tone="pausado">Bajo</Pill> : <Pill tone="listo">OK</Pill>,
             <Btn size="sm" variant="ghost" onClick={() => setAjuste(i)}>Ajustar</Btn>,
           ])}
         />
@@ -352,9 +352,13 @@ function IngredienteModal({ negocio, onClose, onSaved }) {
   const [unidad, setUnidad] = useState('kg')
   const [stock, setStock] = useState(0)
   const [minimo, setMinimo] = useState(1)
+  const [costoUnitario, setCostoUnitario] = useState('')
   async function submit(e) {
     e.preventDefault()
-    await createIngrediente(negocio.id, { nombre, unidad, stock: parseFloat(stock) || 0, minimo: parseFloat(minimo) || 0 })
+    await createIngrediente(negocio.id, {
+      nombre, unidad, stock: parseFloat(stock) || 0, minimo: parseFloat(minimo) || 0,
+      costo_unitario: parseFloat(costoUnitario) || 0,
+    })
     onSaved()
   }
   return (
@@ -370,7 +374,11 @@ function IngredienteModal({ negocio, onClose, onSaved }) {
           </Field>
           <Field label="Existencias iniciales"><Input required type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
         </div>
-        <Field label="Nivel mínimo (alerta de reposición)"><Input required type="number" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Nivel mínimo (alerta de reposición)"><Input required type="number" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
+          <Field label="Costo por unidad (opcional — ej: $ por kg)"><Input type="number" placeholder="$0" value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} /></Field>
+        </div>
+        <p className="text-creamsoft text-[12px] -mt-2 mb-3">Si no lo sabes con exactitud, déjalo en 0 — se va a ajustar solo con la primera compra que registres de este ingrediente.</p>
         <Btn variant="primary" className="w-full justify-center">Guardar ingrediente</Btn>
       </form>
     </Modal>
@@ -428,7 +436,7 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
   async function submit(e) {
     e.preventDefault()
     const ing = ingredientes.find((i) => i.id === ingId)
-    await registrarCompra(negocio.id, { ingredienteId: ingId, cantidad: parseFloat(cantidad) || 0, valor: parseFloat(valor) || 0 }, ing.stock)
+    await registrarCompra(negocio.id, { ingredienteId: ingId, cantidad: parseFloat(cantidad) || 0, valor: parseFloat(valor) || 0 }, ing)
     onSaved()
   }
   return (

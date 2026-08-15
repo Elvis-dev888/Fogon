@@ -95,12 +95,23 @@ export async function deleteCategoria(id) {
    PRODUCTOS  (adiciones se guardan como jsonb: [{nombre, precio}])
    ========================================================= */
 export async function fetchProductos(negocioId) {
-  const { data, error } = await supabase.from('productos').select('*').eq('negocio_id', negocioId).order('categoria')
+  const { data, error } = await supabase.from('productos').select('*').eq('negocio_id', negocioId).order('categoria').order('orden')
   if (error) throw error
   return data
 }
 export async function createProducto(negocioId, producto) {
-  const { error } = await supabase.from('productos').insert({ negocio_id: negocioId, ...producto })
+  // Nuevo producto entra siempre al final de su categoría (no en 0, para no
+  // desordenar los que ya tenían un lugar fijo).
+  const { data: existentes, error: e0 } = await supabase
+    .from('productos')
+    .select('orden')
+    .eq('negocio_id', negocioId)
+    .eq('categoria', producto.categoria)
+    .order('orden', { ascending: false })
+    .limit(1)
+  if (e0) throw e0
+  const siguienteOrden = existentes?.length ? existentes[0].orden + 1 : 0
+  const { error } = await supabase.from('productos').insert({ negocio_id: negocioId, ...producto, orden: siguienteOrden })
   if (error) throw error
 }
 export async function updateProducto(id, cambios) {
@@ -110,6 +121,19 @@ export async function updateProducto(id, cambios) {
 export async function deleteProducto(id) {
   const { error } = await supabase.from('productos').delete().eq('id', id)
   if (error) throw error
+}
+
+// productos: [{id, orden}, ...] — intercambia el campo "orden" entre dos (o
+// más) productos de una sola vez. Se usa desde los botones subir/bajar del
+// panel de Productos, para que el dueño fije el orden en que quiere que
+// aparezcan (ej: que las arepas siempre queden en el mismo orden del menú
+// físico), en vez de que salgan ordenadas alfabéticamente o por fecha.
+export async function reordenarProductos(productos) {
+  const resultados = await Promise.all(
+    productos.map((p) => supabase.from('productos').update({ orden: p.orden }).eq('id', p.id))
+  )
+  const conError = resultados.find((r) => r.error)
+  if (conError) throw conError.error
 }
 
 // Sube la foto a Storage dentro de una carpeta con el id del negocio
