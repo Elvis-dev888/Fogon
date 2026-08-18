@@ -1,13 +1,77 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
-import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, dateStr, monthStr, todayStr, sameMonth, ESTADOS, thumbFor } from '../lib/helpers'
+import { fmt$, fmtDate, sameMonth, ESTADOS, thumbFor } from '../lib/helpers'
 import {
-  createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto, reordenarProductos,
+  createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
   createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido,
-  createTrabajador, updateTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso, updateCapitalInicial,
+  createTrabajador, updateTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso,
+  updateNegocio, subirLogoNegocio,
 } from '../lib/api'
 
 const estadoTone = (e) => (e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : 'entregado')
+
+/* ---------------- Mi negocio (logo + datos básicos) ---------------- */
+export function TabMiNegocio({ negocio, notify, onNegocioActualizado }) {
+  const [nombre, setNombre] = useState(negocio.nombre || '')
+  const [slogan, setSlogan] = useState(negocio.slogan || '')
+  const [descripcion, setDescripcion] = useState(negocio.descripcion || '')
+  const [preview, setPreview] = useState(negocio.logo_url || null)
+  const [archivo, setArchivo] = useState(null)
+  const [guardando, setGuardando] = useState(false)
+  const [subiendo, setSubiendo] = useState(false)
+
+  function onPickFile(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setArchivo(file)
+    setPreview(URL.createObjectURL(file))
+  }
+
+  async function guardar(e) {
+    e.preventDefault()
+    setGuardando(true)
+    try {
+      let logoUrl = negocio.logo_url
+      if (archivo) {
+        setSubiendo(true)
+        logoUrl = await subirLogoNegocio(negocio.id, archivo)
+        setSubiendo(false)
+      }
+      await updateNegocio(negocio.id, { nombre, slogan, descripcion, logo_url: logoUrl })
+      notify('Datos del negocio actualizados')
+      if (onNegocioActualizado) await onNegocioActualizado()
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div>
+      <SectionTitle title="Mi negocio" sub="El logo y los datos que ven tus clientes en el catálogo." />
+      <Card className="p-6 max-w-[520px]">
+        <form onSubmit={guardar}>
+          <Field label="Logo del negocio">
+            <div className="flex items-center gap-4">
+              <div className="w-20 h-20 rounded-full border border-line overflow-hidden flex items-center justify-center text-3xl bg-paper shrink-0">
+                {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : negocio.emoji}
+              </div>
+              <label className="text-[12.5px] text-gold cursor-pointer hover:text-champagne">
+                {preview ? 'Cambiar logo' : 'Subir logo'}
+                <input type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+              </label>
+            </div>
+          </Field>
+          <Field label="Nombre del negocio"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
+          <Field label="Eslogan"><Input value={slogan} onChange={(e) => setSlogan(e.target.value)} /></Field>
+          <Field label="Descripción"><Textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></Field>
+          <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
+            {subiendo ? 'Subiendo logo…' : guardando ? 'Guardando…' : 'Guardar cambios'}
+          </Btn>
+        </form>
+      </Card>
+    </div>
+  )
+}
 
 /* ---------------- Dashboard ---------------- */
 export function TabDashboard({ negocio, data }) {
@@ -67,102 +131,33 @@ export function TabDashboard({ negocio, data }) {
 
 /* ---------------- Productos ---------------- */
 export function TabProductos({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // null | 'new' | 'new-adicion' | producto object
-
-  // Las adiciones (es_adicion=true) no son platos del menú — no se muestran
-  // en el catálogo con categorías, sino en su propia lista, y luego el
-  // cliente puede sumarlas a cualquier otro producto que esté pidiendo.
-  const menuProductos = data.productos.filter((p) => !p.es_adicion)
-  const adiciones = data.productos.filter((p) => p.es_adicion)
-
-  const porCategoria = {}
-  menuProductos.forEach((p) => {
-    if (!porCategoria[p.categoria]) porCategoria[p.categoria] = []
-    porCategoria[p.categoria].push(p)
-  })
-
-  async function mover(lista, index, direccion) {
-    const otro = index + direccion
-    if (otro < 0 || otro >= lista.length) return
-    const a = lista[index]
-    const b = lista[otro]
-    await reordenarProductos([{ id: a.id, orden: b.orden }, { id: b.id, orden: a.orden }])
-    reload()
-  }
+  const [modal, setModal] = useState(null) // null | 'new' | producto object
 
   return (
     <div>
-      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${menuProductos.length} productos.`}
+      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${data.productos.length} productos.`}
         action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>} />
-      {Object.entries(porCategoria).map(([categoria, lista]) => (
-        <div key={categoria} className="mb-7">
-          <h3 className="font-serif text-base font-semibold text-gold mb-3">{categoria}</h3>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-            {lista.map((p, i) => (
-              <ProductoCard key={p.id} p={p}
-                onSubir={i > 0 ? () => mover(lista, i, -1) : null}
-                onBajar={i < lista.length - 1 ? () => mover(lista, i, 1) : null}
-                onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
-                onEdit={() => setModal(p)}
-                onDelete={async () => { await deleteProducto(p.id); notify('Producto eliminado'); reload() }}
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      <div className="mb-2">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="font-serif text-base font-semibold text-gold">Adiciones</h3>
-            <p className="text-creamsoft text-[12px] mt-0.5">Opciones extra que el cliente puede sumarle a cualquier producto — ej: una gaseosa, doble carne, una bolita más.</p>
-          </div>
-          <Btn size="sm" variant="mustard" onClick={() => setModal('new-adicion')}>➕ Nueva adición</Btn>
-        </div>
-        <Card className="p-0 overflow-hidden">
-          {adiciones.length === 0 ? (
-            <div className="p-5"><Empty icon="➕">Aún no tienes adiciones creadas.</Empty></div>
-          ) : (
-            <div className="divide-y divide-line">
-              {adiciones.map((a) => (
-                <div key={a.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-lg">{a.imagen_url ? <img src={a.imagen_url} alt="" className="w-6 h-6 rounded object-cover inline-block align-middle" /> : a.emoji}</span>
-                    <span className="text-[13.5px]">{a.nombre}</span>
-                    {!a.disponible && <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotada</span>}
-                  </div>
-                  <div className="flex items-center gap-3.5">
-                    <span className="font-mono text-champagne text-[13px]">{fmt$(a.precio)}</span>
-                    <button onClick={async () => { await updateProducto(a.id, { disponible: !a.disponible }); reload() }} className="text-[11.5px] text-creamsoft hover:text-gold">
-                      {a.disponible ? 'Desactivar' : 'Activar'}
-                    </button>
-                    <button onClick={() => setModal(a)} className="text-[11.5px] text-creamsoft hover:text-gold">Editar</button>
-                    <button onClick={async () => { await deleteProducto(a.id); notify('Adición eliminada'); reload() }} className="text-wine font-bold text-[13px]">✕</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+        {data.productos.map((p) => (
+          <ProductoCard key={p.id} p={p}
+            onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
+            onEdit={() => setModal(p)}
+            onDelete={async () => { await deleteProducto(p.id); notify('Producto eliminado'); reload() }}
+          />
+        ))}
       </div>
-
       {modal && (
         <ProductoModal
-          negocio={negocio} categorias={data.categorias}
-          producto={modal === 'new' || modal === 'new-adicion' ? null : modal}
-          modoAdicionInicial={modal === 'new-adicion'}
+          negocio={negocio} categorias={data.categorias} producto={modal === 'new' ? null : modal}
           onClose={() => setModal(null)}
-          onSaved={() => {
-            const msg = modal === 'new' ? 'Producto creado' : modal === 'new-adicion' ? 'Adición creada' : 'Cambios guardados'
-            setModal(null); notify(msg); reload()
-          }}
+          onSaved={() => { setModal(null); notify(modal === 'new' ? 'Producto creado' : 'Producto actualizado'); reload() }}
         />
       )}
     </div>
   )
 }
 
-function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
+function ProductoCard({ p, onToggle, onEdit, onDelete }) {
   return (
     <div className="group border border-line rounded overflow-hidden bg-paper2 hover:border-gold transition-colors relative">
       {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotado</span>}
@@ -171,20 +166,11 @@ function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
         <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none">
           <span className="steam-span absolute bottom-[70%] left-[45%] w-[5px] h-5 rounded-full bg-cream/40 blur-[3px] opacity-0" />
         </div>
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
-          <button onClick={onSubir} disabled={!onSubir} title="Subir en el orden"
-            className={`w-6 h-6 rounded-full grid place-items-center text-xs font-bold ${onSubir ? 'bg-paper/90 text-cream hover:bg-gold hover:text-paper cursor-pointer' : 'bg-paper/40 text-creamsoft/40 cursor-not-allowed'}`}>▲</button>
-          <button onClick={onBajar} disabled={!onBajar} title="Bajar en el orden"
-            className={`w-6 h-6 rounded-full grid place-items-center text-xs font-bold ${onBajar ? 'bg-paper/90 text-cream hover:bg-gold hover:text-paper cursor-pointer' : 'bg-paper/40 text-creamsoft/40 cursor-not-allowed'}`}>▼</button>
-        </div>
       </div>
       <div className="p-3.5">
         <span className="text-[10.5px] text-creamsoft font-semibold uppercase tracking-wide">{p.categoria}</span>
         <h4 className="font-serif font-semibold text-[15px] mb-0.5">{p.nombre}</h4>
         <div className="font-mono font-bold text-gold my-2">{fmt$(p.precio)}</div>
-        {p.adiciones?.length > 0 && (
-          <div className="text-[11px] text-creamsoft mb-1.5">+ {p.adiciones.length} adición{p.adiciones.length === 1 ? '' : 'es'} disponible{p.adiciones.length === 1 ? '' : 's'}</div>
-        )}
         {p.stock !== null && p.stock !== undefined && (
           <div className={`text-[11.5px] font-semibold mb-1.5 ${p.stock === 0 ? 'text-wine' : 'text-creamsoft'}`}>
             {p.stock === 0 ? 'Sin stock' : `Quedan ${p.stock}`}
@@ -200,18 +186,16 @@ function ProductoCard({ p, onToggle, onEdit, onDelete, onSubir, onBajar }) {
   )
 }
 
-function ProductoModal({ negocio, categorias, producto, modoAdicionInicial, onClose, onSaved }) {
-  const esAdicion = producto ? producto.es_adicion : !!modoAdicionInicial
+function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
   const [nombre, setNombre] = useState(producto?.nombre || '')
   const [categoria, setCategoria] = useState(producto?.categoria || categorias[0]?.nombre || '')
   const [precio, setPrecio] = useState(producto?.precio || '')
   const [desc, setDesc] = useState(producto?.desc || '')
-  const [emoji, setEmoji] = useState(producto?.emoji || (esAdicion ? '➕' : '🍽️'))
+  const [emoji, setEmoji] = useState(producto?.emoji || '🍽️')
   const [stock, setStock] = useState(producto?.stock ?? '')
   const [imagenUrl, setImagenUrl] = useState(producto?.imagen_url || '')
   const [archivo, setArchivo] = useState(null)
   const [preview, setPreview] = useState(producto?.imagen_url || null)
-  const [adiciones, setAdiciones] = useState(producto?.adiciones?.length ? producto.adiciones : [])
   const [subiendo, setSubiendo] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -220,16 +204,6 @@ function ProductoModal({ negocio, categorias, producto, modoAdicionInicial, onCl
     if (!file) return
     setArchivo(file)
     setPreview(URL.createObjectURL(file))
-  }
-
-  function addAdicion() {
-    setAdiciones([...adiciones, { nombre: '', precio: 0 }])
-  }
-  function editAdicion(i, campo, valor) {
-    setAdiciones(adiciones.map((a, idx) => (idx === i ? { ...a, [campo]: campo === 'precio' ? valor : valor } : a)))
-  }
-  function removeAdicion(i) {
-    setAdiciones(adiciones.filter((_, idx) => idx !== i))
   }
 
   async function submit(e) {
@@ -242,17 +216,9 @@ function ProductoModal({ negocio, categorias, producto, modoAdicionInicial, onCl
         urlFinal = await subirFotoProducto(negocio.id, archivo)
         setSubiendo(false)
       }
-      const payload = esAdicion
-        ? { nombre, categoria: 'Adiciones', precio: parseFloat(precio) || 0, desc: '', emoji, imagen_url: urlFinal || null, stock: null, adiciones: [], es_adicion: true }
-        : {
-            nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null,
-            stock: stock === '' ? null : parseInt(stock, 10),
-            // Solo se guardan las adiciones que sí tienen nombre (evita filas vacías a medio llenar).
-            adiciones: adiciones.filter((a) => a.nombre.trim() !== '').map((a) => ({ nombre: a.nombre.trim(), precio: parseFloat(a.precio) || 0 })),
-            es_adicion: false,
-          }
+      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null, stock: stock === '' ? null : parseInt(stock, 10) }
       if (producto) await updateProducto(producto.id, payload)
-      else await createProducto(negocio.id, { ...payload, disponible: true })
+      else await createProducto(negocio.id, { ...payload, disponible: true, adiciones: [] })
       onSaved()
     } finally {
       setSaving(false)
@@ -261,11 +227,9 @@ function ProductoModal({ negocio, categorias, producto, modoAdicionInicial, onCl
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">
-        {esAdicion ? (producto ? 'Editar adición' : 'Nueva adición') : (producto ? 'Editar producto' : 'Nuevo producto')}
-      </h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{producto ? 'Editar producto' : 'Nuevo producto'}</h2>
       <form onSubmit={submit}>
-        <Field label={esAdicion ? 'Foto (opcional)' : 'Foto del producto (opcional)'}>
+        <Field label="Foto del producto (opcional)">
           <div className="flex items-center gap-3">
             <div className="w-16 h-16 rounded border border-line overflow-hidden flex items-center justify-center text-2xl bg-paper shrink-0">
               {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : emoji}
@@ -276,50 +240,22 @@ function ProductoModal({ negocio, categorias, producto, modoAdicionInicial, onCl
             </label>
           </div>
         </Field>
-        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={esAdicion ? 'Ej: Bolita de helado extra' : ''} /></Field>
-
-        {esAdicion ? (
+        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Categoría">
+            <Select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+              {categorias.map((c) => <option key={c.id}>{c.nombre}</option>)}
+            </Select>
+          </Field>
           <Field label="Precio (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Categoría">
-                <Select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
-                  {categorias.map((c) => <option key={c.id}>{c.nombre}</option>)}
-                </Select>
-              </Field>
-              <Field label="Precio (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
-            </div>
-            <Field label="Descripción"><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
-          </>
-        )}
-
+        </div>
+        <Field label="Descripción"><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
         <Field label="Emoji / ícono (se usa si no hay foto)"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
-
-        {!esAdicion && (
-          <>
-            <Field label="Stock (cantidad disponible — déjalo vacío para no controlar cantidad)">
-              <Input type="number" min="0" placeholder="Sin límite" value={stock} onChange={(e) => setStock(e.target.value)} />
-            </Field>
-
-            <Field label="Adiciones propias de este producto (opcional — además de las adiciones generales del negocio)">
-              {adiciones.length === 0 && (
-                <p className="text-creamsoft text-[12px] mb-2">Este producto no tiene adiciones propias. Igual el cliente va a ver las adiciones generales del negocio, si tienes alguna creada.</p>
-              )}
-              {adiciones.map((a, i) => (
-                <div key={i} className="flex gap-2 items-center mb-2">
-                  <Input placeholder="Nombre — ej: bolita extra" value={a.nombre} onChange={(e) => editAdicion(i, 'nombre', e.target.value)} className="flex-[2]" />
-                  <Input placeholder="Precio" type="number" value={a.precio} onChange={(e) => editAdicion(i, 'precio', e.target.value)} className="flex-1" />
-                  <button type="button" onClick={() => removeAdicion(i)} className="text-wine font-bold px-1.5 shrink-0">✕</button>
-                </div>
-              ))}
-              <Btn type="button" size="sm" variant="ghost" onClick={addAdicion}>➕ Agregar adición propia</Btn>
-            </Field>
-          </>
-        )}
-
-        <Btn variant="primary" className="w-full justify-center mt-1" disabled={saving}>
-          {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : esAdicion ? 'Crear adición' : 'Crear producto'}
+        <Field label="Stock (cantidad disponible — déjalo vacío para no controlar cantidad)">
+          <Input type="number" min="0" placeholder="Sin límite" value={stock} onChange={(e) => setStock(e.target.value)} />
+        </Field>
+        <Btn variant="primary" className="w-full justify-center" disabled={saving}>
+          {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear producto'}
         </Btn>
       </form>
     </Modal>
@@ -372,30 +308,18 @@ export function TabInventario({ negocio, data, reload, notify }) {
   const [modal, setModal] = useState(false)
   const [ajuste, setAjuste] = useState(null)
 
-  const valorTotal = data.ingredientes.reduce((a, i) => a + i.stock * (i.costo_unitario || 0), 0)
-  const bajos = data.ingredientes.filter((i) => i.stock <= i.minimo && i.stock > 0).length
-  const agotados = data.ingredientes.filter((i) => i.stock === 0).length
-
   return (
     <div>
       <SectionTitle title="Inventario" sub="Existencias de ingredientes y materias primas."
         action={<Btn variant="primary" onClick={() => setModal(true)}>➕ Nuevo ingrediente</Btn>} />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-5">
-        <StatCard label="Valor del inventario" value={fmt$(valorTotal)} tone="gold" />
-        <StatCard label="Ingredientes registrados" value={data.ingredientes.length} />
-        <StatCard label="Con stock bajo" value={bajos} tone="champagne" />
-        <StatCard label="Agotados" value={agotados} />
-      </div>
       <Card className="p-5">
         <Table
-          head={['Ingrediente', 'Existencias', 'Mínimo', 'Costo unitario', 'Valor en stock', 'Estado', '']}
+          head={['Ingrediente', 'Existencias', 'Mínimo', 'Estado', '']}
           rows={data.ingredientes.map((i) => [
             <b>{i.nombre}</b>,
             <span className="font-mono">{i.stock} {i.unidad}</span>,
             <span className="font-mono">{i.minimo} {i.unidad}</span>,
-            <span className="font-mono">{i.costo_unitario ? fmt$(i.costo_unitario) : '—'}</span>,
-            <span className="font-mono">{fmt$(i.stock * (i.costo_unitario || 0))}</span>,
-            i.stock === 0 ? <Pill tone="pausado">Agotado</Pill> : i.stock <= i.minimo ? <Pill tone="pausado">Bajo</Pill> : <Pill tone="listo">OK</Pill>,
+            i.stock <= i.minimo ? <Pill tone="pausado">Bajo</Pill> : <Pill tone="listo">OK</Pill>,
             <Btn size="sm" variant="ghost" onClick={() => setAjuste(i)}>Ajustar</Btn>,
           ])}
         />
@@ -416,13 +340,9 @@ function IngredienteModal({ negocio, onClose, onSaved }) {
   const [unidad, setUnidad] = useState('kg')
   const [stock, setStock] = useState(0)
   const [minimo, setMinimo] = useState(1)
-  const [costoUnitario, setCostoUnitario] = useState('')
   async function submit(e) {
     e.preventDefault()
-    await createIngrediente(negocio.id, {
-      nombre, unidad, stock: parseFloat(stock) || 0, minimo: parseFloat(minimo) || 0,
-      costo_unitario: parseFloat(costoUnitario) || 0,
-    })
+    await createIngrediente(negocio.id, { nombre, unidad, stock: parseFloat(stock) || 0, minimo: parseFloat(minimo) || 0 })
     onSaved()
   }
   return (
@@ -438,11 +358,7 @@ function IngredienteModal({ negocio, onClose, onSaved }) {
           </Field>
           <Field label="Existencias iniciales"><Input required type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Nivel mínimo (alerta de reposición)"><Input required type="number" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
-          <Field label="Costo por unidad (opcional — ej: $ por kg)"><Input type="number" placeholder="$0" value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} /></Field>
-        </div>
-        <p className="text-creamsoft text-[12px] -mt-2 mb-3">Si no lo sabes con exactitud, déjalo en 0 — se va a ajustar solo con la primera compra que registres de este ingrediente.</p>
+        <Field label="Nivel mínimo (alerta de reposición)"><Input required type="number" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
         <Btn variant="primary" className="w-full justify-center">Guardar ingrediente</Btn>
       </form>
     </Modal>
@@ -500,7 +416,7 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
   async function submit(e) {
     e.preventDefault()
     const ing = ingredientes.find((i) => i.id === ingId)
-    await registrarCompra(negocio.id, { ingredienteId: ingId, cantidad: parseFloat(cantidad) || 0, valor: parseFloat(valor) || 0 }, ing)
+    await registrarCompra(negocio.id, { ingredienteId: ingId, cantidad: parseFloat(cantidad) || 0, valor: parseFloat(valor) || 0 }, ing.stock)
     onSaved()
   }
   return (
@@ -547,7 +463,7 @@ export function TabPedidos({ data, reload, notify }) {
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
                   <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
-                  <div className="my-1.5 text-creamsoft">{p.pedido_items.map((it) => `${it.cantidad}× ${it.nombre}${it.adiciones?.length ? ` (${it.adiciones.join(', ')})` : ''}`).join(', ')}</div>
+                  <div className="my-1.5 text-creamsoft">{p.pedido_items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
                   <div className="flex justify-between items-center mt-2">
                     <span className="font-mono">{fmt$(p.total)}</span>
                     {est !== 'Entregado'
@@ -592,7 +508,7 @@ export function TabVentas({ data }) {
 
 /* ---------------- Trabajadores ---------------- */
 export function TabTrabajadores({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // null | 'new' | trabajador (editar)
+  const [modal, setModal] = useState(null) // null | 'new' | trabajador (para editar)
   const [pagoFor, setPagoFor] = useState(null)
 
   return (
@@ -609,8 +525,8 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
               <p className="text-creamsoft text-[13px] mb-2">{w.cargo}</p>
               <p className="font-mono font-bold mb-3">{fmt$(w.pago)}/mes</p>
               <div className="flex gap-1.5 flex-wrap">
+                <Btn size="sm" variant="ghost" onClick={() => setModal(w)}>✏️ Editar salario</Btn>
                 <Btn size="sm" variant="mustard" onClick={() => setPagoFor(w)}>Registrar pago</Btn>
-                <Btn size="sm" variant="ghost" onClick={() => setModal(w)}>Editar</Btn>
                 <Btn size="sm" variant="ghost" onClick={async () => { await toggleTrabajadorEstado(w); reload() }}>
                   {w.estado === 'Activo' ? 'Desactivar' : 'Activar'}
                 </Btn>
@@ -621,8 +537,12 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
         })}
       </div>
       {modal && (
-        <TrabajadorModal negocio={negocio} trabajador={modal === 'new' ? null : modal} onClose={() => setModal(null)}
-          onSaved={() => { const editando = modal !== 'new'; setModal(null); notify(editando ? 'Trabajador actualizado' : 'Trabajador agregado'); reload() }} />
+        <TrabajadorModal
+          negocio={negocio}
+          trabajador={modal === 'new' ? null : modal}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); notify(modal === 'new' ? 'Trabajador agregado' : 'Salario actualizado'); reload() }}
+        />
       )}
       {pagoFor && (
         <PagoModal negocio={negocio} trabajador={pagoFor} onClose={() => setPagoFor(null)}
@@ -632,49 +552,34 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
   )
 }
 function TrabajadorModal({ negocio, trabajador, onClose, onSaved }) {
-  const editando = !!trabajador
   const [nombre, setNombre] = useState(trabajador?.nombre || '')
   const [cargo, setCargo] = useState(trabajador?.cargo || '')
   const [pago, setPago] = useState(trabajador?.pago ?? '')
+  const [guardando, setGuardando] = useState(false)
   async function submit(e) {
     e.preventDefault()
-    if (editando) await updateTrabajador(trabajador.id, { nombre, cargo, pago: parseFloat(pago) || 0 })
-    else await createTrabajador(negocio.id, { nombre, cargo, pago: parseFloat(pago) || 0 })
-    onSaved()
+    setGuardando(true)
+    try {
+      const payload = { nombre, cargo, pago: parseFloat(pago) || 0 }
+      if (trabajador) await updateTrabajador(trabajador.id, payload)
+      else await createTrabajador(negocio.id, payload)
+      onSaved()
+    } finally {
+      setGuardando(false)
+    }
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{editando ? `Editar — ${trabajador.nombre}` : 'Nuevo trabajador'}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{trabajador ? `Editar a ${trabajador.nombre}` : 'Nuevo trabajador'}</h2>
       <form onSubmit={submit}>
         <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Cargo"><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>
           <Field label="Pago mensual (COP)"><Input required type="number" value={pago} onChange={(e) => setPago(e.target.value)} /></Field>
         </div>
-        <Btn variant="primary" className="w-full justify-center">{editando ? 'Guardar cambios' : 'Agregar trabajador'}</Btn>
-      </form>
-    </Modal>
-  )
-}
-function TrabajadorModal({ negocio, onClose, onSaved }) {
-  const [nombre, setNombre] = useState('')
-  const [cargo, setCargo] = useState('')
-  const [pago, setPago] = useState('')
-  async function submit(e) {
-    e.preventDefault()
-    await createTrabajador(negocio.id, { nombre, cargo, pago: parseFloat(pago) || 0 })
-    onSaved()
-  }
-  return (
-    <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">Nuevo trabajador</h2>
-      <form onSubmit={submit}>
-        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Cargo"><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>
-          <Field label="Pago mensual (COP)"><Input required type="number" value={pago} onChange={(e) => setPago(e.target.value)} /></Field>
-        </div>
-        <Btn variant="primary" className="w-full justify-center">Agregar trabajador</Btn>
+        <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
+          {guardando ? 'Guardando…' : trabajador ? 'Guardar cambios' : 'Agregar trabajador'}
+        </Btn>
       </form>
     </Modal>
   )
@@ -700,221 +605,54 @@ function PagoModal({ negocio, trabajador, onClose, onSaved }) {
 }
 
 /* ---------------- Finanzas ---------------- */
-// Libro de caja del negocio: junta ventas, compras, pagos a trabajadores e
-// ingresos/egresos manuales en una sola línea de tiempo, calcula el saldo
-// acumulado a partir de la base inicial, y permite verlo por día o por mes
-// (con comparativo entre meses) e imprimirlo.
-export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated }) {
-  const [modal, setModal] = useState(null) // 'ingreso' | 'egreso' | 'capital'
-  const [vista, setVista] = useState('dia') // 'dia' | 'mes'
-  const [fecha, setFecha] = useState(todayStr())
-  const [mes, setMes] = useState(monthStr(new Date()))
-
-  const capitalInicial = negocio.capital_inicial || 0
-
-  const movimientos = useMemo(() => {
-    const list = []
-    data.ventas.forEach((v) => list.push({ id: `venta-${v.id}`, fecha: v.creado_en, tipo: 'Venta', concepto: 'Venta de pedido', valor: v.total, signo: 1 }))
-    data.ingresos.forEach((i) => list.push({ id: `ingreso-${i.id}`, fecha: i.creado_en, tipo: 'Ingreso extra', concepto: i.concepto, valor: i.valor, signo: 1 }))
-    data.compras.forEach((c) => list.push({ id: `compra-${c.id}`, fecha: c.creado_en, tipo: 'Compra', concepto: c.ingredientes?.nombre ? `${c.ingredientes.nombre} × ${c.cantidad}` : 'Compra de insumo', valor: c.valor, signo: -1 }))
-    data.trabajadores.forEach((w) => (w.pagos || []).forEach((p) => list.push({ id: `pago-${p.id}`, fecha: p.creado_en, tipo: 'Pago personal', concepto: `${w.nombre} — ${p.periodo}`, valor: p.valor, signo: -1 })))
-    data.egresos.forEach((e) => list.push({ id: `egreso-${e.id}`, fecha: e.creado_en, tipo: 'Otro gasto', concepto: e.concepto, valor: e.valor, signo: -1 }))
-    list.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
-    let saldo = capitalInicial
-    return list.map((m) => { saldo += m.signo * m.valor; return { ...m, saldo } })
-  }, [data, capitalInicial])
-
-  const saldoActual = movimientos.length ? movimientos[movimientos.length - 1].saldo : capitalInicial
-  const ingresosHoy = movimientos.filter((m) => dateStr(m.fecha) === todayStr() && m.signo === 1).reduce((a, m) => a + m.valor, 0)
-  const egresosHoy = movimientos.filter((m) => dateStr(m.fecha) === todayStr() && m.signo === -1).reduce((a, m) => a + m.valor, 0)
-
-  // ---- Vista por día ----
-  const movimientosDia = movimientos.filter((m) => dateStr(m.fecha) === fecha)
-  const ingresosDia = movimientosDia.filter((m) => m.signo === 1).reduce((a, m) => a + m.valor, 0)
-  const egresosDia = movimientosDia.filter((m) => m.signo === -1).reduce((a, m) => a + m.valor, 0)
-  const hastaEseDia = movimientos.filter((m) => dateStr(m.fecha) <= fecha)
-  const saldoAlCierreDia = hastaEseDia.length ? hastaEseDia[hastaEseDia.length - 1].saldo : capitalInicial
-
-  // ---- Vista por mes ----
-  const movimientosMes = movimientos.filter((m) => monthStr(m.fecha) === mes)
-  const ingresosMes = movimientosMes.filter((m) => m.signo === 1).reduce((a, m) => a + m.valor, 0)
-  const egresosMes = movimientosMes.filter((m) => m.signo === -1).reduce((a, m) => a + m.valor, 0)
-  const diasMap = {}
-  movimientosMes.forEach((m) => {
-    const d = dateStr(m.fecha)
-    if (!diasMap[d]) diasMap[d] = { ingresos: 0, egresos: 0 }
-    if (m.signo === 1) diasMap[d].ingresos += m.valor
-    else diasMap[d].egresos += m.valor
-  })
-  const diasDelMes = Object.entries(diasMap).sort((a, b) => (a[0] < b[0] ? 1 : -1))
-
-  // ---- Comparativo entre todos los meses con movimientos ----
-  const mesesMap = {}
-  movimientos.forEach((m) => {
-    const k = monthStr(m.fecha)
-    if (!mesesMap[k]) mesesMap[k] = { ingresos: 0, egresos: 0 }
-    if (m.signo === 1) mesesMap[k].ingresos += m.valor
-    else mesesMap[k].egresos += m.valor
-  })
-  const mesesArr = Object.entries(mesesMap)
-    .map(([key, v]) => ({ key, label: fmtMonthLabel(key), ingresos: v.ingresos, egresos: v.egresos, neto: v.ingresos - v.egresos }))
-    .sort((a, b) => (a.key < b.key ? -1 : 1))
-  const mejorIngresos = mesesArr.length ? mesesArr.reduce((a, b) => (b.ingresos > a.ingresos ? b : a)) : null
-  const peorIngresos = mesesArr.length > 1 ? mesesArr.reduce((a, b) => (b.ingresos < a.ingresos ? b : a)) : null
+export function TabFinanzas({ negocio, data, reload, notify }) {
+  const [modal, setModal] = useState(null) // 'ingreso' | 'egreso'
+  const ingresosVentas = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
+  const ingresosExtra = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + i.valor, 0)
+  const egresosCompras = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + c.valor, 0)
+  const egresosPagos = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + p.valor, 0)
+  const egresosOtros = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + e.valor, 0)
 
   return (
     <div>
-      <SectionTitle title="Ingresos y egresos" sub="Ventas, compras y pagos se suman solos — registra aquí lo demás, día a día."
-        action={
-          <div className="flex gap-2 flex-wrap">
-            <Btn size="sm" variant="ghost" onClick={() => setModal('capital')}>💰 Base inicial</Btn>
-            <Btn size="sm" variant="mustard" onClick={() => setModal('ingreso')}>➕ Ingreso</Btn>
-            <Btn size="sm" variant="danger" onClick={() => setModal('egreso')}>➕ Egreso</Btn>
-          </div>
-        } />
-
+      <SectionTitle title="Ingresos y egresos" sub="Compras, pagos y ventas se reflejan aquí automáticamente."
+        action={<div className="flex gap-2">
+          <Btn size="sm" variant="mustard" onClick={() => setModal('ingreso')}>➕ Ingreso</Btn>
+          <Btn size="sm" variant="danger" onClick={() => setModal('egreso')}>➕ Egreso</Btn>
+        </div>} />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label="Base inicial" value={fmt$(capitalInicial)} />
-        <StatCard label="Saldo actual del negocio" value={fmt$(saldoActual)} tone="sage" />
-        <StatCard label="Ingresos de hoy" value={fmt$(ingresosHoy)} tone="gold" />
-        <StatCard label="Egresos de hoy" value={fmt$(egresosHoy)} tone="champagne" />
+        <StatCard label="Ingresos (ventas + otros)" value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
+        <StatCard label="Egresos (compras)" value={fmt$(egresosCompras)} tone="gold" />
+        <StatCard label="Egresos (personal)" value={fmt$(egresosPagos)} tone="champagne" />
+        <StatCard label="Otros egresos" value={fmt$(egresosOtros)} />
       </div>
-
-      <div className="flex gap-2 mb-4 no-print">
-        <Btn size="sm" variant={vista === 'dia' ? 'primary' : 'ghost'} onClick={() => setVista('dia')}>📅 Ver por día</Btn>
-        <Btn size="sm" variant={vista === 'mes' ? 'primary' : 'ghost'} onClick={() => setVista('mes')}>🗓️ Ver por mes</Btn>
+      <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
+        <Card className="p-5">
+          <h3 className="font-serif text-lg font-semibold mb-3">Ingresos extra registrados</h3>
+          {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos manuales aún.</p> :
+            data.ingresos.map((i) => (
+              <div key={i.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
+                <span>{i.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(i.creado_en)}</div></span>
+                <b className="font-mono">{fmt$(i.valor)}</b>
+              </div>
+            ))}
+        </Card>
+        <Card className="p-5">
+          <h3 className="font-serif text-lg font-semibold mb-3">Otros gastos</h3>
+          {data.egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
+            data.egresos.map((e) => (
+              <div key={e.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
+                <span>{e.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(e.creado_en)}</div></span>
+                <b className="font-mono">{fmt$(e.valor)}</b>
+              </div>
+            ))}
+        </Card>
       </div>
-
-      {vista === 'dia' ? (
-        <div id="finanzas-print-area">
-          <div className="flex items-center gap-3 mb-4 flex-wrap no-print">
-            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-auto" />
-            <Btn size="sm" variant="ghost" onClick={() => setFecha(todayStr())}>Hoy</Btn>
-            <Btn size="sm" variant="ghost" onClick={() => window.print()}>🖨️ Imprimir este día</Btn>
-          </div>
-          <h3 className="font-serif text-lg font-semibold mb-0.5">{fmtDateLong(`${fecha}T12:00:00`)}</h3>
-          <p className="text-creamsoft text-[12.5px] mb-3">{negocio.nombre}</p>
-          <div className="grid grid-cols-3 gap-3 mb-4 max-[600px]:grid-cols-1">
-            <StatCard label="Ingresos del día" value={fmt$(ingresosDia)} tone="sage" />
-            <StatCard label="Egresos del día" value={fmt$(egresosDia)} tone="wine" />
-            <StatCard label="Saldo al cierre" value={fmt$(saldoAlCierreDia)} tone="gold" />
-          </div>
-          <Card className="p-5">
-            {movimientosDia.length === 0 ? <Empty icon="🧾">Sin movimientos registrados este día.</Empty> : (
-              <Table head={['Tipo', 'Concepto', 'Ingreso', 'Egreso']} rows={movimientosDia.map((m) => [
-                <Pill tone={m.signo === 1 ? 'listo' : 'pausado'}>{m.tipo}</Pill>,
-                m.concepto,
-                <span className="font-mono">{m.signo === 1 ? fmt$(m.valor) : '—'}</span>,
-                <span className="font-mono">{m.signo === -1 ? fmt$(m.valor) : '—'}</span>,
-              ])} />
-            )}
-          </Card>
-        </div>
-      ) : (
-        <div id="finanzas-print-area">
-          <div className="flex items-center gap-3 mb-4 flex-wrap no-print">
-            <Input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="w-auto" />
-            <Btn size="sm" variant="ghost" onClick={() => setMes(monthStr(new Date()))}>Este mes</Btn>
-            <Btn size="sm" variant="ghost" onClick={() => window.print()}>🖨️ Imprimir este mes</Btn>
-          </div>
-          <h3 className="font-serif text-lg font-semibold mb-0.5">{fmtMonthLabel(mes)}</h3>
-          <p className="text-creamsoft text-[12.5px] mb-3">{negocio.nombre}</p>
-          <div className="grid grid-cols-3 gap-3 mb-4 max-[600px]:grid-cols-1">
-            <StatCard label="Ingresos del mes" value={fmt$(ingresosMes)} tone="sage" />
-            <StatCard label="Egresos del mes" value={fmt$(egresosMes)} tone="wine" />
-            <StatCard label="Resultado del mes" value={fmt$(ingresosMes - egresosMes)} tone="gold" />
-          </div>
-          <h4 className="font-serif text-base font-semibold mb-2.5">Día a día</h4>
-          <Card className="p-5 mb-6">
-            {diasDelMes.length === 0 ? <Empty icon="🧾">Sin movimientos este mes.</Empty> : (
-              <Table head={['Día', 'Ingresos', 'Egresos', 'Neto del día']} rows={diasDelMes.map(([dia, v]) => [
-                <span className="font-mono">{fmtDateLong(`${dia}T12:00:00`)}</span>,
-                <span className="font-mono text-sage">{fmt$(v.ingresos)}</span>,
-                <span className="font-mono text-wine">{fmt$(v.egresos)}</span>,
-                <span className="font-mono">{fmt$(v.ingresos - v.egresos)}</span>,
-              ])} />
-            )}
-          </Card>
-
-          <h4 className="font-serif text-base font-semibold mb-2.5">Comparativo entre meses</h4>
-          <Card className="p-5">
-            {mesesArr.length === 0 ? <Empty>Aún no hay meses con movimientos para comparar.</Empty> : (
-              <Table head={['Mes', 'Ingresos', 'Egresos', 'Neto', '']} rows={mesesArr.map((m) => [
-                m.label,
-                <span className="font-mono text-sage">{fmt$(m.ingresos)}</span>,
-                <span className="font-mono text-wine">{fmt$(m.egresos)}</span>,
-                <span className="font-mono">{fmt$(m.neto)}</span>,
-                m.key === mejorIngresos?.key
-                  ? <Pill tone="listo">🏆 El que más vendió</Pill>
-                  : (peorIngresos && m.key === peorIngresos.key ? <Pill tone="pausado">El más flojo</Pill> : ''),
-              ])} />
-            )}
-          </Card>
-        </div>
-      )}
-
-      <details className="mt-6 no-print">
-        <summary className="cursor-pointer text-creamsoft text-[12.5px] hover:text-gold mb-2">Ver todos los ingresos y egresos manuales registrados</summary>
-        <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1 mt-3">
-          <Card className="p-5">
-            <h4 className="font-serif text-base font-semibold mb-3">Ingresos extra</h4>
-            {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos manuales aún.</p> :
-              data.ingresos.map((i) => (
-                <div key={i.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
-                  <span>{i.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(i.creado_en)}</div></span>
-                  <b className="font-mono">{fmt$(i.valor)}</b>
-                </div>
-              ))}
-          </Card>
-          <Card className="p-5">
-            <h4 className="font-serif text-base font-semibold mb-3">Otros gastos</h4>
-            {data.egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
-              data.egresos.map((e) => (
-                <div key={e.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
-                  <span>{e.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(e.creado_en)}</div></span>
-                  <b className="font-mono">{fmt$(e.valor)}</b>
-                </div>
-              ))}
-          </Card>
-        </div>
-      </details>
-
-      {modal === 'capital' && (
-        <CapitalModal negocio={negocio} onClose={() => setModal(null)}
-          onSaved={(cambios) => { setModal(null); onNegocioUpdated?.(cambios); notify('Base inicial actualizada') }} />
-      )}
-      {(modal === 'ingreso' || modal === 'egreso') && (
+      {modal && (
         <MovimientoModal negocio={negocio} tipo={modal} onClose={() => setModal(null)}
           onSaved={() => { setModal(null); notify('Movimiento registrado'); reload() }} />
       )}
     </div>
-  )
-}
-function CapitalModal({ negocio, onClose, onSaved }) {
-  const [valor, setValor] = useState(negocio.capital_inicial || 0)
-  const [saving, setSaving] = useState(false)
-  async function submit(e) {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      const monto = parseFloat(valor) || 0
-      await updateCapitalInicial(negocio.id, monto)
-      onSaved({ capital_inicial: monto })
-    } finally {
-      setSaving(false)
-    }
-  }
-  return (
-    <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-1">Base inicial del negocio</h2>
-      <p className="text-creamsoft text-[13px] mb-4">
-        El dinero con el que arrancó "{negocio.nombre}" antes de empezar a registrar todo aquí. A partir de este monto se calcula el saldo actual del negocio, sumando y restando cada ingreso y egreso.
-      </p>
-      <form onSubmit={submit}>
-        <Field label="Base inicial (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center" disabled={saving}>{saving ? 'Guardando…' : 'Guardar'}</Btn>
-      </form>
-    </Modal>
   )
 }
 function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
@@ -931,7 +669,7 @@ function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
     <Modal onClose={onClose}>
       <h2 className="font-serif text-xl font-semibold mb-4">{tipo === 'ingreso' ? 'Nuevo ingreso' : 'Nuevo egreso'}</h2>
       <form onSubmit={submit}>
-        <Field label="Concepto"><Input required value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={tipo === 'ingreso' ? 'Ej: venta de excedente' : 'Ej: carne, pollo, cebolla, transporte'} /></Field>
+        <Field label="Concepto"><Input required value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={tipo === 'ingreso' ? 'Ej: venta de excedente' : 'Ej: transporte, servicios'} /></Field>
         <Field label="Valor (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
         <Btn variant="primary" className="w-full justify-center">Guardar</Btn>
       </form>

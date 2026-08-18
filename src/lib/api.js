@@ -49,29 +49,26 @@ export async function createNegocio({ nombre, slogan, emoji }) {
   return data
 }
 
-export async function subirLogoNegocio(negocioId, file) {
-  const ext = file.name.split('.').pop()
-  const path = `${negocioId}/logo-${crypto.randomUUID()}.${ext}`
-  const { error } = await supabase.storage.from('productos').upload(path, file, { upsert: true })
-  if (error) throw error
-  const { data } = supabase.storage.from('productos').getPublicUrl(path)
-  return data.publicUrl
-}
-
-export async function updateNegocioLogo(negocioId, logoUrl) {
-  const { error } = await supabase.from('negocios').update({ logo_url: logoUrl }).eq('id', negocioId)
-  if (error) throw error
-}
-
 export async function toggleNegocioEstado(negocio) {
   const nuevoEstado = negocio.estado === 'Activo' ? 'Pausado' : 'Activo'
   const { error } = await supabase.from('negocios').update({ estado: nuevoEstado }).eq('id', negocio.id)
   if (error) throw error
 }
 
-export async function updateCapitalInicial(negocioId, valor) {
-  const { error } = await supabase.from('negocios').update({ capital_inicial: valor }).eq('id', negocioId)
+export async function updateNegocio(id, cambios) {
+  const { error } = await supabase.from('negocios').update(cambios).eq('id', id)
   if (error) throw error
+}
+
+// Sube el logo a Storage dentro de una carpeta con el id del negocio
+// (mismo patrón que las fotos de producto) y devuelve la URL pública.
+export async function subirLogoNegocio(negocioId, file) {
+  const ext = file.name.split('.').pop()
+  const path = `${negocioId}/logo-${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from('negocios').upload(path, file, { upsert: true })
+  if (error) throw error
+  const { data } = supabase.storage.from('negocios').getPublicUrl(path)
+  return data.publicUrl
 }
 
 /* =========================================================
@@ -95,23 +92,12 @@ export async function deleteCategoria(id) {
    PRODUCTOS  (adiciones se guardan como jsonb: [{nombre, precio}])
    ========================================================= */
 export async function fetchProductos(negocioId) {
-  const { data, error } = await supabase.from('productos').select('*').eq('negocio_id', negocioId).order('categoria').order('orden')
+  const { data, error } = await supabase.from('productos').select('*').eq('negocio_id', negocioId).order('categoria')
   if (error) throw error
   return data
 }
 export async function createProducto(negocioId, producto) {
-  // Nuevo producto entra siempre al final de su categoría (no en 0, para no
-  // desordenar los que ya tenían un lugar fijo).
-  const { data: existentes, error: e0 } = await supabase
-    .from('productos')
-    .select('orden')
-    .eq('negocio_id', negocioId)
-    .eq('categoria', producto.categoria)
-    .order('orden', { ascending: false })
-    .limit(1)
-  if (e0) throw e0
-  const siguienteOrden = existentes?.length ? existentes[0].orden + 1 : 0
-  const { error } = await supabase.from('productos').insert({ negocio_id: negocioId, ...producto, orden: siguienteOrden })
+  const { error } = await supabase.from('productos').insert({ negocio_id: negocioId, ...producto })
   if (error) throw error
 }
 export async function updateProducto(id, cambios) {
@@ -121,19 +107,6 @@ export async function updateProducto(id, cambios) {
 export async function deleteProducto(id) {
   const { error } = await supabase.from('productos').delete().eq('id', id)
   if (error) throw error
-}
-
-// productos: [{id, orden}, ...] — intercambia el campo "orden" entre dos (o
-// más) productos de una sola vez. Se usa desde los botones subir/bajar del
-// panel de Productos, para que el dueño fije el orden en que quiere que
-// aparezcan (ej: que las arepas siempre queden en el mismo orden del menú
-// físico), en vez de que salgan ordenadas alfabéticamente o por fecha.
-export async function reordenarProductos(productos) {
-  const resultados = await Promise.all(
-    productos.map((p) => supabase.from('productos').update({ orden: p.orden }).eq('id', p.id))
-  )
-  const conError = resultados.find((r) => r.error)
-  if (conError) throw conError.error
 }
 
 // Sube la foto a Storage dentro de una carpeta con el id del negocio
@@ -177,12 +150,7 @@ export async function fetchCompras(negocioId) {
   if (error) throw error
   return data
 }
-// ingredienteActual = { stock, costo_unitario } — el registro completo del
-// ingrediente antes de esta compra. El costo unitario se recalcula como
-// promedio ponderado entre lo que ya había y lo que se acaba de comprar,
-// para que "valor del inventario" siga siendo una cifra realista aunque
-// el mismo ingrediente se compre a precios distintos según el día.
-export async function registrarCompra(negocioId, { ingredienteId, cantidad, valor }, ingredienteActual) {
+export async function registrarCompra(negocioId, { ingredienteId, cantidad, valor }, stockActual) {
   const { error: e1 } = await supabase.from('compras').insert({
     negocio_id: negocioId,
     ingrediente_id: ingredienteId,
@@ -190,16 +158,9 @@ export async function registrarCompra(negocioId, { ingredienteId, cantidad, valo
     valor,
   })
   if (e1) throw e1
-
-  const stockActual = ingredienteActual.stock
-  const costoActual = ingredienteActual.costo_unitario || 0
-  const nuevoStock = stockActual + cantidad
-  const valorPrevio = stockActual * costoActual
-  const nuevoCostoUnitario = nuevoStock > 0 ? (valorPrevio + valor) / nuevoStock : costoActual
-
   const { error: e2 } = await supabase
     .from('ingredientes')
-    .update({ stock: nuevoStock, costo_unitario: nuevoCostoUnitario })
+    .update({ stock: stockActual + cantidad })
     .eq('id', ingredienteId)
   if (e2) throw e2
 }
