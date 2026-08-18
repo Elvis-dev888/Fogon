@@ -25,7 +25,7 @@ const TABS = [
   ['estadisticas', '📉', 'Estadísticas'],
 ]
 
-export default function AdminView({ negocio, onExit, notify, onNegocioActualizado }) {
+export default function AdminView({ negocio, onExit, notify, onNegocioUpdated }) {
   const [tab, setTab] = useState('dashboard')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -80,7 +80,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioActualizad
     return <p className="text-creamsoft text-sm">Cargando información de {negocio.nombre}…</p>
   }
 
-  const props = { negocio, data, reload, notify, onNegocioActualizado }
+  const props = { negocio, data, reload, notify, onNegocioUpdated }
 
   return (
     <div className="grid grid-cols-[220px_1fr] gap-5 items-start max-[820px]:grid-cols-1">

@@ -60,6 +60,14 @@ export async function updateNegocio(id, cambios) {
   if (error) throw error
 }
 
+// Base inicial: el capital con el que arrancó el negocio antes de empezar a
+// registrar movimientos en Fogón. Se guarda en negocios.capital_inicial y se
+// usa en la pestaña "Ingresos / Egresos" para calcular el saldo real.
+export async function updateCapitalInicial(id, capitalInicial) {
+  const { error } = await supabase.from('negocios').update({ capital_inicial: capitalInicial }).eq('id', id)
+  if (error) throw error
+}
+
 // Sube el logo a Storage dentro de una carpeta con el id del negocio
 // (mismo patrón que las fotos de producto) y devuelve la URL pública.
 export async function subirLogoNegocio(negocioId, file) {

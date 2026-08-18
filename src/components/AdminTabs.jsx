@@ -1,17 +1,17 @@
 import { useState } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
-import { fmt$, fmtDate, sameMonth, ESTADOS, thumbFor } from '../lib/helpers'
+import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
   createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido,
   createTrabajador, updateTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso,
-  updateNegocio, subirLogoNegocio,
+  updateNegocio, subirLogoNegocio, updateCapitalInicial,
 } from '../lib/api'
 
 const estadoTone = (e) => (e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : 'entregado')
 
 /* ---------------- Mi negocio (logo + datos básicos) ---------------- */
-export function TabMiNegocio({ negocio, notify, onNegocioActualizado }) {
+export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
   const [nombre, setNombre] = useState(negocio.nombre || '')
   const [slogan, setSlogan] = useState(negocio.slogan || '')
   const [descripcion, setDescripcion] = useState(negocio.descripcion || '')
@@ -37,9 +37,10 @@ export function TabMiNegocio({ negocio, notify, onNegocioActualizado }) {
         logoUrl = await subirLogoNegocio(negocio.id, archivo)
         setSubiendo(false)
       }
-      await updateNegocio(negocio.id, { nombre, slogan, descripcion, logo_url: logoUrl })
+      const cambios = { nombre, slogan, descripcion, logo_url: logoUrl }
+      await updateNegocio(negocio.id, cambios)
       notify('Datos del negocio actualizados')
-      if (onNegocioActualizado) await onNegocioActualizado()
+      if (onNegocioUpdated) await onNegocioUpdated(cambios)
     } finally {
       setGuardando(false)
     }
@@ -342,23 +343,31 @@ function IngredienteModal({ negocio, onClose, onSaved }) {
   const [minimo, setMinimo] = useState(1)
   async function submit(e) {
     e.preventDefault()
-    await createIngrediente(negocio.id, { nombre, unidad, stock: parseFloat(stock) || 0, minimo: parseFloat(minimo) || 0 })
+    await createIngrediente(negocio.id, { nombre, unidad: unidad.trim() || 'und', stock: parseFloat(stock) || 0, minimo: parseFloat(minimo) || 0 })
     onSaved()
   }
   return (
     <Modal onClose={onClose}>
       <h2 className="font-serif text-xl font-semibold mb-4">Nuevo ingrediente</h2>
       <form onSubmit={submit}>
-        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
+        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Carne de res, Gaseosa 400ml, Pan de hamburguesa" /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Unidad">
-            <Select value={unidad} onChange={(e) => setUnidad(e.target.value)}>
-              <option>kg</option><option>und</option><option>l</option>
-            </Select>
+          <Field label="Unidad de medida">
+            <Input list="unidades-sugeridas" required value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="kg" />
+            <datalist id="unidades-sugeridas">
+              <option value="kg" /><option value="g" /><option value="lb" />
+              <option value="l" /><option value="ml" /><option value="und" />
+              <option value="paquete" /><option value="display" /><option value="caja" /><option value="docena" />
+            </datalist>
           </Field>
-          <Field label="Existencias iniciales"><Input required type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
+          <Field label="Existencias iniciales"><Input required type="number" step="any" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
         </div>
-        <Field label="Nivel mínimo (alerta de reposición)"><Input required type="number" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
+        <p className="text-creamsoft text-[12px] -mt-2 mb-3.5">
+          Usa la unidad en la que controlas ese producto: <b>kg</b> o <b>lb</b> para carnes que compras y pesas,
+          <b> und</b> o <b>display</b> para bebidas y gaseosas (si las controlas por caja/display, pon ahí cuántos
+          displays tienes), <b>paquete</b> para el pan, etc. Tú decides qué representa una unidad para cada producto.
+        </p>
+        <Field label="Nivel mínimo (alerta de reposición)"><Input required type="number" step="any" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
         <Btn variant="primary" className="w-full justify-center">Guardar ingrediente</Btn>
       </form>
     </Modal>
@@ -413,9 +422,9 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
   const [ingId, setIngId] = useState(ingredientes[0]?.id || '')
   const [cantidad, setCantidad] = useState(1)
   const [valor, setValor] = useState('')
+  const ing = ingredientes.find((i) => i.id === ingId)
   async function submit(e) {
     e.preventDefault()
-    const ing = ingredientes.find((i) => i.id === ingId)
     await registrarCompra(negocio.id, { ingredienteId: ingId, cantidad: parseFloat(cantidad) || 0, valor: parseFloat(valor) || 0 }, ing.stock)
     onSaved()
   }
@@ -429,10 +438,21 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
             {ingredientes.map((i) => <option key={i.id} value={i.id}>{i.nombre}</option>)}
           </Select>
         </Field>
+        {ing && (
+          <p className="text-creamsoft text-[12px] -mt-2 mb-3">
+            Existencia actual: <b className="font-mono">{ing.stock} {ing.unidad}</b>
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cantidad"><Input required type="number" value={cantidad} onChange={(e) => setCantidad(e.target.value)} /></Field>
-          <Field label="Valor total (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
+          <Field label={`Cantidad comprada${ing ? ` (${ing.unidad})` : ''}`}>
+            <Input required type="number" step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
+          </Field>
+          <Field label="Valor total pagado (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
         </div>
+        <p className="text-creamsoft text-[12px] -mt-2 mb-3.5">
+          La cantidad va en la misma unidad del ingrediente (arriba). Si compraste 5 kg de carne, pon 5; si compraste
+          2 displays de gaseosa y ese ingrediente se maneja por display, pon 2.
+        </p>
         <Btn variant="primary" className="w-full justify-center">Registrar compra</Btn>
       </form>
     </Modal>
@@ -605,28 +625,49 @@ function PagoModal({ negocio, trabajador, onClose, onSaved }) {
 }
 
 /* ---------------- Finanzas ---------------- */
-export function TabFinanzas({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // 'ingreso' | 'egreso'
+export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated }) {
+  const [modal, setModal] = useState(null) // 'capital' | 'ingreso' | 'egreso'
+  const capitalInicial = negocio.capital_inicial || 0
+
   const ingresosVentas = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
   const ingresosExtra = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + i.valor, 0)
   const egresosCompras = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + c.valor, 0)
   const egresosPagos = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + p.valor, 0)
   const egresosOtros = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + e.valor, 0)
 
+  // Saldo real del negocio: base inicial + TODO lo que ha entrado y salido
+  // desde siempre (no solo este mes). Esto es lo que responde "¿cuánta plata
+  // tiene el negocio hoy, contando con lo que arrancó?".
+  const ventasTotal = data.ventas.reduce((a, v) => a + v.total, 0)
+  const ingresosTotal = data.ingresos.reduce((a, i) => a + i.valor, 0)
+  const comprasTotal = data.compras.reduce((a, c) => a + c.valor, 0)
+  const pagosTotal = data.trabajadores.flatMap((w) => w.pagos).reduce((a, p) => a + p.valor, 0)
+  const egresosOtrosTotal = data.egresos.reduce((a, e) => a + e.valor, 0)
+  const saldoActual = capitalInicial + ventasTotal + ingresosTotal - comprasTotal - pagosTotal - egresosOtrosTotal
+
   return (
     <div>
       <SectionTitle title="Ingresos y egresos" sub="Compras, pagos y ventas se reflejan aquí automáticamente."
         action={<div className="flex gap-2">
+          <Btn size="sm" variant="ghost" onClick={() => setModal('capital')}>💰 Base inicial</Btn>
           <Btn size="sm" variant="mustard" onClick={() => setModal('ingreso')}>➕ Ingreso</Btn>
           <Btn size="sm" variant="danger" onClick={() => setModal('egreso')}>➕ Egreso</Btn>
         </div>} />
+
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-3.5">
+        <StatCard label="Base inicial" value={fmt$(capitalInicial)} />
+        <StatCard label="Saldo actual del negocio" value={fmt$(saldoActual)} tone={saldoActual >= 0 ? 'sage' : 'wine'} />
+      </div>
+
+      <p className="text-creamsoft text-[11.5px] mb-5">Este mes ↓</p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
         <StatCard label="Ingresos (ventas + otros)" value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
         <StatCard label="Egresos (compras)" value={fmt$(egresosCompras)} tone="gold" />
         <StatCard label="Egresos (personal)" value={fmt$(egresosPagos)} tone="champagne" />
         <StatCard label="Otros egresos" value={fmt$(egresosOtros)} />
       </div>
-      <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
+
+      <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1 mb-6">
         <Card className="p-5">
           <h3 className="font-serif text-lg font-semibold mb-3">Ingresos extra registrados</h3>
           {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos manuales aún.</p> :
@@ -648,13 +689,58 @@ export function TabFinanzas({ negocio, data, reload, notify }) {
             ))}
         </Card>
       </div>
-      {modal && (
+
+      <ReportePeriodo negocio={negocio} data={data} />
+
+      {modal === 'capital' && (
+        <CapitalModal negocio={negocio} onClose={() => setModal(null)}
+          onSaved={async (nuevoValor) => {
+            setModal(null)
+            notify('Base inicial guardada')
+            if (onNegocioUpdated) await onNegocioUpdated({ capital_inicial: nuevoValor })
+          }} />
+      )}
+      {(modal === 'ingreso' || modal === 'egreso') && (
         <MovimientoModal negocio={negocio} tipo={modal} onClose={() => setModal(null)}
           onSaved={() => { setModal(null); notify('Movimiento registrado'); reload() }} />
       )}
     </div>
   )
 }
+
+function CapitalModal({ negocio, onClose, onSaved }) {
+  const [valor, setValor] = useState(negocio.capital_inicial || 0)
+  const [guardando, setGuardando] = useState(false)
+  async function submit(e) {
+    e.preventDefault()
+    setGuardando(true)
+    try {
+      const nuevoValor = parseFloat(valor) || 0
+      await updateCapitalInicial(negocio.id, nuevoValor)
+      onSaved(nuevoValor)
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <Modal onClose={onClose}>
+      <h2 className="font-serif text-xl font-semibold mb-2">Base inicial del negocio</h2>
+      <p className="text-creamsoft text-[13px] mb-4">
+        Es el dinero con el que arrancó el negocio, antes de empezar a registrar ventas, compras y gastos en Fogón.
+        Se suma a todos los movimientos para calcular el saldo actual real.
+      </p>
+      <form onSubmit={submit}>
+        <Field label="Base inicial (COP)">
+          <Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
+        </Field>
+        <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
+          {guardando ? 'Guardando…' : 'Guardar base inicial'}
+        </Btn>
+      </form>
+    </Modal>
+  )
+}
+
 function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
   const [concepto, setConcepto] = useState('')
   const [valor, setValor] = useState('')
@@ -674,6 +760,97 @@ function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
         <Btn variant="primary" className="w-full justify-center">Guardar</Btn>
       </form>
     </Modal>
+  )
+}
+
+/* ---------------- Reporte por día / mes (para imprimir o guardar como PDF) ----------------
+   El usuario escoge un día o un mes, ve el resumen de ese periodo y le da "Imprimir".
+   El diálogo de impresión del navegador siempre trae la opción "Guardar como PDF",
+   así que con este mismo botón se cubre imprimir en papel o generar el PDF para el banco. */
+function ReportePeriodo({ negocio, data }) {
+  const [tipoRango, setTipoRango] = useState('mes') // 'dia' | 'mes'
+  const [fecha, setFecha] = useState(todayStr())
+  const [mes, setMes] = useState(monthStr(new Date()))
+
+  const enRango = (d) => (tipoRango === 'dia' ? dateStr(d) === fecha : monthStr(d) === mes)
+
+  const ventas = data.ventas.filter((v) => enRango(v.creado_en))
+  const ingresos = data.ingresos.filter((i) => enRango(i.creado_en))
+  const compras = data.compras.filter((c) => enRango(c.creado_en))
+  const pagos = data.trabajadores.flatMap((w) => w.pagos.map((p) => ({ ...p, trabajador: w.nombre }))).filter((p) => enRango(p.creado_en))
+  const egresos = data.egresos.filter((e) => enRango(e.creado_en))
+
+  const totalVentas = ventas.reduce((a, v) => a + v.total, 0)
+  const totalIngresos = ingresos.reduce((a, i) => a + i.valor, 0)
+  const totalCompras = compras.reduce((a, c) => a + c.valor, 0)
+  const totalPagos = pagos.reduce((a, p) => a + p.valor, 0)
+  const totalEgresos = egresos.reduce((a, e) => a + e.valor, 0)
+  const resultado = (totalVentas + totalIngresos) - (totalCompras + totalPagos + totalEgresos)
+
+  const movimientos = [
+    ...ventas.map((v) => ({ fecha: v.creado_en, tipo: 'Venta', concepto: 'Pedido de clientes', valor: v.total, signo: 1 })),
+    ...ingresos.map((i) => ({ fecha: i.creado_en, tipo: 'Ingreso', concepto: i.concepto, valor: i.valor, signo: 1 })),
+    ...compras.map((c) => ({ fecha: c.creado_en, tipo: 'Compra', concepto: c.ingredientes?.nombre || 'Insumo', valor: c.valor, signo: -1 })),
+    ...pagos.map((p) => ({ fecha: p.creado_en, tipo: 'Pago personal', concepto: p.trabajador, valor: p.valor, signo: -1 })),
+    ...egresos.map((e) => ({ fecha: e.creado_en, tipo: 'Egreso', concepto: e.concepto, valor: e.valor, signo: -1 })),
+  ].sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+
+  const etiquetaPeriodo = tipoRango === 'dia' ? fmtDateLong(fecha + 'T12:00:00') : fmtMonthLabel(mes)
+
+  return (
+    <Card className="p-5">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4 no-print">
+        <div>
+          <h3 className="font-serif text-lg font-semibold">Reporte por día o mes</h3>
+          <p className="text-creamsoft text-[12.5px]">Para llevar al banco o para tu control — imprime o guarda como PDF.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={tipoRango} onChange={(e) => setTipoRango(e.target.value)} className="!w-auto">
+            <option value="dia">Por día</option>
+            <option value="mes">Por mes</option>
+          </Select>
+          {tipoRango === 'dia' ? (
+            <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="!w-auto" />
+          ) : (
+            <Input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="!w-auto" />
+          )}
+          <Btn size="sm" variant="primary" onClick={() => window.print()}>🖨️ Imprimir / PDF</Btn>
+        </div>
+      </div>
+
+      <div id="finanzas-print-area">
+        <div className="mb-4 hidden print:block">
+          <h2 className="font-serif text-xl font-semibold">{negocio.nombre}</h2>
+          <p className="text-[13px]">Reporte de ingresos y egresos — {etiquetaPeriodo}</p>
+          <p className="text-[11px]">Generado el {fmtDateLong(new Date())}</p>
+        </div>
+
+        <p className="text-creamsoft text-[12px] mb-3 print:hidden">Periodo: <b className="text-cream">{etiquetaPeriodo}</b></p>
+
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 mb-5">
+          <StatCard label="Ventas" value={fmt$(totalVentas)} tone="sage" />
+          <StatCard label="Otros ingresos" value={fmt$(totalIngresos)} tone="sage" />
+          <StatCard label="Compras" value={fmt$(totalCompras)} tone="gold" />
+          <StatCard label="Pagos personal" value={fmt$(totalPagos)} tone="champagne" />
+          <StatCard label="Otros egresos" value={fmt$(totalEgresos)} />
+          <StatCard label="Resultado del periodo" value={fmt$(resultado)} tone={resultado >= 0 ? 'sage' : 'wine'} />
+        </div>
+
+        {movimientos.length === 0 ? (
+          <Empty>No hay movimientos registrados en este periodo.</Empty>
+        ) : (
+          <Table
+            head={['Fecha', 'Tipo', 'Concepto', 'Valor']}
+            rows={movimientos.map((m) => [
+              <span className="font-mono">{fmtDate(m.fecha)}</span>,
+              m.tipo,
+              m.concepto,
+              <span className="font-mono">{m.signo > 0 ? '+' : '−'} {fmt$(m.valor)}</span>,
+            ])}
+          />
+        )}
+      </div>
+    </Card>
   )
 }
 
