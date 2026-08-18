@@ -4,7 +4,7 @@ import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, dateStr, monthStr, todayStr,
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto, reordenarProductos,
   createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido,
-  createTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso, updateCapitalInicial,
+  createTrabajador, updateTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso, updateCapitalInicial,
 } from '../lib/api'
 
 const estadoTone = (e) => (e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : 'entregado')
@@ -592,13 +592,13 @@ export function TabVentas({ data }) {
 
 /* ---------------- Trabajadores ---------------- */
 export function TabTrabajadores({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(false)
+  const [modal, setModal] = useState(null) // null | 'new' | trabajador (editar)
   const [pagoFor, setPagoFor] = useState(null)
 
   return (
     <div>
       <SectionTitle title="Trabajadores" sub={`Equipo de ${negocio.nombre}.`}
-        action={<Btn variant="primary" onClick={() => setModal(true)}>➕ Nuevo trabajador</Btn>} />
+        action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo trabajador</Btn>} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {data.trabajadores.map((w) => {
           const ultimoPago = w.pagos.length ? w.pagos[w.pagos.length - 1] : null
@@ -610,6 +610,7 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
               <p className="font-mono font-bold mb-3">{fmt$(w.pago)}/mes</p>
               <div className="flex gap-1.5 flex-wrap">
                 <Btn size="sm" variant="mustard" onClick={() => setPagoFor(w)}>Registrar pago</Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setModal(w)}>Editar</Btn>
                 <Btn size="sm" variant="ghost" onClick={async () => { await toggleTrabajadorEstado(w); reload() }}>
                   {w.estado === 'Activo' ? 'Desactivar' : 'Activar'}
                 </Btn>
@@ -620,14 +621,39 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
         })}
       </div>
       {modal && (
-        <TrabajadorModal negocio={negocio} onClose={() => setModal(false)}
-          onSaved={() => { setModal(false); notify('Trabajador agregado'); reload() }} />
+        <TrabajadorModal negocio={negocio} trabajador={modal === 'new' ? null : modal} onClose={() => setModal(null)}
+          onSaved={() => { const editando = modal !== 'new'; setModal(null); notify(editando ? 'Trabajador actualizado' : 'Trabajador agregado'); reload() }} />
       )}
       {pagoFor && (
         <PagoModal negocio={negocio} trabajador={pagoFor} onClose={() => setPagoFor(null)}
           onSaved={() => { setPagoFor(null); notify(`Pago registrado a ${pagoFor.nombre}`); reload() }} />
       )}
     </div>
+  )
+}
+function TrabajadorModal({ negocio, trabajador, onClose, onSaved }) {
+  const editando = !!trabajador
+  const [nombre, setNombre] = useState(trabajador?.nombre || '')
+  const [cargo, setCargo] = useState(trabajador?.cargo || '')
+  const [pago, setPago] = useState(trabajador?.pago ?? '')
+  async function submit(e) {
+    e.preventDefault()
+    if (editando) await updateTrabajador(trabajador.id, { nombre, cargo, pago: parseFloat(pago) || 0 })
+    else await createTrabajador(negocio.id, { nombre, cargo, pago: parseFloat(pago) || 0 })
+    onSaved()
+  }
+  return (
+    <Modal onClose={onClose}>
+      <h2 className="font-serif text-xl font-semibold mb-4">{editando ? `Editar — ${trabajador.nombre}` : 'Nuevo trabajador'}</h2>
+      <form onSubmit={submit}>
+        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Cargo"><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>
+          <Field label="Pago mensual (COP)"><Input required type="number" value={pago} onChange={(e) => setPago(e.target.value)} /></Field>
+        </div>
+        <Btn variant="primary" className="w-full justify-center">{editando ? 'Guardar cambios' : 'Agregar trabajador'}</Btn>
+      </form>
+    </Modal>
   )
 }
 function TrabajadorModal({ negocio, onClose, onSaved }) {

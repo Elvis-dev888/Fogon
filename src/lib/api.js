@@ -294,6 +294,10 @@ export async function createTrabajador(negocioId, trabajador) {
   const { error } = await supabase.from('trabajadores').insert({ negocio_id: negocioId, ...trabajador, estado: 'Activo' })
   if (error) throw error
 }
+export async function updateTrabajador(id, cambios) {
+  const { error } = await supabase.from('trabajadores').update(cambios).eq('id', id)
+  if (error) throw error
+}
 export async function toggleTrabajadorEstado(trabajador) {
   const nuevoEstado = trabajador.estado === 'Activo' ? 'Inactivo' : 'Activo'
   const { error } = await supabase.from('trabajadores').update({ estado: nuevoEstado }).eq('id', trabajador.id)
