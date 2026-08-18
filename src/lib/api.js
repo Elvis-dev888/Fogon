@@ -1,292 +1,178 @@
-import { supabase } from './supabaseClient'
+import { useEffect, useState, useCallback } from 'react'
+import {
+  fetchCategorias, fetchProductos, fetchIngredientes, fetchCompras,
+  fetchPedidos, fetchVentas, fetchTrabajadores, fetchIngresos, fetchEgresos,
+} from '../lib/api'
+import {
+  TabDashboard, TabProductos, TabCategorias, TabInventario, TabCompras,
+  TabPedidos, TabVentas, TabTrabajadores, TabFinanzas, TabEstadisticas, TabMiNegocio,
+} from './AdminTabs'
+import { supabase } from '../lib/supabaseClient'
+import { playPedidoNuevo, fmt$ } from '../lib/helpers'
+import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
 
-/* =========================================================
-   NEGOCIOS
-   ========================================================= */
-export async function fetchNegocios() {
-  const { data: negocios, error } = await supabase.from('negocios').select('*').order('creado_en')
-  if (error) throw error
+const TABS = [
+  ['dashboard', '📊', 'Dashboard'],
+  ['minegocio', '🏪', 'Mi negocio'],
+  ['productos', '🍔', 'Productos'],
+  ['categorias', '🏷️', 'Categorías'],
+  ['inventario', '📦', 'Inventario'],
+  ['compras', '🧾', 'Compras'],
+  ['pedidos', '🧑‍🍳', 'Pedidos'],
+  ['ventas', '💰', 'Ventas'],
+  ['trabajadores', '👥', 'Trabajadores'],
+  ['finanzas', '📈', 'Ingresos / Egresos'],
+  ['estadisticas', '📉', 'Estadísticas'],
+]
 
-  // Traemos conteos simples para las tarjetas del Superadmin (consultas ligeras, una por negocio).
-  // Si alguna de estas consultas extra falla, no debe tumbar la lista completa de negocios —
-  // por eso cada negocio se protege con su propio try/catch y cae a stats en cero.
-  const withStats = await Promise.all(
-    negocios.map(async (n) => {
-      try {
-        const [{ count: productosCount, error: e1 }, { count: pedidosCount, error: e2 }, { data: ventas, error: e3 }] =
-          await Promise.all([
-            supabase.from('productos').select('id', { count: 'exact', head: true }).eq('negocio_id', n.id),
-            supabase.from('pedidos').select('id', { count: 'exact', head: true }).eq('negocio_id', n.id),
-            supabase.from('ventas').select('total, creado_en').eq('negocio_id', n.id),
-          ])
-        if (e1) throw e1
-        if (e2) throw e2
-        if (e3) throw e3
-        const now = new Date()
-        const ventasMes = (ventas || [])
-          .filter((v) => {
-            const d = new Date(v.creado_en)
-            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-          })
-          .reduce((a, v) => a + v.total, 0)
-        return { ...n, productosCount, pedidosCount, ventasMes }
-      } catch (err) {
-        console.error(`[Fogón] No se pudieron cargar las estadísticas de "${n.nombre}":`, err)
-        return { ...n, productosCount: 0, pedidosCount: 0, ventasMes: 0 }
-      }
-    })
+export default function AdminView({ negocio, onExit, notify, onNegocioActualizado }) {
+  const [tab, setTab] = useState('dashboard')
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    const [categorias, productos, ingredientes, compras, pedidos, ventas, trabajadores, ingresos, egresos] =
+      await Promise.all([
+        fetchCategorias(negocio.id),
+        fetchProductos(negocio.id),
+        fetchIngredientes(negocio.id),
+        fetchCompras(negocio.id),
+        fetchPedidos(negocio.id),
+        fetchVentas(negocio.id),
+        fetchTrabajadores(negocio.id),
+        fetchIngresos(negocio.id),
+        fetchEgresos(negocio.id),
+      ])
+    setData({ categorias, productos, ingredientes, compras, pedidos, ventas, trabajadores, ingresos, egresos })
+    setLoading(false)
+  }, [negocio.id])
+
+  useEffect(() => {
+    reload()
+  }, [reload])
+
+  // Timbre + registro en vivo: cuando un cliente confirma un pedido, le suena
+  // y le aparece de una vez al que esté administrando este negocio — sin
+  // necesidad de recargar la página ni cambiar de pestaña.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin-pedidos-${negocio.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `negocio_id=eq.${negocio.id}` },
+        (payload) => {
+          playPedidoNuevo()
+          notify(`🔔 Pedido nuevo de ${payload.new.cliente} — ${fmt$(payload.new.total)}`)
+          reload()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `negocio_id=eq.${negocio.id}` },
+        () => reload()
+      )
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [negocio.id, reload, notify])
+
+  if (loading || !data) {
+    return <p className="text-creamsoft text-sm">Cargando información de {negocio.nombre}…</p>
+  }
+
+  const props = { negocio, data, reload, notify, onNegocioActualizado }
+
+  return (
+    <div className="grid grid-cols-[220px_1fr] gap-5 items-start max-[820px]:grid-cols-1">
+      <nav className="bg-paper2 border border-line rounded p-4 sticky top-[78px] flex flex-col gap-0.5 max-[820px]:static max-[820px]:flex-row max-[820px]:overflow-x-auto">
+        <div className="flex items-center gap-2.5 pb-3.5 mb-2.5 border-b border-line max-[820px]:hidden">
+          {negocio.logo_url ? (
+            <img src={negocio.logo_url} alt={negocio.nombre} className="w-8 h-8 rounded-full object-cover border border-gold shrink-0" />
+          ) : (
+            <span className="text-lg shrink-0">{negocio.emoji}</span>
+          )}
+          <span className="text-gold font-serif font-semibold text-base truncate">{negocio.nombre}</span>
+        </div>
+        <CodigoEmpleado negocioId={negocio.id} notify={notify} />
+        {TABS.map(([k, icon, label]) => {
+          const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado').length : 0
+          return (
+            <button
+              key={k}
+              onClick={() => setTab(k)}
+              className={`text-left px-3 py-2.5 rounded-sm text-[13px] flex items-center gap-2.5 whitespace-nowrap transition-colors ${
+                tab === k ? 'bg-gold/15 text-gold font-semibold' : 'text-creamsoft hover:bg-white/5 hover:text-cream'
+              }`}
+            >
+              {icon} {label}
+              {pendientesPedidos > 0 && (
+                <span className="ml-auto bg-gold text-paper text-[10px] font-bold rounded-full w-5 h-5 grid place-items-center animate-pulse">
+                  {pendientesPedidos}
+                </span>
+              )}
+            </button>
+          )
+        })}
+        <button
+          onClick={onExit}
+          className="mt-2.5 pt-3 border-t border-line text-left px-3 py-2.5 text-[13px] text-creamsoft hover:text-cream"
+        >
+          ⏻ Cerrar sesión
+        </button>
+      </nav>
+      <div className="animate-fadein">
+        {tab === 'dashboard' && <TabDashboard {...props} />}
+        {tab === 'minegocio' && <TabMiNegocio {...props} />}
+        {tab === 'productos' && <TabProductos {...props} />}
+        {tab === 'categorias' && <TabCategorias {...props} />}
+        {tab === 'inventario' && <TabInventario {...props} />}
+        {tab === 'compras' && <TabCompras {...props} />}
+        {tab === 'pedidos' && <TabPedidos {...props} />}
+        {tab === 'ventas' && <TabVentas {...props} />}
+        {tab === 'trabajadores' && <TabTrabajadores {...props} />}
+        {tab === 'finanzas' && <TabFinanzas {...props} />}
+        {tab === 'estadisticas' && <TabEstadisticas {...props} />}
+      </div>
+    </div>
   )
-  return withStats
 }
 
-export async function createNegocio({ nombre, slogan, emoji }) {
-  const { data, error } = await supabase
-    .from('negocios')
-    .insert({ nombre, slogan, emoji: emoji || '🍴', estado: 'Activo' })
-    .select()
-    .single()
-  if (error) throw error
-  return data
-}
+function CodigoEmpleado({ negocioId, notify }) {
+  const [codigo, setCodigo] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [regenerando, setRegenerando] = useState(false)
 
-export async function toggleNegocioEstado(negocio) {
-  const nuevoEstado = negocio.estado === 'Activo' ? 'Pausado' : 'Activo'
-  const { error } = await supabase.from('negocios').update({ estado: nuevoEstado }).eq('id', negocio.id)
-  if (error) throw error
-}
+  useEffect(() => {
+    fetchCodigoNegocio(negocioId).then(setCodigo).finally(() => setLoading(false))
+  }, [negocioId])
 
-export async function updateNegocio(id, cambios) {
-  const { error } = await supabase.from('negocios').update(cambios).eq('id', id)
-  if (error) throw error
-}
+  async function copiar() {
+    await navigator.clipboard.writeText(codigo)
+    notify('Código copiado — pásaselo a tu empleado')
+  }
 
-// Sube el logo a Storage dentro de una carpeta con el id del negocio
-// (mismo patrón que las fotos de producto) y devuelve la URL pública.
-export async function subirLogoNegocio(negocioId, file) {
-  const ext = file.name.split('.').pop()
-  const path = `${negocioId}/logo-${crypto.randomUUID()}.${ext}`
-  const { error } = await supabase.storage.from('negocios').upload(path, file, { upsert: true })
-  if (error) throw error
-  const { data } = supabase.storage.from('negocios').getPublicUrl(path)
-  return data.publicUrl
-}
+  async function regenerar() {
+    setRegenerando(true)
+    try {
+      const nuevo = await regenerarCodigoNegocio()
+      setCodigo(nuevo)
+      notify('Código nuevo generado — el anterior ya no sirve')
+    } finally {
+      setRegenerando(false)
+    }
+  }
 
-/* =========================================================
-   CATEGORIAS
-   ========================================================= */
-export async function fetchCategorias(negocioId) {
-  const { data, error } = await supabase.from('categorias').select('*').eq('negocio_id', negocioId).order('nombre')
-  if (error) throw error
-  return data
-}
-export async function createCategoria(negocioId, nombre) {
-  const { error } = await supabase.from('categorias').insert({ negocio_id: negocioId, nombre })
-  if (error) throw error
-}
-export async function deleteCategoria(id) {
-  const { error } = await supabase.from('categorias').delete().eq('id', id)
-  if (error) throw error
-}
+  if (loading) return null
 
-/* =========================================================
-   PRODUCTOS  (adiciones se guardan como jsonb: [{nombre, precio}])
-   ========================================================= */
-export async function fetchProductos(negocioId) {
-  const { data, error } = await supabase.from('productos').select('*').eq('negocio_id', negocioId).order('categoria')
-  if (error) throw error
-  return data
-}
-export async function createProducto(negocioId, producto) {
-  const { error } = await supabase.from('productos').insert({ negocio_id: negocioId, ...producto })
-  if (error) throw error
-}
-export async function updateProducto(id, cambios) {
-  const { error } = await supabase.from('productos').update(cambios).eq('id', id)
-  if (error) throw error
-}
-export async function deleteProducto(id) {
-  const { error } = await supabase.from('productos').delete().eq('id', id)
-  if (error) throw error
-}
-
-// Sube la foto a Storage dentro de una carpeta con el id del negocio
-// (así las políticas de seguridad saben de quién es cada foto) y
-// devuelve la URL pública para guardarla en productos.imagen_url.
-export async function subirFotoProducto(negocioId, file) {
-  const ext = file.name.split('.').pop()
-  const path = `${negocioId}/${crypto.randomUUID()}.${ext}`
-  const { error } = await supabase.storage.from('productos').upload(path, file, { upsert: true })
-  if (error) throw error
-  const { data } = supabase.storage.from('productos').getPublicUrl(path)
-  return data.publicUrl
-}
-
-/* =========================================================
-   INGREDIENTES / INVENTARIO
-   ========================================================= */
-export async function fetchIngredientes(negocioId) {
-  const { data, error } = await supabase.from('ingredientes').select('*').eq('negocio_id', negocioId).order('nombre')
-  if (error) throw error
-  return data
-}
-export async function createIngrediente(negocioId, ingrediente) {
-  const { error } = await supabase.from('ingredientes').insert({ negocio_id: negocioId, ...ingrediente })
-  if (error) throw error
-}
-export async function setIngredienteStock(id, stock) {
-  const { error } = await supabase.from('ingredientes').update({ stock }).eq('id', id)
-  if (error) throw error
-}
-
-/* =========================================================
-   COMPRAS  (aumentan inventario + quedan como egreso implícito)
-   ========================================================= */
-export async function fetchCompras(negocioId) {
-  const { data, error } = await supabase
-    .from('compras')
-    .select('*, ingredientes(nombre)')
-    .eq('negocio_id', negocioId)
-    .order('creado_en', { ascending: false })
-  if (error) throw error
-  return data
-}
-export async function registrarCompra(negocioId, { ingredienteId, cantidad, valor }, stockActual) {
-  const { error: e1 } = await supabase.from('compras').insert({
-    negocio_id: negocioId,
-    ingrediente_id: ingredienteId,
-    cantidad,
-    valor,
-  })
-  if (e1) throw e1
-  const { error: e2 } = await supabase
-    .from('ingredientes')
-    .update({ stock: stockActual + cantidad })
-    .eq('id', ingredienteId)
-  if (e2) throw e2
-}
-
-/* =========================================================
-   PEDIDOS + ITEMS  (crear pedido genera también la venta)
-   ========================================================= */
-export async function fetchPedidos(negocioId) {
-  const { data, error } = await supabase
-    .from('pedidos')
-    .select('*, pedido_items(*)')
-    .eq('negocio_id', negocioId)
-    .order('numero', { ascending: false })
-  if (error) throw error
-  return data
-}
-
-export async function crearPedido(negocioId, { cliente, items, total }) {
-  const { data: pedido, error: e1 } = await supabase
-    .from('pedidos')
-    .insert({ negocio_id: negocioId, cliente, total, estado: 'Pendiente' })
-    .select()
-    .single()
-  if (e1) throw e1
-
-    const itemsPayload = items.map((it) => ({
-    pedido_id: pedido.id,
-    producto_id: it.productId,
-    nombre: it.nombre,
-    cantidad: it.cantidad,
-    adiciones: it.adiciones,
-    observaciones: it.obs,
-    subtotal: it.subtotal,
-  }))
-  const { error: e2 } = await supabase.from('pedido_items').insert(itemsPayload)
-  if (e2) throw e2
-
-  // La venta se genera automáticamente al confirmar el pedido
-  const { error: e3 } = await supabase.from('ventas').insert({
-    negocio_id: negocioId,
-    pedido_id: pedido.id,
-    total,
-  })
-  if (e3) throw e3
-
-  return pedido
-}
-
-export async function avanzarEstadoPedido(pedidoId, nuevoEstado) {
-  const { error } = await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', pedidoId)
-  if (error) throw error
-}
-
-export function suscribirsePedido(pedidoId, onChange) {
-  const channel = supabase
-    .channel(`pedido-${pedidoId}`)
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'pedidos', filter: `id=eq.${pedidoId}` },
-      (payload) => onChange(payload.new)
-    )
-    .subscribe()
-  return () => supabase.removeChannel(channel)
-}
-
-/* =========================================================
-   VENTAS
-   ========================================================= */
-export async function fetchVentas(negocioId) {
-  const { data, error } = await supabase
-    .from('ventas')
-    .select('*')
-    .eq('negocio_id', negocioId)
-    .order('creado_en', { ascending: false })
-  if (error) throw error
-  return data
-}
-
-/* =========================================================
-   TRABAJADORES + PAGOS
-   ========================================================= */
-export async function fetchTrabajadores(negocioId) {
-  const { data, error } = await supabase
-    .from('trabajadores')
-    .select('*, pagos(*)')
-    .eq('negocio_id', negocioId)
-    .order('nombre')
-  if (error) throw error
-  return data
-}
-export async function createTrabajador(negocioId, trabajador) {
-  const { error } = await supabase.from('trabajadores').insert({ negocio_id: negocioId, ...trabajador, estado: 'Activo' })
-  if (error) throw error
-}
-export async function updateTrabajador(id, cambios) {
-  const { error } = await supabase.from('trabajadores').update(cambios).eq('id', id)
-  if (error) throw error
-}
-export async function toggleTrabajadorEstado(trabajador) {
-  const nuevoEstado = trabajador.estado === 'Activo' ? 'Inactivo' : 'Activo'
-  const { error } = await supabase.from('trabajadores').update({ estado: nuevoEstado }).eq('id', trabajador.id)
-  if (error) throw error
-}
-export async function registrarPago(trabajadorId, negocioId, { periodo, valor }) {
-  const { error } = await supabase.from('pagos').insert({ trabajador_id: trabajadorId, negocio_id: negocioId, periodo, valor })
-  if (error) throw error
-}
-
-/* =========================================================
-   INGRESOS / EGRESOS manuales
-   ========================================================= */
-export async function fetchIngresos(negocioId) {
-  const { data, error } = await supabase.from('ingresos').select('*').eq('negocio_id', negocioId).order('creado_en', { ascending: false })
-  if (error) throw error
-  return data
-}
-export async function fetchEgresos(negocioId) {
-  const { data, error } = await supabase.from('egresos').select('*').eq('negocio_id', negocioId).order('creado_en', { ascending: false })
-  if (error) throw error
-  return data
-}
-export async function createIngreso(negocioId, { concepto, valor }) {
-  const { error } = await supabase.from('ingresos').insert({ negocio_id: negocioId, concepto, valor })
-  if (error) throw error
-}
-export async function createEgreso(negocioId, { concepto, valor }) {
-  const { error } = await supabase.from('egresos').insert({ negocio_id: negocioId, concepto, valor })
-  if (error) throw error
+  return (
+    <div className="mb-3 pb-3 border-b border-line max-[820px]:hidden">
+      <p className="text-[10px] uppercase tracking-wide text-creamsoft mb-1">Código para tu empleado</p>
+      <button onClick={copiar} className="font-mono text-sm tracking-[0.25em] text-cream bg-paper border border-line rounded-sm px-2.5 py-1.5 w-full text-center hover:border-gold">
+        {codigo}
+      </button>
+      <button onClick={regenerar} disabled={regenerando} className="text-[11px] text-creamsoft hover:text-gold mt-1.5 w-full text-center">
+        {regenerando ? 'Generando…' : 'Generar uno nuevo'}
+      </button>
+    </div>
+  )
 }
