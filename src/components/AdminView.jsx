@@ -127,7 +127,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
         {tab === 'categorias' && <TabCategorias {...props} />}
         {tab === 'inventario' && <TabInventario {...props} />}
         {tab === 'compras' && <TabCompras {...props} />}
-        {tab === 'pedidos' && <TabPedidos {...props} />}
+        {tab === 'pedidos' && <TabPedidos {...props} simple />}
         {tab === 'ventas' && <TabVentas {...props} />}
         {tab === 'trabajadores' && <TabTrabajadores {...props} />}
         {tab === 'finanzas' && <TabFinanzas {...props} />}
