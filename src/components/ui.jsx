@@ -142,6 +142,7 @@ export function Pill({ children, tone = 'default' }) {
     preparacion: 'bg-champagne/15 text-champagne',
     listo: 'bg-sage/15 text-sage',
     entregado: 'bg-gold/15 text-gold',
+    cancelado: 'bg-wine/15 text-wine',
     activo: 'bg-sage/15 text-sage border border-sage/35',
     pausado: 'bg-wine/15 text-wine border border-wine/35',
   }

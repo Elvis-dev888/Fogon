@@ -196,7 +196,7 @@ export async function crearPedido(negocioId, { cliente, items, total }) {
 
   const itemsPayload = items.map((it) => ({
     pedido_id: pedido.id,
-    producto_id: it.productId,
+    producto_id: it.producto_id || it.productId,
     nombre: it.nombre,
     cantidad: it.cantidad,
     adiciones: it.adiciones,
@@ -219,6 +219,66 @@ export async function crearPedido(negocioId, { cliente, items, total }) {
 
 export async function avanzarEstadoPedido(pedidoId, nuevoEstado) {
   const { error } = await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', pedidoId)
+  if (error) throw error
+}
+
+// Reversa el stock que se descontó a cada producto de este pedido (el mismo
+// gatillo de la base de datos que descuenta al insertar un pedido_item no
+// existe al revés, así que aquí se hace a mano). Solo toca productos que sí
+// llevan control de stock (stock no nulo) — igual que hace el gatillo.
+async function restaurarStockItems(items, productos) {
+  for (const it of items || []) {
+    const productoId = it.producto_id || it.productId
+    if (!productoId) continue
+    const prod = productos.find((p) => p.id === productoId)
+    if (prod && prod.stock !== null && prod.stock !== undefined) {
+      await supabase.from('productos').update({ stock: prod.stock + it.cantidad }).eq('id', productoId)
+    }
+  }
+}
+
+// Edita un pedido ya confirmado: reemplaza sus items por los nuevos,
+// recalcula el total, lo deja igual en la "venta" asociada (para que
+// Finanzas y Ventas no queden desfasados) y ajusta el stock de productos
+// (revierte el de los items viejos, el gatillo descuenta el de los nuevos).
+export async function actualizarPedido(pedido, productos, nuevosItems) {
+  await restaurarStockItems(pedido.pedido_items || pedido.items, productos)
+
+  const { error: eDel } = await supabase.from('pedido_items').delete().eq('pedido_id', pedido.id)
+  if (eDel) throw eDel
+
+  const total = nuevosItems.reduce((a, it) => a + it.subtotal, 0)
+  if (nuevosItems.length > 0) {
+    const itemsPayload = nuevosItems.map((it) => ({
+      pedido_id: pedido.id,
+      producto_id: it.producto_id || it.productId || null,
+      nombre: it.nombre,
+      cantidad: it.cantidad,
+      adiciones: it.adiciones,
+      observaciones: it.obs || '',
+      subtotal: it.subtotal,
+    }))
+    const { error: eIns } = await supabase.from('pedido_items').insert(itemsPayload)
+    if (eIns) throw eIns
+  }
+
+  const { error: eUpd } = await supabase.from('pedidos').update({ total }).eq('id', pedido.id)
+  if (eUpd) throw eUpd
+  await supabase.from('ventas').update({ total }).eq('pedido_id', pedido.id)
+
+  return { items: nuevosItems, total }
+}
+
+// Cancela un pedido: nunca lo borra (queda con estado "Cancelado" para el
+// historial), le devuelve el stock a los productos que tenía, y borra la
+// "venta" asociada para que no siga contando en los reportes de ingresos.
+export async function cancelarPedido(pedido, productos, canceladoPor) {
+  await restaurarStockItems(pedido.pedido_items || pedido.items, productos)
+  await supabase.from('ventas').delete().eq('pedido_id', pedido.id)
+  const { error } = await supabase
+    .from('pedidos')
+    .update({ estado: 'Cancelado', cancelado_en: new Date().toISOString(), cancelado_por: canceladoPor || null })
+    .eq('id', pedido.id)
   if (error) throw error
 }
 

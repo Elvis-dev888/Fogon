@@ -95,7 +95,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
         </div>
         <CodigoEmpleado negocioId={negocio.id} notify={notify} />
         {TABS.map(([k, icon, label]) => {
-          const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado').length : 0
+          const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length : 0
           return (
             <button
               key={k}

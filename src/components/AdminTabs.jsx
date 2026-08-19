@@ -3,12 +3,15 @@ import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty
 import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
-  createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido,
+  createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido, actualizarPedido, cancelarPedido,
   createTrabajador, updateTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso,
   updateNegocio, subirLogoNegocio, updateCapitalInicial,
 } from '../lib/api'
+import { EditarPedidoModal, ConfirmCancelModal } from './PedidoCompartido'
 
-const estadoTone = (e) => (e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : 'entregado')
+const estadoTone = (e) => (
+  e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : e === 'Cancelado' ? 'cancelado' : 'entregado'
+)
 
 /* ---------------- Mi negocio (logo + datos básicos) ---------------- */
 export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
@@ -81,7 +84,7 @@ export function TabDashboard({ negocio, data }) {
   const pagosMes = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + p.valor, 0)
   const otrosMes = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + e.valor, 0)
   const resultado = ventasMes - (comprasMes + pagosMes + otrosMes)
-  const pendientes = data.pedidos.filter((p) => p.estado !== 'Entregado').length
+  const pendientes = data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length
   const lowStock = data.ingredientes.filter((i) => i.stock <= i.minimo)
 
   return (
@@ -132,14 +135,16 @@ export function TabDashboard({ negocio, data }) {
 
 /* ---------------- Productos ---------------- */
 export function TabProductos({ negocio, data, reload, notify }) {
-  const [modal, setModal] = useState(null) // null | 'new' | producto object
+  const [modal, setModal] = useState(null) // null | 'new' | 'new-adicion' | producto object
+  const menu = data.productos.filter((p) => !p.es_adicion)
+  const adicionales = data.productos.filter((p) => p.es_adicion)
 
   return (
     <div>
-      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${data.productos.length} productos.`}
+      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${menu.length} productos.`}
         action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
-        {data.productos.map((p) => (
+        {menu.map((p) => (
           <ProductoCard key={p.id} p={p}
             onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
             onEdit={() => setModal(p)}
@@ -147,11 +152,41 @@ export function TabProductos({ negocio, data, reload, notify }) {
           />
         ))}
       </div>
+
+      <div className="mt-10">
+        <SectionTitle title="Adicionales" sub="Extras que el cliente puede agregarle a cualquier producto (queso, jamón, chicharrón...)."
+          action={<Btn size="sm" variant="mustard" onClick={() => setModal('new-adicion')}>➕ Nuevo adicional</Btn>} />
+        {adicionales.length === 0 ? (
+          <Empty icon="➕">Aún no has creado adicionales.</Empty>
+        ) : (
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
+            {adicionales.map((a) => (
+              <div key={a.id} className="border border-line rounded p-3.5 bg-paper2">
+                <div className="flex justify-between items-start mb-1">
+                  <h4 className="font-semibold text-[14px]">{a.nombre}</h4>
+                  {!a.disponible && <Pill tone="cancelado">Inactivo</Pill>}
+                </div>
+                <div className="font-mono font-bold text-champagne text-[13px] mb-2.5">+ {fmt$(a.precio)}</div>
+                <div className="flex gap-1.5 flex-wrap">
+                  <Btn size="sm" variant="ghost" onClick={async () => { await updateProducto(a.id, { disponible: !a.disponible }); notify(`${a.nombre} ${a.disponible ? 'desactivado' : 'activado'}`); reload() }}>
+                    {a.disponible ? 'Desactivar' : 'Activar'}
+                  </Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => setModal(a)}>Editar</Btn>
+                  <Btn size="sm" variant="danger" onClick={async () => { await deleteProducto(a.id); notify('Adicional eliminado'); reload() }}>Eliminar</Btn>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {modal && (
         <ProductoModal
-          negocio={negocio} categorias={data.categorias} producto={modal === 'new' ? null : modal}
+          negocio={negocio} categorias={data.categorias}
+          producto={modal === 'new' || modal === 'new-adicion' ? null : modal}
+          esAdicionDefault={modal === 'new-adicion'}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); notify(modal === 'new' ? 'Producto creado' : 'Producto actualizado'); reload() }}
+          onSaved={() => { setModal(null); notify(typeof modal === 'string' ? 'Producto creado' : 'Producto actualizado'); reload() }}
         />
       )}
     </div>
@@ -187,7 +222,8 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
   )
 }
 
-function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
+function ProductoModal({ negocio, categorias, producto, esAdicionDefault, onClose, onSaved }) {
+  const esAdicion = producto ? !!producto.es_adicion : !!esAdicionDefault
   const [nombre, setNombre] = useState(producto?.nombre || '')
   const [categoria, setCategoria] = useState(producto?.categoria || categorias[0]?.nombre || '')
   const [precio, setPrecio] = useState(producto?.precio || '')
@@ -217,13 +253,31 @@ function ProductoModal({ negocio, categorias, producto, onClose, onSaved }) {
         urlFinal = await subirFotoProducto(negocio.id, archivo)
         setSubiendo(false)
       }
-      const payload = { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null, stock: stock === '' ? null : parseInt(stock, 10) }
+      const payload = esAdicion
+        ? { nombre, categoria: 'Adicionales', precio: parseFloat(precio) || 0, desc: '', emoji: '➕', imagen_url: null, stock: null, es_adicion: true }
+        : { nombre, categoria, precio: parseFloat(precio) || 0, desc, emoji, imagen_url: urlFinal || null, stock: stock === '' ? null : parseInt(stock, 10) }
       if (producto) await updateProducto(producto.id, payload)
       else await createProducto(negocio.id, { ...payload, disponible: true, adiciones: [] })
       onSaved()
     } finally {
       setSaving(false)
     }
+  }
+
+  if (esAdicion) {
+    return (
+      <Modal onClose={onClose}>
+        <h2 className="font-serif text-xl font-semibold mb-1">{producto ? 'Editar adicional' : 'Nuevo adicional'}</h2>
+        <p className="text-creamsoft text-[13px] mb-4">Va a quedar disponible para agregarse a cualquier producto del menú.</p>
+        <form onSubmit={submit}>
+          <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Queso, Jamón, Huevo" /></Field>
+          <Field label="Precio adicional (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
+          <Btn variant="primary" className="w-full justify-center" disabled={saving}>
+            {saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear adicional'}
+          </Btn>
+        </form>
+      </Modal>
+    )
   }
 
   return (
@@ -459,14 +513,105 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
   )
 }
 
-/* ---------------- Pedidos (kanban) ---------------- */
-export function TabPedidos({ data, reload, notify }) {
+/* ---------------- Pedidos (kanban) ----------------
+   `simple`: usado desde la vista de Empleado — en vez de las 4 columnas y
+   4 pasos (Pendiente → En preparación → Listo → Entregado), el empleado
+   solo ve 2 acciones por pedido: "Pedido aceptado" (para que el cliente
+   sepa que ya lo vieron) y "Entregado". El estado internamente sigue
+   usando los mismos 4 valores (para no romper nada más de la app), solo
+   se saltan pasos al avanzar. En ambos modos, mientras el pedido no esté
+   Entregado ni Cancelado, se puede Editar o Cancelar. */
+export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
+  const [editando, setEditando] = useState(null) // pedido que se está editando
+  const [cancelando, setCancelando] = useState(null) // pedido que se va a cancelar
+  const productos = data.productos || []
+
   async function advance(p) {
     const i = ESTADOS.indexOf(p.estado)
     await avanzarEstadoPedido(p.id, ESTADOS[i + 1])
     notify(`Pedido #${p.numero} → ${ESTADOS[i + 1]}`)
+    if (onAvanzar) onAvanzar(p.id)
     reload()
   }
+  async function aceptar(p) {
+    await avanzarEstadoPedido(p.id, 'En preparación')
+    notify(`Pedido #${p.numero} aceptado`)
+    if (onAvanzar) onAvanzar(p.id)
+    reload()
+  }
+  async function entregar(p) {
+    await avanzarEstadoPedido(p.id, 'Entregado')
+    notify(`Pedido #${p.numero} entregado`)
+    if (onAvanzar) onAvanzar(p.id)
+    reload()
+  }
+
+  const acciones = (p) => (
+    <div className="flex gap-1.5 mt-1.5">
+      <button onClick={() => setEditando(p)} className="text-[11px] text-creamsoft hover:text-gold">✏️ Editar</button>
+      <button onClick={() => setCancelando(p)} className="text-[11px] text-creamsoft hover:text-wine">❌ Cancelar</button>
+    </div>
+  )
+
+  const modales = (
+    <>
+      {editando && (
+        <EditarPedidoModal pedido={editando} productos={productos} onClose={() => setEditando(null)}
+          guardar={(p, prods, items) => actualizarPedido(p, prods, items)}
+          onSaved={() => { const id = editando.id; setEditando(null); notify(`Pedido #${editando.numero} actualizado`); if (onAvanzar) onAvanzar(id); reload() }} />
+      )}
+      {cancelando && (
+        <ConfirmCancelModal pedido={cancelando} onClose={() => setCancelando(null)}
+          cancelar={async () => {
+            const id = cancelando.id
+            await cancelarPedido(cancelando, productos, simple ? 'Empleado' : 'Administrador')
+            setCancelando(null)
+            notify(`Pedido #${cancelando.numero} cancelado`)
+            if (onAvanzar) onAvanzar(id)
+            reload()
+          }} />
+      )}
+    </>
+  )
+
+  if (simple) {
+    const porAtender = data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado')
+    const entregados = data.pedidos.filter((p) => p.estado === 'Entregado')
+    const columnas = [['Por atender', porAtender], ['Entregados', entregados]]
+    return (
+      <div>
+        <SectionTitle title="Pedidos" sub="Toca una vez para aceptar el pedido y otra vez cuando lo entregues. Puedes editar o cancelar mientras no esté entregado." />
+        <div className="grid grid-cols-2 gap-3.5 max-[820px]:grid-cols-1">
+          {columnas.map(([titulo, items]) => (
+            <div key={titulo} className="bg-paper2 border border-line rounded p-3 min-h-[120px]">
+              <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex justify-between">
+                {titulo} <span className="font-mono">{items.length}</span>
+              </h4>
+              {items.length === 0 ? (
+                <p className="text-[12px] text-creamsoft px-1.5">Sin pedidos</p>
+              ) : items.map((p) => (
+                <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
+                  <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
+                  <div className="my-1.5 text-creamsoft">{p.pedido_items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-mono">{fmt$(p.total)}</span>
+                    {p.estado === 'Pendiente' && <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>✅ Pedido aceptado</Btn>}
+                    {(p.estado === 'En preparación' || p.estado === 'Listo') && <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>📦 Entregado</Btn>}
+                    {p.estado === 'Entregado' && <span className="text-[11px]">✅</span>}
+                  </div>
+                  {p.estado !== 'Entregado' && acciones(p)}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {modales}
+      </div>
+    )
+  }
+
+  const cancelados = data.pedidos.filter((p) => p.estado === 'Cancelado')
+
   return (
     <div>
       <SectionTitle title="Pedidos" sub="Gestión en tiempo real — pensada para tablet o computador en cocina." />
@@ -490,12 +635,34 @@ export function TabPedidos({ data, reload, notify }) {
                       ? <Btn size="sm" variant="avocado" onClick={() => advance(p)}>Pasar a {ESTADOS[ESTADOS.indexOf(est) + 1]}</Btn>
                       : <span className="text-[11px]">✅</span>}
                   </div>
+                  {est !== 'Entregado' && acciones(p)}
                 </div>
               ))}
             </div>
           )
         })}
       </div>
+
+      <div className="mt-6">
+        <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex items-center gap-2">
+          Cancelados <span className="font-mono">{cancelados.length}</span>
+        </h4>
+        {cancelados.length === 0 ? (
+          <p className="text-[12px] text-creamsoft">Ningún pedido cancelado.</p>
+        ) : (
+          <Table
+            head={['Pedido', 'Cliente', 'Total', 'Cancelado el', 'Por']}
+            rows={cancelados.map((p) => [
+              <span className="font-mono">#{p.numero}</span>,
+              p.cliente,
+              <span className="font-mono">{fmt$(p.total)}</span>,
+              p.cancelado_en ? fmtDate(p.cancelado_en) : '—',
+              p.cancelado_por || '—',
+            ])}
+          />
+        )}
+      </div>
+      {modales}
     </div>
   )
 }

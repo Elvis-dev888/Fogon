@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Btn, Modal, Field, Input, Empty } from './ui'
 import { fmt$, ESTADOS, thumbFor } from '../lib/helpers'
-import { fetchCategorias, fetchProductos, crearPedido, suscribirsePedido } from '../lib/api'
+import { fetchCategorias, fetchProductos, crearPedido, suscribirsePedido, actualizarPedido, cancelarPedido } from '../lib/api'
+import { ProductoDetalleModal, EditarPedidoModal, ConfirmCancelModal, QtyStepper } from './PedidoCompartido'
 
 export default function ClienteView({ negocio, onExit, notify }) {
   const [categorias, setCategorias] = useState([])
@@ -19,11 +20,19 @@ export default function ClienteView({ negocio, onExit, notify }) {
 
   useEffect(() => {
     if (!pedido) return
-    const unsub = suscribirsePedido(pedido.id, (nuevo) => setPedido((p) => ({ ...p, estado: nuevo.estado })))
+    const unsub = suscribirsePedido(pedido.id, (nuevo) =>
+      setPedido((p) => ({ ...p, estado: nuevo.estado, total: nuevo.total, cancelado_en: nuevo.cancelado_en, cancelado_por: nuevo.cancelado_por }))
+    )
     return unsub
   }, [pedido?.id])
 
-  if (pedido) return <Tracking negocio={negocio} pedido={pedido} onNuevo={() => { setPedido(null); setCart([]) }} />
+  if (pedido) {
+    return (
+      <Tracking negocio={negocio} pedido={pedido} productos={productos}
+        onPedidoActualizado={(cambios) => setPedido((p) => ({ ...p, ...cambios }))}
+        onNuevo={() => { setPedido(null); setCart([]) }} />
+    )
+  }
 
   const catalogo = productos.filter((p) => !p.es_adicion)
   const adicionesGlobales = productos.filter((p) => p.es_adicion && p.disponible)
@@ -84,86 +93,14 @@ export default function ClienteView({ negocio, onExit, notify }) {
       {drawer && (
         <CartDrawer negocio={negocio} cart={cart} onClose={() => setDrawer(false)}
           onRemove={(i) => setCart((c) => c.filter((_, idx) => idx !== i))}
-          onConfirmed={(p) => { setPedido(p); setDrawer(false) }} />
+          onQty={(i, q) => setCart((c) => c.map((it, idx) => idx === i ? { ...it, cantidad: q, subtotal: it.unitPrice * q } : it))}
+          onConfirmed={(p) => { setPedido({ ...p, items: cart }); setDrawer(false) }} />
       )}
     </div>
   )
 }
 
-function ProductoDetalleModal({ producto, adicionesGlobales, onClose, onAdd }) {
-  // Se combinan las adiciones propias de este producto (las que el admin le
-  // puso solo a él) con las adiciones generales del negocio (bebidas, extras
-  // que aplican a cualquier plato) — el cliente las ve todas juntas, en una
-  // sola lista, sin necesidad de saber cuál es cuál.
-  const opciones = [
-    ...(producto.adiciones || []).map((a) => ({ nombre: a.nombre, precio: a.precio })),
-    ...(adicionesGlobales || []).map((p) => ({ nombre: p.nombre, precio: p.precio })),
-  ]
-  const [selected, setSelected] = useState(new Set())
-  const [qty, setQty] = useState(1)
-  const [obs, setObs] = useState('')
-
-  const adTotal = [...selected].reduce((a, i) => a + opciones[i].precio, 0)
-  const total = (producto.precio + adTotal) * qty
-
-  function toggle(i) {
-    setSelected((s) => {
-      const next = new Set(s)
-      next.has(i) ? next.delete(i) : next.add(i)
-      return next
-    })
-  }
-
-  function submit(e) {
-    e.preventDefault()
-    onAdd({
-      productId: producto.id,
-      nombre: producto.nombre,
-      cantidad: qty,
-      adiciones: [...selected].map((i) => opciones[i].nombre),
-      obs: obs.trim(),
-      subtotal: total,
-    })
-  }
-
-  return (
-    <Modal onClose={onClose}>
-      {producto.imagen_url
-        ? <img src={producto.imagen_url} alt={producto.nombre} className="w-full h-40 object-cover rounded mb-3" />
-        : <div className="text-5xl text-center mb-1.5">{producto.emoji}</div>}
-      <h2 className="font-serif text-xl font-semibold text-center mb-0.5">{producto.nombre}</h2>
-      <p className="text-creamsoft text-center text-sm mb-3.5">{producto.desc}</p>
-      <p className="font-mono font-bold text-gold text-center text-lg mb-4">{fmt$(producto.precio)}</p>
-      <form onSubmit={submit}>
-        {opciones.length > 0 && (
-          <Field label="Adiciones">
-            <div className="border border-line rounded-sm divide-y divide-line">
-              {opciones.map((a, i) => (
-                <label key={i} className="flex items-center justify-between px-3 py-2.5 cursor-pointer">
-                  <span className="flex items-center gap-2.5 text-[13.5px]">
-                    <span className={`w-4 h-4 rounded-sm border flex items-center justify-center text-[10px] shrink-0 ${selected.has(i) ? 'bg-gold border-gold text-paper' : 'border-creamsoft'}`}>
-                      {selected.has(i) ? '✓' : ''}
-                    </span>
-                    {a.nombre}
-                  </span>
-                  <span className="font-mono text-champagne text-[12.5px]">+ {fmt$(a.precio)}</span>
-                  <input type="checkbox" className="hidden" checked={selected.has(i)} onChange={() => toggle(i)} />
-                </label>
-              ))}
-            </div>
-          </Field>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Cantidad"><Input type="number" min="1" value={qty} onChange={(e) => setQty(parseInt(e.target.value) || 1)} /></Field>
-          <Field label="Observaciones"><Input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ej: sin cebolla" /></Field>
-        </div>
-        <Btn variant="primary" className="w-full justify-center">Agregar al carrito — <span className="font-mono">{fmt$(total)}</span></Btn>
-      </form>
-    </Modal>
-  )
-}
-
-function CartDrawer({ negocio, cart, onClose, onRemove, onConfirmed }) {
+function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
   const [nombre, setNombre] = useState('')
   const [saving, setSaving] = useState(false)
   const total = cart.reduce((a, c) => a + c.subtotal, 0)
@@ -188,13 +125,16 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onConfirmed }) {
             {cart.map((c, i) => (
               <div key={i} className="flex justify-between gap-2.5 py-2.5 border-b border-line text-[13px]">
                 <span>
-                  <span className="font-semibold">{c.cantidad}× {c.nombre}</span>
+                  <span className="font-semibold">{c.nombre}</span>
                   {c.adiciones.length > 0 && <div className="text-creamsoft text-[11.5px]">+ {c.adiciones.join(', ')}</div>}
                   {c.obs && <div className="text-creamsoft text-[11.5px]">"{c.obs}"</div>}
                 </span>
-                <span className="flex flex-col items-end gap-1">
+                <span className="flex flex-col items-end gap-1.5">
                   <b className="font-mono">{fmt$(c.subtotal)}</b>
-                  <button onClick={() => onRemove(i)} className="text-[11px] text-creamsoft hover:text-wine">Quitar</button>
+                  <div className="flex items-center gap-2">
+                    <QtyStepper value={c.cantidad} onChange={(q) => onQty(i, q)} />
+                    <button onClick={() => onRemove(i)} className="text-[11px] text-creamsoft hover:text-wine">Quitar</button>
+                  </div>
                 </span>
               </div>
             ))}
@@ -212,25 +152,74 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onConfirmed }) {
   )
 }
 
-function Tracking({ negocio, pedido, onNuevo }) {
+function Tracking({ negocio, pedido, productos, onPedidoActualizado, onNuevo }) {
   const idx = ESTADOS.indexOf(pedido.estado)
+  const cancelado = pedido.estado === 'Cancelado'
+  const puedeModificar = pedido.estado === 'Pendiente'
+  const [modal, setModal] = useState(null) // 'editar' | 'cancelar'
+  const items = pedido.pedido_items || pedido.items || []
+
   return (
     <div className="bg-paper2 border border-line rounded p-6 max-w-[560px] mx-auto text-center">
-      <div className="inline-block text-gold font-serif italic font-semibold text-lg pb-1.5 border-b border-gold animate-stampin">
-        ¡Pedido confirmado!
+      <div className={`inline-block font-serif italic font-semibold text-lg pb-1.5 border-b animate-stampin ${cancelado ? 'text-wine border-wine' : 'text-gold border-gold'}`}>
+        {cancelado ? 'Pedido cancelado' : '¡Pedido confirmado!'}
       </div>
       <h2 className="font-serif text-2xl font-semibold mt-4 mb-1">Pedido #{pedido.numero || '—'}</h2>
       <p className="text-creamsoft mb-1.5">{negocio.nombre} · <b className="font-mono">{fmt$(pedido.total)}</b></p>
-      <div className="flex justify-between my-6">
-        {ESTADOS.map((e, i) => (
-          <div key={e} className={`flex-1 text-center relative text-[10.5px] font-semibold ${i <= idx ? 'text-gold' : 'text-creamsoft'}`}>
-            <div className={`w-3.5 h-3.5 rounded-full mx-auto mb-2 border ${i <= idx ? 'bg-gold border-gold' : 'bg-paper border-line'}`} />
-            {e}
-          </div>
-        ))}
-      </div>
-      <p className="text-creamsoft text-[12px] mb-4">El estado se actualiza solo cuando la cocina lo cambie — no necesitas recargar la página.</p>
+
+      {items.length > 0 && (
+        <div className="text-left border border-line rounded-sm mb-5 mt-4 divide-y divide-line">
+          {items.map((it, i) => (
+            <div key={i} className="px-3.5 py-2.5 text-[13px] flex justify-between">
+              <span>
+                <span className="font-semibold">{it.cantidad}× {it.nombre}</span>
+                {(it.adiciones || []).length > 0 && <div className="text-creamsoft text-[11.5px]">+ {it.adiciones.join(', ')}</div>}
+              </span>
+              <b className="font-mono">{fmt$(it.subtotal)}</b>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!cancelado && (
+        <div className="flex justify-between my-6">
+          {ESTADOS.map((e, i) => (
+            <div key={e} className={`flex-1 text-center relative text-[10.5px] font-semibold ${i <= idx ? 'text-gold' : 'text-creamsoft'}`}>
+              <div className={`w-3.5 h-3.5 rounded-full mx-auto mb-2 border ${i <= idx ? 'bg-gold border-gold' : 'bg-paper border-line'}`} />
+              {e}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {cancelado ? (
+        <p className="text-creamsoft text-[12px] mb-4">Este pedido fue cancelado y no se va a preparar.</p>
+      ) : (
+        <p className="text-creamsoft text-[12px] mb-4">El estado se actualiza solo cuando la cocina lo cambie — no necesitas recargar la página.</p>
+      )}
+
+      {puedeModificar && (
+        <div className="flex gap-2.5 mb-3">
+          <Btn variant="ghost" className="flex-1 justify-center" onClick={() => setModal('editar')}>✏️ Editar pedido</Btn>
+          <Btn variant="danger" className="flex-1 justify-center" onClick={() => setModal('cancelar')}>❌ Cancelar pedido</Btn>
+        </div>
+      )}
+
       <Btn variant="primary" className="w-full justify-center" onClick={onNuevo}>Hacer otro pedido</Btn>
+
+      {modal === 'editar' && (
+        <EditarPedidoModal pedido={pedido} productos={productos} onClose={() => setModal(null)}
+          guardar={(p, prods, items) => actualizarPedido(p, prods, items)}
+          onSaved={({ items, total }) => { setModal(null); onPedidoActualizado({ items, total }) }} />
+      )}
+      {modal === 'cancelar' && (
+        <ConfirmCancelModal pedido={pedido} onClose={() => setModal(null)}
+          cancelar={async () => {
+            await cancelarPedido(pedido, productos, pedido.cliente || 'Cliente')
+            setModal(null)
+            onPedidoActualizado({ estado: 'Cancelado', cancelado_en: new Date().toISOString(), cancelado_por: pedido.cliente || 'Cliente' })
+          }} />
+      )}
     </div>
   )
 }
