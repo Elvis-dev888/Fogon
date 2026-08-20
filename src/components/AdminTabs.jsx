@@ -669,9 +669,15 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
 
 /* ---------------- Ventas ---------------- */
 export function TabVentas({ data }) {
+  const [detalle, setDetalle] = useState(null) // venta abierta para ver su detalle
+  const [rango, setRango] = useState('mes') // 'mes' | 'historico' — para el resumen por producto
   const total = data.ventas.reduce((a, v) => a + v.total, 0)
-  const mes = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
+  const ventasMes = data.ventas.filter((v) => sameMonth(v.creado_en))
+  const mes = ventasMes.reduce((a, v) => a + v.total, 0)
   const prom = data.ventas.length ? total / data.ventas.length : 0
+
+  const resumenProductos = resumirProductosVendidos(rango === 'mes' ? ventasMes : data.ventas)
+
   return (
     <div>
       <SectionTitle title="Ventas" sub="Cada pedido confirmado genera su registro de venta." />
@@ -681,16 +687,74 @@ export function TabVentas({ data }) {
         <StatCard label="Pedidos" value={data.ventas.length} tone="champagne" />
         <StatCard label="Ticket promedio" value={fmt$(prom)} />
       </div>
-      <Card className="p-5">
+      <Card className="p-5 mb-6">
         {data.ventas.length === 0 ? <Empty icon="💵">Aún no hay ventas registradas.</Empty> : (
-          <Table head={['Fecha', 'Total']} rows={data.ventas.map((v) => [
-            <span className="font-mono">{fmtDate(v.creado_en)}</span>,
-            <span className="font-mono">{fmt$(v.total)}</span>,
-          ])} />
+          <Table head={['Fecha', 'Pedido', 'Productos', 'Total', '']} rows={data.ventas.map((v) => {
+            const items = v.pedidos?.pedido_items || []
+            const resumen = items.length
+              ? items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')
+              : '—'
+            return [
+              <span className="font-mono">{fmtDate(v.creado_en)}</span>,
+              v.pedidos?.numero ? `#${v.pedidos.numero}` : '—',
+              <span className="text-[12.5px] text-creamsoft">{resumen}</span>,
+              <span className="font-mono">{fmt$(v.total)}</span>,
+              items.length > 0 && (
+                <button onClick={() => setDetalle(v)} className="text-[12px] font-semibold text-gold hover:text-golddark whitespace-nowrap">
+                  Ver detalle →
+                </button>
+              ),
+            ]
+          })} />
         )}
       </Card>
+
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+        <h3 className="font-serif text-lg font-semibold">Productos vendidos</h3>
+        <div className="flex gap-1 bg-paper2 border border-line rounded-full p-1">
+          {[['mes', 'Este mes'], ['historico', 'Todo el histórico']].map(([k, label]) => (
+            <button key={k} onClick={() => setRango(k)}
+              className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold ${rango === k ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className="text-creamsoft text-[12.5px] mb-3">
+        Cuánto se vendió de cada producto — sirve para saber qué reponer en Inventario/Compras.
+      </p>
+      <Card className="p-5">
+        {resumenProductos.length === 0 ? <Empty icon="📦">No hay productos vendidos en este rango.</Empty> : (
+          <Table
+            head={['Producto', 'Cantidad vendida', 'Valor unitario prom.', 'Total vendido']}
+            rows={resumenProductos.map((p) => [
+              p.nombre,
+              <span className="font-mono">{p.cantidad}</span>,
+              <span className="font-mono">{fmt$(p.total / p.cantidad)}</span>,
+              <span className="font-mono">{fmt$(p.total)}</span>,
+            ])}
+          />
+        )}
+      </Card>
+
+      {detalle && <VentaDetalleModal venta={detalle} onClose={() => setDetalle(null)} />}
     </div>
   )
+}
+
+// Suma cantidad y valor total por nombre de producto, a partir de las líneas
+// (pedido_items) de un conjunto de ventas — para la tabla "Productos vendidos".
+function resumirProductosVendidos(ventas) {
+  const map = {}
+  ventas.forEach((v) => {
+    const items = v.pedidos?.pedido_items || []
+    items.forEach((it) => {
+      if (!map[it.nombre]) map[it.nombre] = { nombre: it.nombre, cantidad: 0, total: 0 }
+      map[it.nombre].cantidad += it.cantidad
+      map[it.nombre].total += it.subtotal
+    })
+  })
+  return Object.values(map).sort((a, b) => b.total - a.total)
 }
 
 /* ---------------- Trabajadores ---------------- */
