@@ -27,6 +27,18 @@ export default function App() {
   const [session, setSession] = useState(undefined) // undefined = todavía no se sabe
   const [perfil, setPerfil] = useState(null)
   const [miNegocio, setMiNegocio] = useState(null)
+  const [online, setOnline] = useState(navigator.onLine)
+
+  useEffect(() => {
+    const goOnline = () => setOnline(true)
+    const goOffline = () => setOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
 
   const notify = useCallback((msg) => setToast(msg), [])
 
@@ -85,7 +97,17 @@ export default function App() {
   }
 
   const negocioCliente = negocios.find((n) => n.id === negocioId) || null
-
+ if (!online) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-paper text-center px-6">
+        <div>
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full border border-gold grid place-items-center text-2xl">📡</div>
+          <h2 className="font-serif text-2xl font-semibold mb-2">Sin conexión</h2>
+          <p className="text-creamsoft text-sm max-w-xs mx-auto">Fogón necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
+        </div>
+      </div>
+    )
+  }
   return (
     <div>
       <div className="bg-paper text-creamsoft overflow-hidden whitespace-nowrap border-b border-line">
