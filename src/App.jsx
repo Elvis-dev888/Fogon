@@ -9,6 +9,7 @@ import { AdminAuth, SuperadminAuth, EmpleadoAuth, UnirseNegocioForm, CrearNegoci
 import { supabase } from './lib/supabaseClient'
 import { fetchPerfil, fetchNegocioPorId, signOut } from './lib/auth'
 import { fetchNegocios } from './lib/api'
+import { DOWNLOAD_LINKS } from './lib/downloads'
 
 const ROLES = [
   ['super', '🛠️', 'Admin'],
@@ -20,8 +21,10 @@ const ROLES = [
 const APP_ROLES = ROLES.filter(([role]) => role !== 'cliente')
 
 export default function App() {
-  const isNativeApp = Capacitor.isNativePlatform() // true = corriendo como app (Android); false = navegador/web
+  const isDesktopApp = typeof window !== 'undefined' && (window.location.search.includes('desktop=1') || !!window.process?.versions?.electron)
+  const isNativeApp = Capacitor.isNativePlatform() || isDesktopApp // app nativa: Android + desktop Windows
   const [role, setRole] = useState(isNativeApp ? 'admin' : 'cliente')
+  const isDesktopShell = isNativeApp && isDesktopApp
   const [negocioId, setNegocioId] = useState(null) // solo lo usa el flujo de Cliente
   const [adminIntent, setAdminIntent] = useState(null) // null | 'entrar' | 'registrar' — solo lo usa el flujo de Admin
   const [negocios, setNegocios] = useState([])
@@ -135,20 +138,24 @@ export default function App() {
     )
   }
   return (
-    <div className="relative min-h-screen">
-      <img src="/Kiosko.jpg" alt="" aria-hidden="true" className="fixed pointer-events-none z-0 left-1/2 top-1/2 w-[min(86vw,860px)] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full object-cover opacity-[0.24] mix-blend-screen" />
-      <div className="relative z-10 bg-paper text-creamsoft overflow-hidden whitespace-nowrap border-b border-line">
-        <div className="inline-block pl-full animate-ticker font-serif italic text-[13px] py-1.5 tracking-wide">
-          {negocios.map((n) => `${n.nombre} — ${n.slogan}`).join('     ·     ')}
-          {'     ·     '}
-          {negocios.map((n) => `${n.nombre} — ${n.slogan}`).join('     ·     ')}
+    <div className={`relative min-h-screen ${isDesktopShell ? 'desktop-shell' : ''}`}>
+      {!isDesktopShell && (
+        <img src="/Kiosko.jpg" alt="" aria-hidden="true" className="fixed pointer-events-none z-0 left-1/2 top-1/2 w-[min(86vw,860px)] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full object-cover opacity-[0.24] mix-blend-screen" />
+      )}
+      {!isDesktopShell && (
+        <div className="relative z-10 bg-paper text-creamsoft overflow-hidden whitespace-nowrap border-b border-line">
+          <div className="inline-block pl-full animate-ticker font-serif italic text-[13px] py-1.5 tracking-wide">
+            {negocios.map((n) => `${n.nombre} — ${n.slogan}`).join('     ·     ')}
+            {'     ·     '}
+            {negocios.map((n) => `${n.nombre} — ${n.slogan}`).join('     ·     ')}
+          </div>
         </div>
-      </div>
+      )}
 
-      <header className="sticky top-0 z-40 bg-paper/90 backdrop-blur border-b border-line">
+      <header className={`sticky top-0 z-40 border-b ${isDesktopShell ? 'desktop-app-header' : 'bg-paper/90 backdrop-blur border-line'}`}>
         <div className={`max-w-[1200px] mx-auto px-5 py-4 flex items-center gap-3 ${!isNativeApp ? 'justify-between flex-wrap' : ''}`}>
           <div className="flex items-center gap-3">
-            <BrandMark size={48} />
+            <BrandMark size={isDesktopShell ? 40 : 48} />
             <div>
               <h1 className="font-serif text-xl font-semibold m-0">Kiosco</h1>
               <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">plataforma multiempresa</span>
@@ -176,7 +183,7 @@ export default function App() {
       </header>
       <div className="h-[2px] bg-gradient-to-r from-transparent via-gold to-transparent opacity-70" />
 
-      <main className={`relative z-10 max-w-[1200px] mx-auto px-5 py-8 ${isNativeApp ? 'pb-28' : 'pb-8'}`}>
+      <main className={`relative z-10 max-w-[1200px] mx-auto px-5 py-8 ${isNativeApp ? 'pb-28' : 'pb-8'} ${isDesktopShell ? 'desktop-app-main' : ''}`}>
         {loadError && (
           <div className="mb-6 border border-wine bg-wine/10 text-wine text-sm rounded p-4">
             <b>No se pudo cargar la información de Supabase:</b> {loadError}
@@ -230,12 +237,12 @@ export default function App() {
         {/* ---------------- CLIENTE (público, sin cuenta) ---------------- */}
         {role === 'cliente' && (negocioCliente
           ? <ClienteView negocio={negocioCliente} onExit={exitNegocioCliente} notify={notify} />
-          : <PickNegocio negocios={negocios} onEnter={(id) => setNegocioId(id)} showWelcome={isNativeApp} />)}
+          : <PickNegocio negocios={negocios} onEnter={(id) => setNegocioId(id)} showWelcome={isNativeApp} showDownloads={!isNativeApp} />)}
       </main>
 
       {isNativeApp && (
         <nav
-          className="fixed bottom-0 inset-x-0 z-40 bg-paper2/95 backdrop-blur border-t border-line flex items-stretch"
+          className={`fixed bottom-0 inset-x-0 z-40 bg-paper2/95 backdrop-blur border-t border-line flex items-stretch ${isDesktopShell ? 'desktop-app-nav' : ''}`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           {APP_ROLES.map(([r, icon, label]) => (
@@ -325,7 +332,7 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
   )
 }
 
-function PickNegocio({ negocios, onEnter, showWelcome = false }) {
+function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = false }) {
   return (
     <div>
       {showWelcome && <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-10 md:px-12 md:py-14 mb-10">
@@ -342,6 +349,22 @@ function PickNegocio({ negocios, onEnter, showWelcome = false }) {
           <p className="text-creamsoft text-sm md:text-base max-w-xl leading-relaxed">Kiosco conecta a tus clientes con sus negocios favoritos. Explora catálogos, arma pedidos y síguelos en tiempo real desde cualquier dispositivo.</p>
         </div>
       </section>}
+
+      {showDownloads && <section className="mb-8 rounded border border-line bg-paper2 p-5 md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-gold mb-2">¿Tienes un negocio?</p>
+            <h3 className="font-serif text-2xl font-semibold mb-1">Administra tu negocio con Kiosco.</h3>
+            <p className="text-creamsoft text-sm max-w-xl leading-relaxed">Gestiona productos, inventario, pedidos, ventas y equipo de trabajo desde la aplicación oficial de Kiosco.</p>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            <a href={DOWNLOAD_LINKS.android} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full bg-gold text-paper font-semibold text-[12.5px] px-4 py-2.5 hover:bg-golddark">📱 Android</a>
+            <a href={DOWNLOAD_LINKS.ios} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">🍎 iPhone</a>
+            <a href={DOWNLOAD_LINKS.windows} className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">💻 Windows</a>
+          </div>
+        </div>
+      </section>}
+
       <div className="mb-7">
         <h2 className="font-serif text-3xl font-semibold mb-2">¿Dónde quieres pedir hoy?</h2>
         <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Explora un negocio para conocer su catálogo y hacer tu pedido.</p>
