@@ -133,8 +133,9 @@ export default function App() {
     )
   }
   return (
-    <div>
-      <div className="bg-paper text-creamsoft overflow-hidden whitespace-nowrap border-b border-line">
+    <div className="relative min-h-screen">
+      <img src="/Kiosko.jpg" alt="" aria-hidden="true" className="fixed pointer-events-none z-0 left-1/2 top-1/2 w-[min(78vw,760px)] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full object-cover opacity-[0.10]" />
+      <div className="relative z-10 bg-paper text-creamsoft overflow-hidden whitespace-nowrap border-b border-line">
         <div className="inline-block pl-full animate-ticker font-serif italic text-[13px] py-1.5 tracking-wide">
           {negocios.map((n) => `${n.nombre} — ${n.slogan}`).join('     ·     ')}
           {'     ·     '}
@@ -145,7 +146,7 @@ export default function App() {
       <header className="sticky top-0 z-40 bg-paper/90 backdrop-blur border-b border-line">
         <div className={`max-w-[1200px] mx-auto px-5 py-4 flex items-center gap-3 ${!isNativeApp ? 'justify-between flex-wrap' : ''}`}>
           <div className="flex items-center gap-3">
-            <BrandMark size={36} />
+            <BrandMark size={48} />
             <div>
               <h1 className="font-serif text-xl font-semibold m-0">Kiosco</h1>
               <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">plataforma multiempresa</span>
@@ -173,7 +174,7 @@ export default function App() {
       </header>
       <div className="h-[2px] bg-gradient-to-r from-transparent via-gold to-transparent opacity-70" />
 
-      <main className={`max-w-[1200px] mx-auto px-5 py-8 ${isNativeApp ? 'pb-28' : 'pb-8'}`}>
+      <main className={`relative z-10 max-w-[1200px] mx-auto px-5 py-8 ${isNativeApp ? 'pb-28' : 'pb-8'}`}>
         {loadError && (
           <div className="mb-6 border border-wine bg-wine/10 text-wine text-sm rounded p-4">
             <b>No se pudo cargar la información de Supabase:</b> {loadError}
@@ -283,7 +284,7 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
         <div className="absolute -right-10 -top-16 opacity-20"><BrandMark size={230} /></div>
         <div className="relative max-w-3xl">
           <div className="flex items-center gap-4 mb-5">
-            <BrandMark size={72} />
+            <BrandMark size={96} />
             <div>
               <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Kiosco Negocios</p>
               <p className="text-xs text-creamsoft">Centro de gestión para tu negocio</p>
@@ -329,7 +330,7 @@ function PickNegocio({ negocios, onEnter, showWelcome = false }) {
         <div className="absolute -right-16 -top-20 opacity-20"><BrandMark size={270} /></div>
         <div className="relative max-w-2xl">
           <div className="flex items-center gap-3 mb-6">
-            <BrandMark size={58} />
+            <BrandMark size={96} />
             <div>
               <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Kiosco</p>
               <p className="text-xs text-creamsoft">Plataforma multiempresa</p>
