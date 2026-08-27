@@ -51,7 +51,7 @@ export default function App() {
       setNegocios(list)
       setLoadError(null)
     } catch (err) {
-      console.error('[Fogón] Error cargando negocios:', err)
+      console.error('[Kiosco] Error cargando negocios:', err)
       setLoadError(err.message || String(err))
     }
   }, [])
@@ -127,7 +127,7 @@ export default function App() {
         <div>
           <div className="w-16 h-16 mx-auto mb-4 rounded-full border border-gold grid place-items-center text-2xl">📡</div>
           <h2 className="font-serif text-2xl font-semibold mb-2">Sin conexión</h2>
-          <p className="text-creamsoft text-sm max-w-xs mx-auto">Fogón necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
+          <p className="text-creamsoft text-sm max-w-xs mx-auto">Kiosco necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
         </div>
       </div>
     )
@@ -147,7 +147,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <BrandMark size={36} />
             <div>
-              <h1 className="font-serif text-xl font-semibold m-0">Fogón</h1>
+              <h1 className="font-serif text-xl font-semibold m-0">Kiosco</h1>
               <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">plataforma multiempresa</span>
             </div>
           </div>
@@ -227,7 +227,7 @@ export default function App() {
         {/* ---------------- CLIENTE (público, sin cuenta) ---------------- */}
         {role === 'cliente' && (negocioCliente
           ? <ClienteView negocio={negocioCliente} onExit={exitNegocioCliente} notify={notify} />
-          : <PickNegocio negocios={negocios} onEnter={(id) => setNegocioId(id)} />)}
+          : <PickNegocio negocios={negocios} onEnter={(id) => setNegocioId(id)} showWelcome={isNativeApp} />)}
       </main>
 
       {isNativeApp && (
@@ -279,6 +279,20 @@ export default function App() {
 function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
   return (
     <div>
+      <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-9 md:px-10 md:py-11 mb-8">
+        <div className="absolute -right-10 -top-16 opacity-20"><BrandMark size={230} /></div>
+        <div className="relative max-w-3xl">
+          <div className="flex items-center gap-4 mb-5">
+            <BrandMark size={72} />
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Kiosco Negocios</p>
+              <p className="text-xs text-creamsoft">Centro de gestión para tu negocio</p>
+            </div>
+          </div>
+          <h2 className="font-serif text-3xl md:text-4xl font-semibold mb-3 leading-tight">El saber de cada negocio en un solo lugar.</h2>
+          <p className="text-creamsoft text-sm md:text-base leading-relaxed max-w-2xl">Administra tu catálogo, pedidos, inventario, equipo, ventas y finanzas desde una plataforma organizada, pensada para que tengas toda la información de tu negocio al alcance.</p>
+        </div>
+      </section>
       <div className="mb-7 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="font-serif text-3xl font-semibold mb-2">Panel de negocios</h2>
@@ -308,23 +322,23 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
   )
 }
 
-function PickNegocio({ negocios, onEnter }) {
+function PickNegocio({ negocios, onEnter, showWelcome = false }) {
   return (
     <div>
-      <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-10 md:px-12 md:py-14 mb-10">
+      {showWelcome && <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-10 md:px-12 md:py-14 mb-10">
         <div className="absolute -right-16 -top-20 opacity-20"><BrandMark size={270} /></div>
         <div className="relative max-w-2xl">
           <div className="flex items-center gap-3 mb-6">
             <BrandMark size={58} />
             <div>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Fogón</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Kiosco</p>
               <p className="text-xs text-creamsoft">Plataforma multiempresa</p>
             </div>
           </div>
           <h2 className="font-serif text-4xl md:text-5xl font-semibold mb-4 leading-tight">El sabor de cada negocio, en un solo lugar.</h2>
-          <p className="text-creamsoft text-sm md:text-base max-w-xl leading-relaxed">Fogón conecta a tus clientes con sus negocios favoritos. Explora catálogos, arma pedidos y síguelos en tiempo real desde cualquier dispositivo.</p>
+          <p className="text-creamsoft text-sm md:text-base max-w-xl leading-relaxed">Kiosco conecta a tus clientes con sus negocios favoritos. Explora catálogos, arma pedidos y síguelos en tiempo real desde cualquier dispositivo.</p>
         </div>
-      </section>
+      </section>}
       <div className="mb-7">
         <h2 className="font-serif text-3xl font-semibold mb-2">¿Dónde quieres pedir hoy?</h2>
         <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Explora un negocio para conocer su catálogo y hacer tu pedido.</p>

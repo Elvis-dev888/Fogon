@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 
-// Emblema de Fogón: una marca circular inspirada en cocina, hogar y comunidad.
+// Emblema de Kiosco: una marca circular inspirada en cocina, hogar y comunidad.
 export function BrandMark({ size = 38 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className="shrink-0" role="img" aria-label="Emblema de Fogón">
+    <svg width={size} height={size} viewBox="0 0 100 100" className="shrink-0" role="img" aria-label="Emblema de Kiosco">
       <circle cx="50" cy="50" r="48" fill="#15130F" />
       <circle cx="50" cy="50" r="45" fill="none" stroke="#D7B55E" strokeWidth="2" />
       <g stroke="#E8CD7A" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
