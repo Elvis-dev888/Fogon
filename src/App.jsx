@@ -134,7 +134,7 @@ export default function App() {
   }
   return (
     <div className="relative min-h-screen">
-      <img src="/Kiosko.jpg" alt="" aria-hidden="true" className="fixed pointer-events-none z-0 left-1/2 top-1/2 w-[min(78vw,760px)] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full object-cover opacity-[0.10]" />
+      <img src="/Kiosko.jpg" alt="" aria-hidden="true" className="fixed pointer-events-none z-0 left-1/2 top-1/2 w-[min(86vw,860px)] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full object-cover opacity-[0.24] mix-blend-screen" />
       <div className="relative z-10 bg-paper text-creamsoft overflow-hidden whitespace-nowrap border-b border-line">
         <div className="inline-block pl-full animate-ticker font-serif italic text-[13px] py-1.5 tracking-wide">
           {negocios.map((n) => `${n.nombre} — ${n.slogan}`).join('     ·     ')}
