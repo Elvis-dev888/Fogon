@@ -42,7 +42,7 @@ export async function reclamarSuperadmin() {
   if (error) throw error
 }
 
-// Negocios que ya están en Fogón pero todavía no tienen ningún admin vinculado
+// Negocios que ya están en Kiosko pero todavía no tienen ningún admin vinculado
 export async function fetchNegociosSinAdmin() {
   const { data, error } = await supabase.rpc('negocios_sin_admin')
   if (error) throw error

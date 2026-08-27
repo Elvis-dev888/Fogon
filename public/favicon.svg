@@ -10,10 +10,11 @@
   </defs>
   <circle cx="32" cy="32" r="30" fill="#14110E"/>
   <circle cx="32" cy="32" r="29" fill="none" stroke="#C79A3C" stroke-width="1.4"/>
-  <g filter="url(#glow)" stroke="#E8CD7A" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M24 14 v14 a4 4 0 0 0 8 0 V14"/>
-    <path d="M28 14 v14"/>
-    <path d="M28 28 v22"/>
-    <path d="M42 14 c-5 6 -5 12 0 16 c2 2 2 5 0 7 l-2 9"/>
+  <g filter="url(#glow)" stroke="#E8CD7A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M13 25 Q17.5 33 22 25 Q26.5 17 31 25 Q35.5 33 40 25 Q44.5 17 49 25"/>
+    <path d="M16 25 V40"/>
+    <path d="M46 25 V40"/>
+    <path d="M16 40 H46"/>
+    <path d="M18 40 V47 H44 V40"/>
   </g>
 </svg>

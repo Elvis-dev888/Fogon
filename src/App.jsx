@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Toast, Btn, NegocioLogo, NegocioBanner } from './components/ui'
+import { Capacitor } from '@capacitor/core'
+import { Toast, Btn, NegocioLogo, NegocioBanner, BrandMark } from './components/ui'
 import SuperadminView from './components/SuperadminView'
 import AdminView from './components/AdminView'
 import EmpleadoView from './components/EmpleadoView'
@@ -10,13 +11,14 @@ import { fetchPerfil, fetchNegocioPorId, signOut } from './lib/auth'
 import { fetchNegocios } from './lib/api'
 
 const ROLES = [
-  ['super', '🛠️ Superadmin'],
-  ['admin', '👑 Admin negocio'],
-  ['empleado', '🛎️ Empleado'],
-  ['cliente', '🛒 Cliente'],
+  ['super', '🛠️', 'Admin'],
+  ['admin', '👑', 'Negocio'],
+  ['empleado', '🛎️', 'Equipo'],
+  ['cliente', '🛒', 'Cliente'],
 ]
 
 export default function App() {
+  const isNativeApp = Capacitor.isNativePlatform() // true = corriendo como app (Android); false = navegador/web
   const [role, setRole] = useState('cliente')
   const [negocioId, setNegocioId] = useState(null) // solo lo usa el flujo de Cliente
   const [adminIntent, setAdminIntent] = useState(null) // null | 'entrar' | 'registrar' — solo lo usa el flujo de Admin
@@ -28,6 +30,7 @@ export default function App() {
   const [perfil, setPerfil] = useState(null)
   const [miNegocio, setMiNegocio] = useState(null)
   const [online, setOnline] = useState(navigator.onLine)
+  const [menuAbierto, setMenuAbierto] = useState(false)
 
   useEffect(() => {
     const goOnline = () => setOnline(true)
@@ -48,7 +51,7 @@ export default function App() {
       setNegocios(list)
       setLoadError(null)
     } catch (err) {
-      console.error('[Fogón] Error cargando negocios:', err)
+      console.error('[Kiosko] Error cargando negocios:', err)
       setLoadError(err.message || String(err))
     }
   }, [])
@@ -89,6 +92,7 @@ export default function App() {
     await signOut()
     setRole('cliente')
     setAdminIntent(null)
+    setMenuAbierto(false)
   }
 
   function exitNegocioCliente() {
@@ -97,13 +101,33 @@ export default function App() {
   }
 
   const negocioCliente = negocios.find((n) => n.id === negocioId) || null
+
+  // Botón físico "atrás" de Android: en vez de cerrar la app de golpe, primero
+  // retrocede un nivel dentro de la navegación (como esperaría cualquier app nativa).
+  // Solo aplica dentro de la app empacada — en la web no existe ese botón.
+  useEffect(() => {
+    if (!isNativeApp) return
+    let listenerHandle
+    let cancelled = false
+    import('@capacitor/app').then(({ App: CapacitorApp }) => {
+      if (cancelled) return
+      CapacitorApp.addListener('backButton', () => {
+        if (menuAbierto) { setMenuAbierto(false); return }
+        if (role === 'cliente' && negocioCliente) { exitNegocioCliente(); return }
+        if (role === 'admin' && !session && adminIntent) { setAdminIntent(null); return }
+        if (role !== 'cliente') { setRole('cliente'); return }
+        CapacitorApp.exitApp()
+      }).then((h) => { listenerHandle = h })
+    })
+    return () => { cancelled = true; listenerHandle?.remove() }
+  }, [isNativeApp, role, negocioCliente, session, adminIntent, menuAbierto])
  if (!online) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-paper text-center px-6">
         <div>
           <div className="w-16 h-16 mx-auto mb-4 rounded-full border border-gold grid place-items-center text-2xl">📡</div>
           <h2 className="font-serif text-2xl font-semibold mb-2">Sin conexión</h2>
-          <p className="text-creamsoft text-sm max-w-xs mx-auto">Fogón necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
+          <p className="text-creamsoft text-sm max-w-xs mx-auto">Kiosko necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
         </div>
       </div>
     )
@@ -119,32 +143,37 @@ export default function App() {
       </div>
 
       <header className="sticky top-0 z-40 bg-paper/90 backdrop-blur border-b border-line">
-        <div className="max-w-[1200px] mx-auto px-5 py-4 flex items-center justify-between gap-4 flex-wrap">
+        <div className={`max-w-[1200px] mx-auto px-5 py-4 flex items-center gap-3 ${!isNativeApp ? 'justify-between flex-wrap' : ''}`}>
           <div className="flex items-center gap-3">
-            <div className="w-[38px] h-[38px] grid place-items-center border border-gold rounded-full text-gold font-serif font-bold">F</div>
+            <BrandMark size={36} />
             <div>
-              <h1 className="font-serif text-xl font-semibold m-0">Fogón</h1>
-              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">plataforma multiempresa para negocios de comida</span>
+              <h1 className="font-serif text-xl font-semibold m-0">Kiosko</h1>
+              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">tu kiosko digital, para cualquier negocio</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-1 bg-paper2 border border-line rounded-full p-1">
-              {ROLES.map(([r, label]) => (
-                <button key={r} onClick={() => { setRole(r); setAdminIntent(null) }}
-                  className={`px-4 py-2 rounded-full text-[12.5px] font-semibold ${role === r ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}>
-                  {label}
-                </button>
-              ))}
+
+          {/* En la web se conserva la navegación original de arriba (pestañas + cerrar sesión).
+              En la app, esto se reemplaza por la barra inferior de más abajo. */}
+          {!isNativeApp && (
+            <div className="flex items-center gap-3">
+              <div className="flex gap-1 bg-paper2 border border-line rounded-full p-1">
+                {ROLES.map(([r, icon, label]) => (
+                  <button key={r} onClick={() => { setRole(r); setAdminIntent(null) }}
+                    className={`px-4 py-2 rounded-full text-[12.5px] font-semibold ${role === r ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}>
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+              {session && (
+                <Btn size="sm" variant="ghost" onClick={handleSignOut}>Cerrar sesión</Btn>
+              )}
             </div>
-            {session && (
-              <Btn size="sm" variant="ghost" onClick={handleSignOut}>Cerrar sesión</Btn>
-            )}
-          </div>
+          )}
         </div>
       </header>
       <div className="h-[2px] bg-gradient-to-r from-transparent via-gold to-transparent opacity-70" />
 
-      <main className="max-w-[1200px] mx-auto px-5 py-8 pb-24">
+      <main className={`max-w-[1200px] mx-auto px-5 py-8 ${isNativeApp ? 'pb-28' : 'pb-8'}`}>
         {loadError && (
           <div className="mb-6 border border-wine bg-wine/10 text-wine text-sm rounded p-4">
             <b>No se pudo cargar la información de Supabase:</b> {loadError}
@@ -201,6 +230,47 @@ export default function App() {
           : <PickNegocio negocios={negocios} onEnter={(id) => setNegocioId(id)} />)}
       </main>
 
+      {isNativeApp && (
+        <nav
+          className="fixed bottom-0 inset-x-0 z-40 bg-paper2/95 backdrop-blur border-t border-line flex items-stretch"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          {ROLES.map(([r, icon, label]) => (
+            <button
+              key={r}
+              onClick={() => { setRole(r); setAdminIntent(null); setMenuAbierto(false) }}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10.5px] font-semibold ${role === r ? 'text-gold' : 'text-creamsoft'}`}
+            >
+              <span className={`text-lg leading-none ${role === r ? 'opacity-100' : 'opacity-70'}`}>{icon}</span>
+              {label}
+            </button>
+          ))}
+          <div className="relative flex-1 flex flex-col items-center justify-center">
+            <button
+              onClick={() => setMenuAbierto((v) => !v)}
+              className={`w-full flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10.5px] font-semibold ${menuAbierto ? 'text-gold' : 'text-creamsoft'}`}
+            >
+              <span className={`text-lg leading-none ${menuAbierto ? 'opacity-100' : 'opacity-70'}`}>👤</span>
+              Perfil
+            </button>
+            {menuAbierto && (
+              <div className="absolute bottom-full right-2 mb-2 w-44 bg-paper2 border border-line rounded shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-2 animate-popin">
+                {session ? (
+                  <>
+                    {perfil?.rol && (
+                      <p className="text-[11px] text-creamsoft px-2 pb-2 pt-1 uppercase tracking-wide">{perfil.rol}</p>
+                    )}
+                    <Btn size="sm" variant="danger" className="w-full justify-center" onClick={handleSignOut}>Cerrar sesión</Btn>
+                  </>
+                ) : (
+                  <p className="text-[11.5px] text-creamsoft px-2 py-1.5">No has iniciado sesión</p>
+                )}
+              </div>
+            )}
+          </div>
+        </nav>
+      )}
+
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>
   )
@@ -212,7 +282,7 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
       <div className="mb-7 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="font-serif text-3xl font-semibold mb-2">Panel de negocios</h2>
-          <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Elige tu negocio para entrar con tu correo, o registra uno nuevo si vas a usar Fogón por primera vez.</p>
+          <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Elige tu negocio para entrar con tu correo, o registra uno nuevo si vas a usar Kiosko por primera vez.</p>
         </div>
         <button onClick={onRegistrar} className="bg-gold text-paper font-semibold text-[13px] rounded-full px-5 py-3 hover:bg-golddark whitespace-nowrap">
           ➕ Registrar mi propio negocio

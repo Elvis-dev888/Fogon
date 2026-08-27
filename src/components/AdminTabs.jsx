@@ -957,7 +957,7 @@ function CapitalModal({ negocio, onClose, onSaved }) {
     <Modal onClose={onClose}>
       <h2 className="font-serif text-xl font-semibold mb-2">Base inicial del negocio</h2>
       <p className="text-creamsoft text-[13px] mb-4">
-        Es el dinero con el que arrancó el negocio, antes de empezar a registrar ventas, compras y gastos en Fogón.
+        Es el dinero con el que arrancó el negocio, antes de empezar a registrar ventas, compras y gastos en Kiosko.
         Se suma a todos los movimientos para calcular el saldo actual real.
       </p>
       <form onSubmit={submit}>

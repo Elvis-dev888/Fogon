@@ -1,5 +1,23 @@
 import { useEffect } from 'react'
 
+// Marca de Kiosko: toldo de puesto/kiosko sobre un mostrador — neutro,
+// sirve para cualquier tipo de negocio (no solo comida).
+export function BrandMark({ size = 38 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" className="shrink-0">
+      <circle cx="32" cy="32" r="30" fill="#14110E" />
+      <circle cx="32" cy="32" r="29" fill="none" stroke="#C79A3C" strokeWidth="1.4" />
+      <g stroke="#E8CD7A" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 25 Q17.5 33 22 25 Q26.5 17 31 25 Q35.5 33 40 25 Q44.5 17 49 25" />
+        <path d="M16 25 V40" />
+        <path d="M46 25 V40" />
+        <path d="M16 40 H46" />
+        <path d="M18 40 V47 H44 V40" />
+      </g>
+    </svg>
+  )
+}
+
 export function Btn({ variant = 'default', size = 'md', className = '', children, ...props }) {
   const base = 'inline-flex items-center gap-2 font-semibold tracking-wide transition-colors duration-200 disabled:opacity-35 disabled:cursor-not-allowed'
   const sizes = { md: 'px-4 py-2.5 text-[13px] rounded', sm: 'px-3 py-1.5 text-[11.5px] rounded-sm' }

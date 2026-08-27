@@ -41,10 +41,10 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
   return (
     <div className="max-w-[420px] mx-auto mt-10">
       <h2 className="font-serif text-2xl font-semibold mb-1 text-center">
-        {modo === 'login' ? 'Panel de negocios' : 'Registra tu negocio en Fogón'}
+        {modo === 'login' ? 'Panel de negocios' : 'Registra tu negocio en Kiosko'}
       </h2>
       <p className="text-creamsoft text-sm text-center mb-6">
-        {modo === 'login' ? '¿Tu negocio ya está en Fogón? Ingresa con tu cuenta.' : 'Crea tu cuenta — en el siguiente paso configuras (o reclamas) tu negocio.'}
+        {modo === 'login' ? '¿Tu negocio ya está en Kiosko? Ingresa con tu cuenta.' : 'Crea tu cuenta — en el siguiente paso configuras (o reclamas) tu negocio.'}
       </p>
 
       {/* Elección explícita: entrar a un negocio existente, o registrar uno nuevo */}
@@ -283,7 +283,7 @@ export function CrearNegocioForm({ onCreated, notify }) {
     return (
       <div className="max-w-[460px] mx-auto mt-10">
         <h2 className="font-serif text-2xl font-semibold mb-1 text-center">¿Uno de estos es tu negocio?</h2>
-        <p className="text-creamsoft text-sm text-center mb-6">Estos negocios ya están en Fogón pero todavía no tienen administrador. Si alguno es tuyo, reclámalo — quedará vinculado a tu cuenta.</p>
+        <p className="text-creamsoft text-sm text-center mb-6">Estos negocios ya están en Kiosko pero todavía no tienen administrador. Si alguno es tuyo, reclámalo — quedará vinculado a tu cuenta.</p>
         <div className="space-y-3">
           {disponibles.map((n) => (
             <Card key={n.id} className="p-4 flex items-center justify-between">
@@ -326,7 +326,7 @@ function FormNegocioNuevo({ onCreated, notify, onVolver }) {
     try {
       const negocio = await crearNegocioPropio({
         nombre: nombre.trim(),
-        slogan: slogan.trim() || 'Recién llegado a Fogón',
+        slogan: slogan.trim() || 'Recién llegado a Kiosko',
         emoji,
         tipo,
         descripcion: descripcion.trim(),

@@ -31,7 +31,7 @@ export async function fetchNegocios() {
           .reduce((a, v) => a + v.total, 0)
         return { ...n, productosCount, pedidosCount, ventasMes }
       } catch (err) {
-        console.error(`[Fogón] No se pudieron cargar las estadísticas de "${n.nombre}":`, err)
+        console.error(`[Kiosko] No se pudieron cargar las estadísticas de "${n.nombre}":`, err)
         return { ...n, productosCount: 0, pedidosCount: 0, ventasMes: 0 }
       }
     })
@@ -61,7 +61,7 @@ export async function updateNegocio(id, cambios) {
 }
 
 // Base inicial: el capital con el que arrancó el negocio antes de empezar a
-// registrar movimientos en Fogón. Se guarda en negocios.capital_inicial y se
+// registrar movimientos en Kiosko. Se guarda en negocios.capital_inicial y se
 // usa en la pestaña "Ingresos / Egresos" para calcular el saldo real.
 export async function updateCapitalInicial(id, capitalInicial) {
   const { error } = await supabase.from('negocios').update({ capital_inicial: capitalInicial }).eq('id', id)
