@@ -2,20 +2,7 @@ import { useEffect } from 'react'
 
 // Emblema de Kiosco: una marca circular inspirada en cocina, hogar y comunidad.
 export function BrandMark({ size = 38 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 100 100" className="shrink-0" role="img" aria-label="Emblema de Kiosco">
-      <circle cx="50" cy="50" r="48" fill="#15130F" />
-      <circle cx="50" cy="50" r="45" fill="none" stroke="#D7B55E" strokeWidth="2" />
-      <g stroke="#E8CD7A" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M22 35c7-8 14-8 21 0 7-8 14-8 21 0 7-8 14-8 21 0" />
-        <path d="M24 36v24h52V36M29 60v12h42V60" />
-        <path d="M50 20c-7 8-7 14 0 20 7-6 7-12 0-20Z" />
-        <path d="M50 40v18M42 49c4-2 7-5 8-9M58 49c-4-2-7-5-8-9" />
-        <path d="M37 75c4-5 8-5 13 0 5-5 9-5 13 0" />
-      </g>
-      <circle cx="50" cy="50" r="3" fill="#D7B55E" />
-    </svg>
-  )
+  return <img src="/Kiosko.jpg" width={size} height={size} className="shrink-0 rounded-full object-cover" alt="Logo de Kiosco" />
 }
 
 export function Btn({ variant = 'default', size = 'md', className = '', children, ...props }) {
