@@ -1,9 +1,5 @@
 {
   "appId": "com.fogon.app",
   "appName": "Kiosco",
-  "webDir": "dist",
-  "server": {
-    "url": "https://administraciondenegocios.netlify.app",
-    "cleartext": false
-  }
+  "webDir": "dist"
 }

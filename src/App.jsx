@@ -17,9 +17,11 @@ const ROLES = [
   ['cliente', '🛒', 'Cliente'],
 ]
 
+const APP_ROLES = ROLES.filter(([role]) => role !== 'cliente')
+
 export default function App() {
   const isNativeApp = Capacitor.isNativePlatform() // true = corriendo como app (Android); false = navegador/web
-  const [role, setRole] = useState('cliente')
+  const [role, setRole] = useState(isNativeApp ? 'admin' : 'cliente')
   const [negocioId, setNegocioId] = useState(null) // solo lo usa el flujo de Cliente
   const [adminIntent, setAdminIntent] = useState(null) // null | 'entrar' | 'registrar' — solo lo usa el flujo de Admin
   const [negocios, setNegocios] = useState([])
@@ -90,7 +92,7 @@ export default function App() {
 
   async function handleSignOut() {
     await signOut()
-    setRole('cliente')
+    setRole(isNativeApp ? 'admin' : 'cliente')
     setAdminIntent(null)
     setMenuAbierto(false)
   }
@@ -158,7 +160,7 @@ export default function App() {
           {!isNativeApp && (
             <div className="flex items-center gap-3">
               <div className="flex gap-1 bg-paper2 border border-line rounded-full p-1">
-                {ROLES.map(([r, icon, label]) => (
+                {ROLES.filter(([r]) => r === 'cliente').map(([r, icon, label]) => (
                   <button key={r} onClick={() => { setRole(r); setAdminIntent(null) }}
                     className={`px-4 py-2 rounded-full text-[12.5px] font-semibold ${role === r ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}>
                     {icon} {label}
@@ -236,7 +238,7 @@ export default function App() {
           className="fixed bottom-0 inset-x-0 z-40 bg-paper2/95 backdrop-blur border-t border-line flex items-stretch"
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          {ROLES.map(([r, icon, label]) => (
+          {APP_ROLES.map(([r, icon, label]) => (
             <button
               key={r}
               onClick={() => { setRole(r); setAdminIntent(null); setMenuAbierto(false) }}
