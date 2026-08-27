@@ -1,19 +1,19 @@
 import { useEffect } from 'react'
 
-// Marca de Kiosko: toldo de puesto/kiosko sobre un mostrador — neutro,
-// sirve para cualquier tipo de negocio (no solo comida).
+// Emblema de Fogón: una marca circular inspirada en cocina, hogar y comunidad.
 export function BrandMark({ size = 38 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" className="shrink-0">
-      <circle cx="32" cy="32" r="30" fill="#14110E" />
-      <circle cx="32" cy="32" r="29" fill="none" stroke="#C79A3C" strokeWidth="1.4" />
-      <g stroke="#E8CD7A" strokeWidth="2.6" fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M13 25 Q17.5 33 22 25 Q26.5 17 31 25 Q35.5 33 40 25 Q44.5 17 49 25" />
-        <path d="M16 25 V40" />
-        <path d="M46 25 V40" />
-        <path d="M16 40 H46" />
-        <path d="M18 40 V47 H44 V40" />
+    <svg width={size} height={size} viewBox="0 0 100 100" className="shrink-0" role="img" aria-label="Emblema de Fogón">
+      <circle cx="50" cy="50" r="48" fill="#15130F" />
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#D7B55E" strokeWidth="2" />
+      <g stroke="#E8CD7A" strokeWidth="2.2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 35c7-8 14-8 21 0 7-8 14-8 21 0 7-8 14-8 21 0" />
+        <path d="M24 36v24h52V36M29 60v12h42V60" />
+        <path d="M50 20c-7 8-7 14 0 20 7-6 7-12 0-20Z" />
+        <path d="M50 40v18M42 49c4-2 7-5 8-9M58 49c-4-2-7-5-8-9" />
+        <path d="M37 75c4-5 8-5 13 0 5-5 9-5 13 0" />
       </g>
+      <circle cx="50" cy="50" r="3" fill="#D7B55E" />
     </svg>
   )
 }

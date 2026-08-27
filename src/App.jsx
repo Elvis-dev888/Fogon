@@ -51,7 +51,7 @@ export default function App() {
       setNegocios(list)
       setLoadError(null)
     } catch (err) {
-      console.error('[Kiosko] Error cargando negocios:', err)
+      console.error('[Fogón] Error cargando negocios:', err)
       setLoadError(err.message || String(err))
     }
   }, [])
@@ -127,7 +127,7 @@ export default function App() {
         <div>
           <div className="w-16 h-16 mx-auto mb-4 rounded-full border border-gold grid place-items-center text-2xl">📡</div>
           <h2 className="font-serif text-2xl font-semibold mb-2">Sin conexión</h2>
-          <p className="text-creamsoft text-sm max-w-xs mx-auto">Kiosko necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
+          <p className="text-creamsoft text-sm max-w-xs mx-auto">Fogón necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
         </div>
       </div>
     )
@@ -147,8 +147,8 @@ export default function App() {
           <div className="flex items-center gap-3">
             <BrandMark size={36} />
             <div>
-              <h1 className="font-serif text-xl font-semibold m-0">Kiosko</h1>
-              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">tu kiosko digital, para cualquier negocio</span>
+              <h1 className="font-serif text-xl font-semibold m-0">Fogón</h1>
+              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">plataforma multiempresa</span>
             </div>
           </div>
 
@@ -311,9 +311,23 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
 function PickNegocio({ negocios, onEnter }) {
   return (
     <div>
+      <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-10 md:px-12 md:py-14 mb-10">
+        <div className="absolute -right-16 -top-20 opacity-20"><BrandMark size={270} /></div>
+        <div className="relative max-w-2xl">
+          <div className="flex items-center gap-3 mb-6">
+            <BrandMark size={58} />
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Fogón</p>
+              <p className="text-xs text-creamsoft">Plataforma multiempresa</p>
+            </div>
+          </div>
+          <h2 className="font-serif text-4xl md:text-5xl font-semibold mb-4 leading-tight">El sabor de cada negocio, en un solo lugar.</h2>
+          <p className="text-creamsoft text-sm md:text-base max-w-xl leading-relaxed">Fogón conecta a tus clientes con sus negocios favoritos. Explora catálogos, arma pedidos y síguelos en tiempo real desde cualquier dispositivo.</p>
+        </div>
+      </section>
       <div className="mb-7">
         <h2 className="font-serif text-3xl font-semibold mb-2">¿Dónde quieres pedir hoy?</h2>
-        <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Explora el catálogo, arma tu pedido y síguelo en tiempo real.</p>
+        <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Explora un negocio para conocer su catálogo y hacer tu pedido.</p>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
         {negocios.filter((n) => n.estado === 'Activo').map((n) => (

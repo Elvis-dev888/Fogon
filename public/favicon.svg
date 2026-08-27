@@ -1,20 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="2.2" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-  <circle cx="32" cy="32" r="30" fill="#14110E"/>
-  <circle cx="32" cy="32" r="29" fill="none" stroke="#C79A3C" stroke-width="1.4"/>
-  <g filter="url(#glow)" stroke="#E8CD7A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M13 25 Q17.5 33 22 25 Q26.5 17 31 25 Q35.5 33 40 25 Q44.5 17 49 25"/>
-    <path d="M16 25 V40"/>
-    <path d="M46 25 V40"/>
-    <path d="M16 40 H46"/>
-    <path d="M18 40 V47 H44 V40"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="48" fill="#15130F"/>
+  <circle cx="50" cy="50" r="45" fill="none" stroke="#D7B55E" stroke-width="2"/>
+  <g stroke="#E8CD7A" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M22 35c7-8 14-8 21 0 7-8 14-8 21 0 7-8 14-8 21 0"/>
+    <path d="M24 36v24h52V36M29 60v12h42V60"/>
+    <path d="M50 20c-7 8-7 14 0 20 7-6 7-12 0-20Z"/>
+    <path d="M50 40v18M42 49c4-2 7-5 8-9M58 49c-4-2-7-5-8-9"/>
+    <path d="M37 75c4-5 8-5 13 0 5-5 9-5 13 0"/>
   </g>
+  <circle cx="50" cy="50" r="3" fill="#D7B55E"/>
 </svg>
