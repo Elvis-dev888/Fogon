@@ -3,8 +3,10 @@ import { Btn, Modal, Field, Input, Empty } from './ui'
 import { fmt$, ESTADOS, thumbFor } from '../lib/helpers'
 import { fetchCategorias, fetchProductos, crearPedido, suscribirsePedido, actualizarPedido, cancelarPedido } from '../lib/api'
 import { ProductoDetalleModal, EditarPedidoModal, ConfirmCancelModal, QtyStepper } from './PedidoCompartido'
+import { useLanguage } from '../lib/i18n.jsx'
 
 export default function ClienteView({ negocio, onExit, notify }) {
+  const { t } = useLanguage()
   const [categorias, setCategorias] = useState([])
   const [productos, setProductos] = useState([])
   const [catActiva, setCatActiva] = useState('Todas')
@@ -43,8 +45,8 @@ export default function ClienteView({ negocio, onExit, notify }) {
       <div className="rounded p-9 mb-6 relative overflow-hidden border border-line bg-gradient-to-br from-paper3 to-paper2">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_88%_20%,rgba(199,154,60,.16),transparent_55%)] pointer-events-none" />
         <h2 className="font-serif text-3xl font-semibold mb-2">{negocio.emoji} {negocio.nombre}</h2>
-        <p className="text-creamsoft max-w-md leading-relaxed">{negocio.slogan}. Arma tu pedido, personalízalo con adiciones y síguelo hasta que llegue a tu mesa.</p>
-        <Btn className="mt-4 bg-paper2" onClick={onExit}>↩ Ver otros negocios</Btn>
+        <p className="text-creamsoft max-w-md leading-relaxed">{negocio.slogan}. {t.customer.trackingDescription}</p>
+        <Btn className="mt-4 bg-paper2" onClick={onExit}>↩ {t.customer.otherBusinesses}</Btn>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-4">
@@ -60,7 +62,7 @@ export default function ClienteView({ negocio, onExit, notify }) {
         {prods.map((p) => (
           <button key={p.id} disabled={!p.disponible} onClick={() => setDetalle(p)}
             className={`text-left border border-line rounded overflow-hidden bg-paper2 hover:border-gold transition-colors relative ${!p.disponible ? 'opacity-50' : ''}`}>
-            {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotado</span>}
+            {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">{t.customer.outOfStock}</span>}
             <div className="h-24 flex items-center justify-center text-4xl border-b border-line overflow-hidden" style={{ background: thumbFor(p.emoji) }}>
               {p.imagen_url ? <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" /> : p.emoji}
             </div>
@@ -69,19 +71,19 @@ export default function ClienteView({ negocio, onExit, notify }) {
               <h4 className="font-serif font-semibold text-[15px] mb-0.5">{p.nombre}</h4>
               {p.desc && <p className="text-[12px] text-creamsoft mb-1.5">{p.desc}</p>}
               <div className="font-mono font-bold text-gold my-1.5">{fmt$(p.precio)}</div>
-              {p.disponible && <span className="text-[12px] font-semibold text-gold">Agregar →</span>}
+              {p.disponible && <span className="text-[12px] font-semibold text-gold">{t.customer.add}</span>}
             </div>
           </button>
         ))}
         {prods.length === 0 && (
-          <div className="col-span-full"><Empty icon="🍽️">No hay productos en esta categoría.</Empty></div>
+          <div className="col-span-full"><Empty icon="🍽️">{t.customer.noProducts}</Empty></div>
         )}
       </div>
 
       {cart.length > 0 && (
         <button onClick={() => setDrawer(true)}
           className="fixed right-6 bottom-6 z-50 bg-gold text-paper rounded-full px-5 py-3.5 flex items-center gap-2.5 font-bold text-sm shadow-xl">
-          🧺 Ver pedido <span className="bg-paper text-gold rounded-full px-2.5 text-[11.5px]">{cart.reduce((a, c) => a + c.cantidad, 0)}</span>
+          🧺 {t.customer.viewOrder} <span className="bg-paper text-gold rounded-full px-2.5 text-[11.5px]">{cart.reduce((a, c) => a + c.cantidad, 0)}</span>
         </button>
       )}
 
@@ -101,6 +103,7 @@ export default function ClienteView({ negocio, onExit, notify }) {
 }
 
 function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
+  const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
   const [saving, setSaving] = useState(false)
   const total = cart.reduce((a, c) => a + c.subtotal, 0)
@@ -119,8 +122,8 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
     <div className="fixed inset-0 bg-black/70 z-[60] flex justify-end" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="w-full max-w-[420px] bg-paper border-l border-line h-full p-6 overflow-y-auto animate-slidein">
         <button className="float-right text-creamsoft hover:text-gold text-lg" onClick={onClose}>✕</button>
-        <h2 className="font-serif text-xl font-semibold mb-4">Tu pedido</h2>
-        {cart.length === 0 ? <Empty icon="🧺">Tu carrito está vacío.</Empty> : (
+        <h2 className="font-serif text-xl font-semibold mb-4">{t.customer.order}</h2>
+        {cart.length === 0 ? <Empty icon="🧺">{t.customer.emptyCart}</Empty> : (
           <>
             {cart.map((c, i) => (
               <div key={i} className="flex justify-between gap-2.5 py-2.5 border-b border-line text-[13px]">
@@ -133,7 +136,7 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
                   <b className="font-mono">{fmt$(c.subtotal)}</b>
                   <div className="flex items-center gap-2">
                     <QtyStepper value={c.cantidad} onChange={(q) => onQty(i, q)} />
-                    <button onClick={() => onRemove(i)} className="text-[11px] text-creamsoft hover:text-wine">Quitar</button>
+                    <button onClick={() => onRemove(i)} className="text-[11px] text-creamsoft hover:text-wine">{t.customer.remove}</button>
                   </div>
                 </span>
               </div>
@@ -141,9 +144,9 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
             <div className="flex justify-between my-4 font-bold text-lg">
               <span>Total</span><span className="font-mono">{fmt$(total)}</span>
             </div>
-            <Field label="Tu nombre"><Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="¿Cómo te llamas?" /></Field>
+            <Field label={t.customer.name}><Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t.customer.namePlaceholder} /></Field>
             <Btn variant="primary" className="w-full justify-center" disabled={saving} onClick={confirmar}>
-              {saving ? 'Confirmando…' : 'Confirmar pedido'}
+              {saving ? t.customer.confirming : t.customer.confirm}
             </Btn>
           </>
         )}
@@ -153,6 +156,7 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
 }
 
 function Tracking({ negocio, pedido, productos, onPedidoActualizado, onNuevo }) {
+  const { t } = useLanguage()
   const idx = ESTADOS.indexOf(pedido.estado)
   const cancelado = pedido.estado === 'Cancelado'
   const puedeModificar = pedido.estado === 'Pendiente'
@@ -162,7 +166,7 @@ function Tracking({ negocio, pedido, productos, onPedidoActualizado, onNuevo }) 
   return (
     <div className="bg-paper2 border border-line rounded p-6 max-w-[560px] mx-auto text-center">
       <div className={`inline-block font-serif italic font-semibold text-lg pb-1.5 border-b animate-stampin ${cancelado ? 'text-wine border-wine' : 'text-gold border-gold'}`}>
-        {cancelado ? 'Pedido cancelado' : '¡Pedido confirmado!'}
+        {cancelado ? t.customer.cancelled : t.customer.confirmed}
       </div>
       <h2 className="font-serif text-2xl font-semibold mt-4 mb-1">Pedido #{pedido.numero || '—'}</h2>
       <p className="text-creamsoft mb-1.5">{negocio.nombre} · <b className="font-mono">{fmt$(pedido.total)}</b></p>
@@ -193,19 +197,19 @@ function Tracking({ negocio, pedido, productos, onPedidoActualizado, onNuevo }) 
       )}
 
       {cancelado ? (
-        <p className="text-creamsoft text-[12px] mb-4">Este pedido fue cancelado y no se va a preparar.</p>
+        <p className="text-creamsoft text-[12px] mb-4">{t.customer.cancelledDescription}</p>
       ) : (
-        <p className="text-creamsoft text-[12px] mb-4">El estado se actualiza solo cuando la cocina lo cambie — no necesitas recargar la página.</p>
+        <p className="text-creamsoft text-[12px] mb-4">{t.customer.trackingDescription}</p>
       )}
 
       {puedeModificar && (
         <div className="flex gap-2.5 mb-3">
-          <Btn variant="ghost" className="flex-1 justify-center" onClick={() => setModal('editar')}>✏️ Editar pedido</Btn>
-          <Btn variant="danger" className="flex-1 justify-center" onClick={() => setModal('cancelar')}>❌ Cancelar pedido</Btn>
+          <Btn variant="ghost" className="flex-1 justify-center" onClick={() => setModal('editar')}>✏️ {t.customer.edit}</Btn>
+          <Btn variant="danger" className="flex-1 justify-center" onClick={() => setModal('cancelar')}>❌ {t.customer.cancel}</Btn>
         </div>
       )}
 
-      <Btn variant="primary" className="w-full justify-center" onClick={onNuevo}>Hacer otro pedido</Btn>
+      <Btn variant="primary" className="w-full justify-center" onClick={onNuevo}>{t.customer.newOrder}</Btn>
 
       {modal === 'editar' && (
         <EditarPedidoModal pedido={pedido} productos={productos} onClose={() => setModal(null)}

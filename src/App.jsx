@@ -10,17 +10,19 @@ import { supabase } from './lib/supabaseClient'
 import { fetchPerfil, fetchNegocioPorId, signOut } from './lib/auth'
 import { fetchNegocios } from './lib/api'
 import { DOWNLOAD_LINKS } from './lib/downloads'
+import { LANGUAGES, useLanguage } from './lib/i18n.jsx'
 
 const ROLES = [
-  ['super', '🛠️', 'Admin'],
-  ['admin', '👑', 'Negocio'],
-  ['empleado', '🛎️', 'Equipo'],
-  ['cliente', '🛒', 'Cliente'],
+  ['super', '🛠️', 'admin'],
+  ['admin', '👑', 'business'],
+  ['empleado', '🛎️', 'team'],
+  ['cliente', '🛒', 'customerRole'],
 ]
 
 const APP_ROLES = ROLES.filter(([role]) => role !== 'cliente')
 
 export default function App() {
+  const { language, setLanguage, t } = useLanguage()
   const isDesktopApp = typeof window !== 'undefined' && (window.location.search.includes('desktop=1') || !!window.process?.versions?.electron)
   const isNativeApp = Capacitor.isNativePlatform() || isDesktopApp // app nativa: Android + desktop Windows
   const [role, setRole] = useState(isNativeApp ? 'admin' : 'cliente')
@@ -131,8 +133,8 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center bg-paper text-center px-6">
         <div>
           <div className="w-16 h-16 mx-auto mb-4 rounded-full border border-gold grid place-items-center text-2xl">📡</div>
-          <h2 className="font-serif text-2xl font-semibold mb-2">Sin conexión</h2>
-          <p className="text-creamsoft text-sm max-w-xs mx-auto">Kiosco necesita internet para funcionar. Revisa tu wifi o datos móviles — se reconecta solo apenas vuelva la señal.</p>
+          <h2 className="font-serif text-2xl font-semibold mb-2">{t.noConnection}</h2>
+          <p className="text-creamsoft text-sm max-w-xs mx-auto">{t.connectionDescription}</p>
         </div>
       </div>
     )
@@ -158,7 +160,7 @@ export default function App() {
             <BrandMark size={isDesktopShell ? 40 : 48} />
             <div>
               <h1 className="font-serif text-xl font-semibold m-0">Kiosco</h1>
-              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">plataforma multiempresa</span>
+              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">{t.platform}</span>
             </div>
           </div>
 
@@ -170,15 +172,20 @@ export default function App() {
                 {ROLES.filter(([r]) => r === 'cliente').map(([r, icon, label]) => (
                   <button key={r} onClick={() => { setRole(r); setAdminIntent(null) }}
                     className={`px-4 py-2 rounded-full text-[12.5px] font-semibold ${role === r ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}>
-                    {icon} {label}
+                    {icon} {t[label]}
                   </button>
                 ))}
               </div>
-              {session && (
-                <Btn size="sm" variant="ghost" onClick={handleSignOut}>Cerrar sesión</Btn>
-              )}
+              {session && <Btn size="sm" variant="ghost" onClick={handleSignOut}>{t.signOut}</Btn>}
             </div>
           )}
+          <label className="inline-flex items-center gap-2 text-[11px] text-creamsoft ml-auto">
+            <span className="sr-only">{t.language}</span>
+            <select value={language} onChange={(event) => setLanguage(event.target.value)} aria-label={t.language}
+              className="bg-paper2 border border-line rounded px-2 py-1.5 text-cream focus:outline-none focus:border-gold">
+              {LANGUAGES.map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+            </select>
+          </label>
         </div>
       </header>
       <div className="h-[2px] bg-gradient-to-r from-transparent via-gold to-transparent opacity-70" />
@@ -192,26 +199,26 @@ export default function App() {
 
         {/* ---------------- SUPERADMIN ---------------- */}
         {role === 'super' && (
-          session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">Cargando…</p> :
+          session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
           !session ? <SuperadminAuth onDone={loadPerfil} /> :
-          !perfil ? <p className="text-creamsoft text-sm text-center mt-10">Cargando tu perfil…</p> :
+          !perfil ? <p className="text-creamsoft text-sm text-center mt-10">{t.loadingProfile}</p> :
           perfil.rol !== 'superadmin' ? <SinPermiso mensaje="Esta cuenta no tiene permisos de superadministrador. Ese rol se asigna a mano, no se puede obtener desde la app." /> :
           <SuperadminView negocios={negocios} onChanged={loadNegocios} notify={notify} />
         )}
 
         {/* ---------------- ADMIN DE NEGOCIO ---------------- */}
         {role === 'admin' && (
-          session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">Cargando…</p> :
+          session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
           !session ? (
             adminIntent === null
               ? <PickNegocioAdmin negocios={negocios} onEntrar={() => setAdminIntent('entrar')} onRegistrar={() => setAdminIntent('registrar')} />
               : <AdminAuth modoInicial={adminIntent === 'registrar' ? 'registro' : 'login'} onDone={loadPerfil} notify={notify} onVolver={() => setAdminIntent(null)} />
           ) :
-          !perfil ? <p className="text-creamsoft text-sm text-center mt-10">Cargando tu perfil…</p> :
+          !perfil ? <p className="text-creamsoft text-sm text-center mt-10">{t.loadingProfile}</p> :
           perfil.rol === 'pendiente' ? <CrearNegocioForm notify={notify} onCreated={() => { loadPerfil(); loadNegocios() }} /> :
           perfil.rol === 'superadmin' ? <SinPermiso mensaje="Esta cuenta es de superadministrador, no administra un negocio individual." /> :
           perfil.rol !== 'admin' ? <SinPermiso mensaje="Esta cuenta no está registrada como administradora de un negocio." /> :
-          !miNegocio ? <p className="text-creamsoft text-sm text-center mt-10">Cargando tu negocio…</p> :
+          !miNegocio ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
           <AdminView
             negocio={miNegocio}
             onExit={handleSignOut}
@@ -225,12 +232,12 @@ export default function App() {
 
         {/* ---------------- EMPLEADO (atiende pedidos) ---------------- */}
         {role === 'empleado' && (
-          session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">Cargando…</p> :
+          session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
           !session ? <EmpleadoAuth onDone={loadPerfil} notify={notify} /> :
-          !perfil ? <p className="text-creamsoft text-sm text-center mt-10">Cargando tu perfil…</p> :
+          !perfil ? <p className="text-creamsoft text-sm text-center mt-10">{t.loadingProfile}</p> :
           perfil.rol === 'pendiente' ? <UnirseNegocioForm notify={notify} onJoined={() => loadPerfil()} /> :
           perfil.rol !== 'empleado' ? <SinPermiso mensaje="Esta cuenta no está registrada como empleado." /> :
-          !miNegocio ? <p className="text-creamsoft text-sm text-center mt-10">Cargando tu negocio…</p> :
+          !miNegocio ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
           <EmpleadoView negocio={miNegocio} onExit={handleSignOut} notify={notify} />
         )}
 
@@ -252,7 +259,7 @@ export default function App() {
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10.5px] font-semibold ${role === r ? 'text-gold' : 'text-creamsoft'}`}
             >
               <span className={`text-lg leading-none ${role === r ? 'opacity-100' : 'opacity-70'}`}>{icon}</span>
-              {label}
+              {t[label]}
             </button>
           ))}
           <div className="relative flex-1 flex flex-col items-center justify-center">
@@ -333,6 +340,8 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
 }
 
 function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = false }) {
+  const { t } = useLanguage()
+
   return (
     <div>
       {showWelcome && <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-10 md:px-12 md:py-14 mb-10">
@@ -354,20 +363,20 @@ function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = f
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-[0.2em] text-gold mb-2">¿Tienes un negocio?</p>
-            <h3 className="font-serif text-2xl font-semibold mb-1">Administra tu negocio con Kiosco.</h3>
-            <p className="text-creamsoft text-sm max-w-xl leading-relaxed">Gestiona productos, inventario, pedidos, ventas y equipo de trabajo desde la aplicación oficial de Kiosco.</p>
+            <h3 className="font-serif text-2xl font-semibold mb-1">{t.manageBusiness}</h3>
+            <p className="text-creamsoft text-sm max-w-xl leading-relaxed">{t.manageBusinessDescription}</p>
           </div>
           <div className="flex flex-wrap gap-2.5">
-            <a href={DOWNLOAD_LINKS.android} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full bg-gold text-paper font-semibold text-[12.5px] px-4 py-2.5 hover:bg-golddark">📱 Android</a>
-            <a href={DOWNLOAD_LINKS.ios} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">🍎 iPhone</a>
-            <a href={DOWNLOAD_LINKS.windows} className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">💻 Windows</a>
+            <a href={DOWNLOAD_LINKS.android} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full bg-gold text-paper font-semibold text-[12.5px] px-4 py-2.5 hover:bg-golddark">📱 {t.android}</a>
+            <a href={DOWNLOAD_LINKS.ios} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">🍎 {t.iphone}</a>
+            <a href={DOWNLOAD_LINKS.windows} className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">💻 {t.windows}</a>
           </div>
         </div>
       </section>}
 
       <div className="mb-7">
-        <h2 className="font-serif text-3xl font-semibold mb-2">¿Dónde quieres pedir hoy?</h2>
-        <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Explora un negocio para conocer su catálogo y hacer tu pedido.</p>
+        <h2 className="font-serif text-3xl font-semibold mb-2">{t.chooseOrder}</h2>
+        <p className="text-creamsoft text-sm max-w-lg leading-relaxed">{t.chooseOrderDescription}</p>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
         {negocios.filter((n) => n.estado === 'Activo').map((n) => (

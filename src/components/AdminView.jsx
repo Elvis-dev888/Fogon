@@ -6,26 +6,21 @@ import {
 import {
   TabDashboard, TabProductos, TabCategorias, TabInventario, TabCompras,
   TabPedidos, TabVentas, TabTrabajadores, TabFinanzas, TabEstadisticas, TabMiNegocio,
+  TabMiSuscripcion,
 } from './AdminTabs'
 import { supabase } from '../lib/supabaseClient'
 import { playPedidoNuevo, fmt$ } from '../lib/helpers'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
+import { useLanguage } from '../lib/i18n.jsx'
 
 const TABS = [
-  ['dashboard', '📊', 'Dashboard'],
-  ['minegocio', '🏪', 'Mi negocio'],
-  ['productos', '🍔', 'Productos'],
-  ['categorias', '🏷️', 'Categorías'],
-  ['inventario', '📦', 'Inventario'],
-  ['compras', '🧾', 'Compras'],
-  ['pedidos', '🧑‍🍳', 'Pedidos'],
-  ['ventas', '💰', 'Ventas'],
-  ['trabajadores', '👥', 'Trabajadores'],
-  ['finanzas', '📈', 'Ingresos / Egresos'],
-  ['estadisticas', '📉', 'Estadísticas'],
+  ['dashboard', '📊'], ['suscripcion', '💳'], ['minegocio', '🏪'], ['productos', '🍔'],
+  ['categorias', '🏷️'], ['inventario', '📦'], ['compras', '🧾'], ['pedidos', '🧑‍🍳'],
+  ['ventas', '💰'], ['trabajadores', '👥'], ['finanzas', '📈'], ['estadisticas', '📉'],
 ]
 
 export default function AdminView({ negocio, onExit, notify, onNegocioUpdated }) {
+  const { t } = useLanguage()
   const [tab, setTab] = useState('dashboard')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -77,7 +72,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
   }, [negocio.id, reload, notify])
 
   if (loading || !data) {
-    return <p className="text-creamsoft text-sm">Cargando información de {negocio.nombre}…</p>
+    return <p className="text-creamsoft text-sm">{t.loading} {negocio.nombre}…</p>
   }
 
   const props = { negocio, data, reload, notify, onNegocioUpdated }
@@ -94,7 +89,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
           <span className="text-gold font-serif font-semibold text-base truncate">{negocio.nombre}</span>
         </div>
         <CodigoEmpleado negocioId={negocio.id} notify={notify} />
-        {TABS.map(([k, icon, label]) => {
+        {TABS.map(([k, icon]) => {
           const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length : 0
           return (
             <button
@@ -104,7 +99,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
                 tab === k ? 'bg-gold/15 text-gold font-semibold' : 'text-creamsoft hover:bg-white/5 hover:text-cream'
               }`}
             >
-              {icon} {label}
+              {icon} {t.tabs[k]}
               {pendientesPedidos > 0 && (
                 <span className="ml-auto bg-gold text-paper text-[10px] font-bold rounded-full w-5 h-5 grid place-items-center animate-pulse">
                   {pendientesPedidos}
@@ -117,11 +112,12 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
           onClick={onExit}
           className="mt-2.5 pt-3 border-t border-line text-left px-3 py-2.5 text-[13px] text-creamsoft hover:text-cream"
         >
-          ⏻ Cerrar sesión
+          ⏻ {t.signOut}
         </button>
       </nav>
       <div className="animate-fadein">
         {tab === 'dashboard' && <TabDashboard {...props} />}
+        {tab === 'suscripcion' && <TabMiSuscripcion {...props} />}
         {tab === 'minegocio' && <TabMiNegocio {...props} />}
         {tab === 'productos' && <TabProductos {...props} />}
         {tab === 'categorias' && <TabCategorias {...props} />}
@@ -138,6 +134,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
 }
 
 function CodigoEmpleado({ negocioId, notify }) {
+  const { t } = useLanguage()
   const [codigo, setCodigo] = useState('')
   const [loading, setLoading] = useState(true)
   const [regenerando, setRegenerando] = useState(false)
@@ -148,7 +145,7 @@ function CodigoEmpleado({ negocioId, notify }) {
 
   async function copiar() {
     await navigator.clipboard.writeText(codigo)
-    notify('Código copiado — pásaselo a tu empleado')
+    notify(t.copyCode)
   }
 
   async function regenerar() {
@@ -156,7 +153,7 @@ function CodigoEmpleado({ negocioId, notify }) {
     try {
       const nuevo = await regenerarCodigoNegocio()
       setCodigo(nuevo)
-      notify('Código nuevo generado — el anterior ya no sirve')
+      notify(t.newCode)
     } finally {
       setRegenerando(false)
     }
@@ -166,12 +163,12 @@ function CodigoEmpleado({ negocioId, notify }) {
 
   return (
     <div className="mb-3 pb-3 border-b border-line max-[820px]:hidden">
-      <p className="text-[10px] uppercase tracking-wide text-creamsoft mb-1">Código para tu empleado</p>
+      <p className="text-[10px] uppercase tracking-wide text-creamsoft mb-1">{t.employeeCode}</p>
       <button onClick={copiar} className="font-mono text-sm tracking-[0.25em] text-cream bg-paper border border-line rounded-sm px-2.5 py-1.5 w-full text-center hover:border-gold">
         {codigo}
       </button>
       <button onClick={regenerar} disabled={regenerando} className="text-[11px] text-creamsoft hover:text-gold mt-1.5 w-full text-center">
-        {regenerando ? 'Generando…' : 'Generar uno nuevo'}
+        {regenerando ? t.generating : t.newCode}
       </button>
     </div>
   )

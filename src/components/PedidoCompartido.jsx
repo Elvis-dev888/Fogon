@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Btn, Modal, Field, Input, Empty } from './ui'
 import { fmt$, thumbFor } from '../lib/helpers'
+import { useLanguage } from '../lib/i18n.jsx'
 
 /* ---------------------------------------------------------------
    Elegir cantidad y adicionales de UN producto (lo usa el cliente al
@@ -8,6 +9,7 @@ import { fmt$, thumbFor } from '../lib/helpers'
    agrega un producto nuevo a un pedido existente).
    --------------------------------------------------------------- */
 export function ProductoDetalleModal({ producto, adicionesGlobales, onClose, onAdd }) {
+  const { t } = useLanguage()
   // Se combinan las adiciones propias de este producto (las que el admin le
   // puso solo a él) con las adiciones generales del negocio (bebidas, extras
   // que aplican a cualquier plato) — el cliente las ve todas juntas.
@@ -54,7 +56,7 @@ export function ProductoDetalleModal({ producto, adicionesGlobales, onClose, onA
       <p className="font-mono font-bold text-gold text-center text-lg mb-4">{fmt$(producto.precio)}</p>
       <form onSubmit={submit}>
         {opciones.length > 0 && (
-          <Field label="Adiciones">
+          <Field label={t.orderShared.additions}>
             <div className="border border-line rounded-sm divide-y divide-line">
               {opciones.map((a, i) => (
                 <label key={i} className="flex items-center justify-between px-3 py-2.5 cursor-pointer">
@@ -72,10 +74,10 @@ export function ProductoDetalleModal({ producto, adicionesGlobales, onClose, onA
           </Field>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cantidad"><QtyStepper value={qty} onChange={setQty} /></Field>
-          <Field label="Observaciones"><Input value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ej: sin cebolla" /></Field>
+          <Field label={t.orderShared.quantity}><QtyStepper value={qty} onChange={setQty} /></Field>
+          <Field label={t.orderShared.notes}><Input value={obs} onChange={(e) => setObs(e.target.value)} placeholder={t.orderShared.notesPlaceholder} /></Field>
         </div>
-        <Btn variant="primary" className="w-full justify-center">Agregar al carrito — <span className="font-mono">{fmt$(total)}</span></Btn>
+        <Btn variant="primary" className="w-full justify-center">{t.orderShared.addToCart} — <span className="font-mono">{fmt$(total)}</span></Btn>
       </form>
     </Modal>
   )
@@ -102,6 +104,7 @@ export function QtyStepper({ value, onChange, min = 1 }) {
    Entregado ni Cancelado).
    --------------------------------------------------------------- */
 export function EditarPedidoModal({ pedido, productos, onClose, onSaved, guardar }) {
+  const { t } = useLanguage()
   const original = (pedido.pedido_items || pedido.items || []).map((it) => ({
     producto_id: it.producto_id || it.productId || null,
     nombre: it.nombre,
@@ -139,10 +142,10 @@ export function EditarPedidoModal({ pedido, productos, onClose, onSaved, guardar
 
   return (
     <Modal onClose={onClose} width="max-w-[520px]">
-      <h2 className="font-serif text-xl font-semibold mb-1">Editar pedido #{pedido.numero}</h2>
-      <p className="text-creamsoft text-[13px] mb-4">Ajusta cantidades, quita productos o agrega otros. El total se recalcula solo.</p>
+      <h2 className="font-serif text-xl font-semibold mb-1">{t.orderShared.editTitle} #{pedido.numero}</h2>
+      <p className="text-creamsoft text-[13px] mb-4">{t.orderShared.editDescription}</p>
 
-      {items.length === 0 ? <Empty icon="🧺">Sin productos — agrega al menos uno para poder guardar.</Empty> : items.map((it, i) => (
+      {items.length === 0 ? <Empty icon="🧺">{t.orderShared.empty}</Empty> : items.map((it, i) => (
         <div key={i} className="flex justify-between gap-2.5 py-2.5 border-b border-line text-[13px]">
           <span>
             <span className="font-semibold">{it.nombre}</span>
@@ -153,7 +156,7 @@ export function EditarPedidoModal({ pedido, productos, onClose, onSaved, guardar
             <b className="font-mono">{fmt$(it.subtotal)}</b>
             <div className="flex items-center gap-2">
               <QtyStepper value={it.cantidad} onChange={(q) => setQty(i, q)} />
-              <button onClick={() => quitar(i)} className="text-[11px] text-creamsoft hover:text-wine">Quitar</button>
+              <button onClick={() => quitar(i)} className="text-[11px] text-creamsoft hover:text-wine">{t.customer.remove}</button>
             </div>
           </span>
         </div>
@@ -163,15 +166,15 @@ export function EditarPedidoModal({ pedido, productos, onClose, onSaved, guardar
         <span>Total</span><span className="font-mono">{fmt$(total)}</span>
       </div>
 
-      <Btn size="sm" variant="ghost" className="mb-4" onClick={() => setAgregando('catalogo')}>➕ Agregar producto</Btn>
+      <Btn size="sm" variant="ghost" className="mb-4" onClick={() => setAgregando('catalogo')}>➕ {t.orderShared.addProduct}</Btn>
 
       <Btn variant="primary" className="w-full justify-center" disabled={guardando || items.length === 0} onClick={submit}>
-        {guardando ? 'Guardando…' : 'Guardar cambios'}
+        {guardando ? t.orderShared.saving : t.orderShared.save}
       </Btn>
 
       {agregando === 'catalogo' && (
         <Modal onClose={() => setAgregando(null)}>
-          <h2 className="font-serif text-lg font-semibold mb-3">Elige un producto</h2>
+          <h2 className="font-serif text-lg font-semibold mb-3">{t.orderShared.chooseProduct}</h2>
           <div className="grid grid-cols-2 gap-2.5">
             {catalogo.map((p) => (
               <button key={p.id} disabled={!p.disponible} onClick={() => setAgregando(p)}
@@ -198,6 +201,7 @@ export function EditarPedidoModal({ pedido, productos, onClose, onSaved, guardar
    por accidente con un solo clic.
    --------------------------------------------------------------- */
 export function ConfirmCancelModal({ pedido, onClose, cancelar }) {
+  const { t } = useLanguage()
   const [cancelando, setCancelando] = useState(false)
   async function confirmar() {
     setCancelando(true)
@@ -209,15 +213,14 @@ export function ConfirmCancelModal({ pedido, onClose, cancelar }) {
   }
   return (
     <Modal onClose={onClose} width="max-w-[400px]">
-      <h2 className="font-serif text-lg font-semibold mb-2">¿Cancelar este pedido?</h2>
+      <h2 className="font-serif text-lg font-semibold mb-2">{t.orderShared.cancelTitle}</h2>
       <p className="text-creamsoft text-[13px] mb-5">
-        Pedido #{pedido.numero} — {fmt$(pedido.total)}. Esta acción no se puede deshacer, pero el pedido se conserva
-        en el historial marcado como "Cancelado".
+        Pedido #{pedido.numero} — {fmt$(pedido.total)}. {t.orderShared.cancelDescription}
       </p>
       <div className="flex gap-2.5">
-        <Btn variant="ghost" className="flex-1 justify-center" onClick={onClose}>Volver</Btn>
+        <Btn variant="ghost" className="flex-1 justify-center" onClick={onClose}>{t.orderShared.back}</Btn>
         <Btn variant="danger" className="flex-1 justify-center" disabled={cancelando} onClick={confirmar}>
-          {cancelando ? 'Cancelando…' : 'Cancelar pedido'}
+          {cancelando ? t.orderShared.cancelling : t.customer.cancel}
         </Btn>
       </div>
     </Modal>

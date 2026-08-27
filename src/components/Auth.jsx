@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { Btn, Card, Field, Input, Select, Textarea } from './ui'
 import { signUp, signIn, signOut, crearNegocioPropio, unirseComoEmpleado, reclamarSuperadmin, fetchNegociosSinAdmin, reclamarNegocioExistente } from '../lib/auth'
+import { useLanguage } from '../lib/i18n.jsx'
 
 /* ---------------- Login / registro para Admin de negocio ---------------- */
 export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
+  const { t } = useLanguage()
   const [modo, setModo] = useState(modoInicial || 'login') // login | registro
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -21,12 +23,12 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
         const result = await signUp(email, password)
         if (!result.session) {
           // El proyecto exige confirmar el correo: no hay sesión todavía, así que no seguimos al panel.
-          setAviso('Te enviamos un correo de confirmación a ' + email + '. Ábrelo, confirma tu cuenta, y vuelve aquí a iniciar sesión.')
+          setAviso(t.authAdmin.confirmation.replace('{email}', email))
           setModo('login')
           setLoading(false)
           return
         }
-        notify('Cuenta creada. Ahora vamos a registrar tu negocio.')
+        notify(t.authAdmin.accountCreated)
       } else {
         await signIn(email, password)
       }
@@ -41,10 +43,10 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
   return (
     <div className="max-w-[420px] mx-auto mt-10">
       <h2 className="font-serif text-2xl font-semibold mb-1 text-center">
-        {modo === 'login' ? 'Panel de negocios' : 'Registra tu negocio en Kiosko'}
+        {modo === 'login' ? t.authAdmin.loginTitle : t.authAdmin.registerTitle}
       </h2>
       <p className="text-creamsoft text-sm text-center mb-6">
-        {modo === 'login' ? '¿Tu negocio ya está en Kiosko? Ingresa con tu cuenta.' : 'Crea tu cuenta — en el siguiente paso configuras (o reclamas) tu negocio.'}
+        {modo === 'login' ? t.authAdmin.loginDescription : t.authAdmin.registerDescription}
       </p>
 
       {/* Elección explícita: entrar a un negocio existente, o registrar uno nuevo */}
@@ -53,13 +55,13 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
           onClick={() => { setModo('login'); setError(''); setAviso('') }}
           className={`py-2.5 rounded-full text-[12.5px] font-semibold transition-colors ${modo === 'login' ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}
         >
-          Iniciar sesión
+          {t.authAdmin.login}
         </button>
         <button
           onClick={() => { setModo('registro'); setError(''); setAviso('') }}
           className={`py-2.5 rounded-full text-[12.5px] font-semibold transition-colors ${modo === 'registro' ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}
         >
-          ➕ Registrar otro negocio
+          ➕ {t.authAdmin.register}
         </button>
       </div>
 
@@ -67,17 +69,17 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
 
       <Card className="p-6">
         <form onSubmit={submit}>
-          <Field label="Correo"><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label="Contraseña"><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <Field label={t.authAdmin.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+          <Field label={t.authAdmin.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
           <Btn variant="primary" className="w-full justify-center" disabled={loading}>
-            {loading ? 'Un momento…' : modo === 'login' ? 'Ingresar' : 'Crear cuenta y continuar'}
+            {loading ? t.authAdmin.wait : modo === 'login' ? t.authAdmin.enter : t.authAdmin.createContinue}
           </Btn>
         </form>
       </Card>
       {onVolver && (
         <button onClick={onVolver} className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-4">
-          ← Volver a elegir negocio
+          ← {t.authAdmin.back}
         </button>
       )}
     </div>
@@ -86,6 +88,7 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
 
 /* ---------------- Login / registro para Empleado (el que atiende) ---------------- */
 export function EmpleadoAuth({ onDone, notify }) {
+  const { t } = useLanguage()
   const [modo, setModo] = useState('login') // login | registro
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -102,12 +105,12 @@ export function EmpleadoAuth({ onDone, notify }) {
       if (modo === 'registro') {
         const result = await signUp(email, password)
         if (!result.session) {
-          setAviso('Te enviamos un correo de confirmación a ' + email + '. Ábrelo, confirma tu cuenta, y vuelve aquí a iniciar sesión.')
+          setAviso(t.authEmployee.confirmation.replace('{email}', email))
           setModo('login')
           setLoading(false)
           return
         }
-        notify('Cuenta creada. Ahora pon el código que te dio el dueño del negocio.')
+        notify(t.authEmployee.accountCreated)
       } else {
         await signIn(email, password)
       }
@@ -122,26 +125,26 @@ export function EmpleadoAuth({ onDone, notify }) {
   return (
     <div className="max-w-[420px] mx-auto mt-10">
       <h2 className="font-serif text-2xl font-semibold mb-1 text-center">
-        {modo === 'login' ? 'Ingresa a atender pedidos' : 'Crea tu cuenta de empleado'}
+        {modo === 'login' ? t.authEmployee.loginTitle : t.authEmployee.registerTitle}
       </h2>
       <p className="text-creamsoft text-sm text-center mb-6">
-        {modo === 'login' ? 'Con tu propio correo — no necesitas el usuario del dueño.' : 'Después te pediremos el código de tu negocio.'}
+        {modo === 'login' ? t.authEmployee.loginDescription : t.authEmployee.registerDescription}
       </p>
       {aviso && <div className="mb-4 border border-gold bg-gold/10 text-champagne text-[12.5px] rounded p-3">{aviso}</div>}
       <Card className="p-6">
         <form onSubmit={submit}>
-          <Field label="Correo"><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label="Contraseña"><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <Field label={t.authEmployee.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+          <Field label={t.authEmployee.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
           <Btn variant="primary" className="w-full justify-center" disabled={loading}>
-            {loading ? 'Un momento…' : modo === 'login' ? 'Ingresar' : 'Crear cuenta'}
+            {loading ? t.authEmployee.wait : modo === 'login' ? t.authEmployee.login : t.authEmployee.create}
           </Btn>
         </form>
         <button
           onClick={() => { setModo(modo === 'login' ? 'registro' : 'login'); setError(''); setAviso('') }}
           className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-4"
         >
-          {modo === 'login' ? '¿Todavía no tienes cuenta? Créala aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+          {modo === 'login' ? t.authEmployee.createQuestion : t.authEmployee.loginQuestion}
         </button>
       </Card>
     </div>
@@ -150,6 +153,7 @@ export function EmpleadoAuth({ onDone, notify }) {
 
 /* ---------------- Paso único del empleado: unirse a su negocio con el código ---------------- */
 export function UnirseNegocioForm({ onJoined, notify }) {
+  const { t } = useLanguage()
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -160,7 +164,7 @@ export function UnirseNegocioForm({ onJoined, notify }) {
     setLoading(true)
     try {
       const negocio = await unirseComoEmpleado(codigo.trim())
-      notify(`Listo — ya puedes atender pedidos de ${negocio.nombre}`)
+      notify(t.authEmployee.linked.replace('{business}', negocio.nombre))
       onJoined(negocio)
     } catch (err) {
       setError(err.message || String(err))
@@ -171,19 +175,19 @@ export function UnirseNegocioForm({ onJoined, notify }) {
 
   return (
     <div className="max-w-[420px] mx-auto mt-10">
-      <h2 className="font-serif text-2xl font-semibold mb-1 text-center">Código de tu negocio</h2>
-      <p className="text-creamsoft text-sm text-center mb-6">Pídeselo al dueño — son 6 caracteres. Solo lo pones una vez.</p>
+      <h2 className="font-serif text-2xl font-semibold mb-1 text-center">{t.authEmployee.codeTitle}</h2>
+      <p className="text-creamsoft text-sm text-center mb-6">{t.authEmployee.codeDescription}</p>
       <Card className="p-6">
         <form onSubmit={submit}>
-          <Field label="Código de acceso">
+          <Field label={t.authEmployee.codeLabel}>
             <Input required value={codigo} onChange={(e) => setCodigo(e.target.value.toUpperCase())} maxLength={6} placeholder="EJ: A1B2C3" className="tracking-[0.3em] text-center font-mono uppercase" />
           </Field>
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
-          <Btn variant="primary" className="w-full justify-center" disabled={loading}>{loading ? 'Verificando…' : 'Entrar a atender'}</Btn>
+          <Btn variant="primary" className="w-full justify-center" disabled={loading}>{loading ? t.authEmployee.verify : t.authEmployee.enterOrders}</Btn>
         </form>
       </Card>
       <button onClick={() => signOut().then(() => window.location.reload())} className="w-full text-center text-[12px] text-creamsoft hover:text-gold mt-4">
-        Cerrar sesión
+        {t.authEmployee.signOut}
       </button>
     </div>
   )
@@ -191,6 +195,7 @@ export function UnirseNegocioForm({ onJoined, notify }) {
 
 /* ---------------- Login para Superadmin (sin registro público) ---------------- */
 export function SuperadminAuth({ onDone }) {
+  const { t } = useLanguage()
   const [modo, setModo] = useState('login') // login | registro (registro solo sirve si nadie es superadmin todavía)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -207,7 +212,7 @@ export function SuperadminAuth({ onDone }) {
       if (modo === 'registro') {
         const result = await signUp(email, password)
         if (!result.session) {
-          setAviso('Te enviamos un correo de confirmación a ' + email + '. Confírmalo y vuelve aquí a iniciar sesión — ahí sí quedará como superadmin.')
+          setAviso(t.authSuper.confirmation.replace('{email}', email))
           setModo('login')
           setLoading(false)
           return
@@ -226,25 +231,25 @@ export function SuperadminAuth({ onDone }) {
 
   return (
     <div className="max-w-[420px] mx-auto mt-10">
-      <h2 className="font-serif text-2xl font-semibold mb-1 text-center">Acceso de Superadministrador</h2>
+      <h2 className="font-serif text-2xl font-semibold mb-1 text-center">{t.authSuper.title}</h2>
       <p className="text-creamsoft text-sm text-center mb-6">
-        {modo === 'login' ? 'Este acceso es exclusivo.' : 'Este registro solo funciona una vez, para la primera persona que lo use — si ya existe un superadmin, se rechaza.'}
+        {modo === 'login' ? t.authSuper.exclusive : t.authSuper.firstSetup}
       </p>
       {aviso && <div className="mb-4 border border-gold bg-gold/10 text-champagne text-[12.5px] rounded p-3">{aviso}</div>}
       <Card className="p-6">
         <form onSubmit={submit}>
-          <Field label="Correo"><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label="Contraseña"><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <Field label={t.authSuper.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+          <Field label={t.authSuper.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
           <Btn variant="primary" className="w-full justify-center" disabled={loading}>
-            {loading ? 'Un momento…' : modo === 'login' ? 'Ingresar' : 'Reclamar acceso de superadmin'}
+            {loading ? t.authSuper.wait : modo === 'login' ? t.authSuper.enter : t.authSuper.claim}
           </Btn>
         </form>
         <button
           onClick={() => { setModo(modo === 'login' ? 'registro' : 'login'); setError(''); setAviso('') }}
           className="w-full text-center text-[12px] text-creamsoft hover:text-gold mt-4"
         >
-          {modo === 'login' ? '¿Eres tú configurando la plataforma por primera vez?' : '¿Ya tienes cuenta? Inicia sesión'}
+          {modo === 'login' ? t.authSuper.firstQuestion : t.authSuper.loginQuestion}
         </button>
       </Card>
     </div>
@@ -253,6 +258,7 @@ export function SuperadminAuth({ onDone }) {
 
 /* ---------------- Paso único: reclamar un negocio existente, o crear uno nuevo ---------------- */
 export function CrearNegocioForm({ onCreated, notify }) {
+  const { t } = useLanguage()
   const [disponibles, setDisponibles] = useState(null) // null = cargando
   const [reclamando, setReclamando] = useState(null)
   const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false)
@@ -265,7 +271,7 @@ export function CrearNegocioForm({ onCreated, notify }) {
     setReclamando(negocio.id)
     try {
       const actualizado = await reclamarNegocioExistente(negocio.id)
-      notify(`Listo — ya administras ${actualizado.nombre}`)
+      notify(t.businessSetup.claimed.replace('{business}', actualizado.nombre))
       onCreated(actualizado)
     } catch (err) {
       notify(err.message || String(err))
@@ -276,14 +282,14 @@ export function CrearNegocioForm({ onCreated, notify }) {
   const hayDisponibles = disponibles && disponibles.length > 0
 
   if (disponibles === null) {
-    return <p className="text-creamsoft text-sm text-center mt-10">Cargando…</p>
+    return <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p>
   }
 
   if (hayDisponibles && !mostrarFormNuevo) {
     return (
       <div className="max-w-[460px] mx-auto mt-10">
-        <h2 className="font-serif text-2xl font-semibold mb-1 text-center">¿Uno de estos es tu negocio?</h2>
-        <p className="text-creamsoft text-sm text-center mb-6">Estos negocios ya están en Kiosko pero todavía no tienen administrador. Si alguno es tuyo, reclámalo — quedará vinculado a tu cuenta.</p>
+        <h2 className="font-serif text-2xl font-semibold mb-1 text-center">{t.businessSetup.chooseTitle}</h2>
+        <p className="text-creamsoft text-sm text-center mb-6">{t.businessSetup.chooseDescription}</p>
         <div className="space-y-3">
           {disponibles.map((n) => (
             <Card key={n.id} className="p-4 flex items-center justify-between">
@@ -292,16 +298,16 @@ export function CrearNegocioForm({ onCreated, notify }) {
                 <p className="text-creamsoft text-[12.5px]">{n.slogan}</p>
               </div>
               <Btn size="sm" variant="primary" disabled={reclamando === n.id} onClick={() => reclamar(n)}>
-                {reclamando === n.id ? 'Reclamando…' : 'Es mío'}
+                {reclamando === n.id ? t.businessSetup.claiming : t.businessSetup.claim}
               </Btn>
             </Card>
           ))}
         </div>
         <button onClick={() => setMostrarFormNuevo(true)} className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-5">
-          Ninguno de estos — mi negocio es nuevo
+          {t.businessSetup.newBusiness}
         </button>
         <button onClick={() => signOut().then(() => window.location.reload())} className="w-full text-center text-[12px] text-creamsoft hover:text-gold mt-3">
-          Cerrar sesión
+          {t.businessSetup.signOut}
         </button>
       </div>
     )
@@ -311,6 +317,7 @@ export function CrearNegocioForm({ onCreated, notify }) {
 }
 
 function FormNegocioNuevo({ onCreated, notify, onVolver }) {
+  const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState('Comidas rápidas')
   const [descripcion, setDescripcion] = useState('')
@@ -326,12 +333,12 @@ function FormNegocioNuevo({ onCreated, notify, onVolver }) {
     try {
       const negocio = await crearNegocioPropio({
         nombre: nombre.trim(),
-        slogan: slogan.trim() || 'Recién llegado a Kiosko',
+        slogan: slogan.trim() || t.businessSetup.defaultSlogan,
         emoji,
         tipo,
         descripcion: descripcion.trim(),
       })
-      notify(`${negocio.nombre} quedó registrado — ya puedes administrarlo`)
+      notify(t.businessSetup.businessCreated.replace('{business}', negocio.nombre))
       onCreated(negocio)
     } catch (err) {
       setError(err.message || String(err))
@@ -342,12 +349,12 @@ function FormNegocioNuevo({ onCreated, notify, onVolver }) {
 
   return (
     <div className="max-w-[460px] mx-auto mt-10">
-      <h2 className="font-serif text-2xl font-semibold mb-1 text-center">Cuéntanos de tu negocio</h2>
-      <p className="text-creamsoft text-sm text-center mb-6">Esto solo se hace una vez. Después entras directo a tu panel.</p>
+      <h2 className="font-serif text-2xl font-semibold mb-1 text-center">{t.businessSetup.title}</h2>
+      <p className="text-creamsoft text-sm text-center mb-6">{t.businessSetup.description}</p>
       <Card className="p-6">
         <form onSubmit={submit}>
-          <Field label="Nombre del negocio"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Fritanga La 15" /></Field>
-          <Field label="¿A qué se dedica?">
+          <Field label={t.businessSetup.name}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Fritanga La 15" /></Field>
+          <Field label={t.businessSetup.type}>
             <Select value={tipo} onChange={(e) => setTipo(e.target.value)}>
               <option>Comidas rápidas</option>
               <option>Fritanga</option>
@@ -358,22 +365,22 @@ function FormNegocioNuevo({ onCreated, notify, onVolver }) {
               <option>Otro</option>
             </Select>
           </Field>
-          <Field label="Cuéntanos qué hace tu negocio">
+          <Field label={t.businessSetup.descriptionLabel}>
             <Textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej: Vendemos hamburguesas, arepas y bebidas en el barrio..." />
           </Field>
-          <Field label="Eslogan (opcional)"><Input value={slogan} onChange={(e) => setSlogan(e.target.value)} placeholder="Ej: Fritos con actitud" /></Field>
-          <Field label="Emoji / ícono"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
+          <Field label={t.businessSetup.slogan}><Input value={slogan} onChange={(e) => setSlogan(e.target.value)} placeholder="Ej: Fritos con actitud" /></Field>
+          <Field label={t.businessSetup.icon}><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
-          <Btn variant="primary" className="w-full justify-center" disabled={loading}>{loading ? 'Creando…' : 'Registrar mi negocio'}</Btn>
+          <Btn variant="primary" className="w-full justify-center" disabled={loading}>{loading ? t.businessSetup.creating : t.businessSetup.create}</Btn>
         </form>
       </Card>
       {onVolver && (
         <button onClick={onVolver} className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-4">
-          ← Volver a la lista de negocios
+          ← {t.businessSetup.back}
         </button>
       )}
       <button onClick={() => signOut().then(() => window.location.reload())} className="w-full text-center text-[12px] text-creamsoft hover:text-gold mt-3">
-        Cerrar sesión
+        {t.businessSetup.signOut}
       </button>
     </div>
   )
@@ -381,13 +388,14 @@ function FormNegocioNuevo({ onCreated, notify, onVolver }) {
 
 /* ---------------- Bloqueo: sesión válida pero sin el rol correcto ---------------- */
 export function SinPermiso({ mensaje }) {
+  const { t } = useLanguage()
   return (
     <div className="max-w-[460px] mx-auto mt-10 text-center">
       <Card className="p-6">
         <div className="text-3xl mb-3">🔒</div>
-        <h2 className="font-serif text-xl font-semibold mb-2">No tienes acceso a esta sección</h2>
+        <h2 className="font-serif text-xl font-semibold mb-2">{t.access.deniedTitle}</h2>
         <p className="text-creamsoft text-sm mb-5">{mensaje}</p>
-        <Btn onClick={() => signOut().then(() => window.location.reload())}>Cerrar sesión</Btn>
+        <Btn onClick={() => signOut().then(() => window.location.reload())}>{t.access.signOut}</Btn>
       </Card>
     </div>
   )

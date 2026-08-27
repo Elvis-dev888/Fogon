@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
 import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
+import { getSubscriptionSummary, formatDaysLeft } from '../lib/subscription'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
   createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido, actualizarPedido, cancelarPedido,
@@ -8,6 +9,7 @@ import {
   updateNegocio, subirLogoNegocio, updateCapitalInicial,
 } from '../lib/api'
 import { EditarPedidoModal, ConfirmCancelModal } from './PedidoCompartido'
+import { useLanguage } from '../lib/i18n.jsx'
 
 const estadoTone = (e) => (
   e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : e === 'Cancelado' ? 'cancelado' : 'entregado'
@@ -77,6 +79,58 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
   )
 }
 
+export function TabMiSuscripcion({ negocio }) {
+  const summary = getSubscriptionSummary(negocio)
+  const estadoTone = summary.isTrialActive ? 'activo' : summary.isTrialExpired ? 'pausado' : 'activo'
+
+  return (
+    <div>
+      <SectionTitle title="Mi suscripción" sub="Se deja preparada la monetización sin bloquear funciones durante los primeros 3 meses." />
+      <Card className="p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-1">Plan actual</p>
+            <h3 className="font-serif text-2xl text-gold">{summary.plan}</h3>
+            <p className="text-sm text-creamsoft mt-1">Acceso {summary.accessGranted ? 'completo' : 'pendiente de suscripción'}</p>
+          </div>
+          <Pill tone={estadoTone}>{summary.statusLabel}</Pill>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
+          <StatCard label="Estado" value={summary.statusLabel} tone={summary.isTrialActive ? 'sage' : 'wine'} />
+          <StatCard label="Inicio del trial" value={summary.trialStartedAt ? fmtDate(summary.trialStartedAt) : '—'} tone="gold" />
+          <StatCard label="Fin del trial" value={summary.trialEndsAt ? fmtDate(summary.trialEndsAt) : '—'} tone="champagne" />
+        </div>
+
+        <div className="mt-6 border border-line rounded p-4 bg-paper">
+          {summary.isTrialActive ? (
+            <>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Período gratuito</p>
+              <p className="font-semibold text-cream">🎉 Estás disfrutando de Kiosco Pro gratis.</p>
+              <p className="text-sm text-creamsoft mt-2">Tienes acceso completo durante tu período de prueba. Te quedan {formatDaysLeft(summary.remainingDays)}.</p>
+            </>
+          ) : summary.isTrialExpired ? (
+            <>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Próxima renovación</p>
+              <p className="font-semibold text-wine">🔴 Tu período gratuito ha finalizado.</p>
+              <p className="text-sm text-creamsoft mt-2">Continúa utilizando todas las herramientas mediante una suscripción mensual de US$4.99. La funcionalidad sigue activa por ahora y la monetización se habilitará cuando corresponda.</p>
+              <div className="mt-4">
+                <Btn variant="primary" className="justify-center">Actualizar a Kiosco Pro</Btn>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Suscripción activa</p>
+              <p className="font-semibold text-cream">✅ Tu negocio tiene acceso completo a Kiosco Pro.</p>
+              <p className="text-sm text-creamsoft mt-2">Próxima renovación: {summary.renewedAt ? fmtDate(summary.renewedAt) : 'Sin fecha registrada aún'}.</p>
+            </>
+          )}
+        </div>
+      </Card>
+    </div>
+  )
+}
+
 /* ---------------- Dashboard ---------------- */
 export function TabDashboard({ negocio, data }) {
   const ventasMes = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
@@ -135,44 +189,45 @@ export function TabDashboard({ negocio, data }) {
 
 /* ---------------- Productos ---------------- */
 export function TabProductos({ negocio, data, reload, notify }) {
+  const { t } = useLanguage()
   const [modal, setModal] = useState(null) // null | 'new' | 'new-adicion' | producto object
   const menu = data.productos.filter((p) => !p.es_adicion)
   const adicionales = data.productos.filter((p) => p.es_adicion)
 
   return (
     <div>
-      <SectionTitle title="Productos" sub={`Catálogo configurable de ${negocio.nombre} — ${menu.length} productos.`}
-        action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo producto</Btn>} />
+      <SectionTitle title={t.catalogAdmin.products} sub={t.catalogAdmin.catalogDescription.replace('{business}', negocio.nombre).replace('{count}', menu.length)}
+        action={<Btn variant="primary" onClick={() => setModal('new')}>➕ {t.catalogAdmin.newProduct}</Btn>} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {menu.map((p) => (
           <ProductoCard key={p.id} p={p}
             onToggle={async () => { await updateProducto(p.id, { disponible: !p.disponible }); notify(`${p.nombre} ${p.disponible ? 'marcado como agotado' : 'disponible de nuevo'}`); reload() }}
             onEdit={() => setModal(p)}
-            onDelete={async () => { await deleteProducto(p.id); notify('Producto eliminado'); reload() }}
+            onDelete={async () => { await deleteProducto(p.id); notify(t.catalogAdmin.deleted); reload() }}
           />
         ))}
       </div>
 
       <div className="mt-10">
-        <SectionTitle title="Adicionales" sub="Extras que el cliente puede agregarle a cualquier producto (queso, jamón, chicharrón...)."
-          action={<Btn size="sm" variant="mustard" onClick={() => setModal('new-adicion')}>➕ Nuevo adicional</Btn>} />
+        <SectionTitle title={t.catalogAdmin.additionals} sub={t.catalogAdmin.additionsDescription}
+          action={<Btn size="sm" variant="mustard" onClick={() => setModal('new-adicion')}>➕ {t.catalogAdmin.newAdditional}</Btn>} />
         {adicionales.length === 0 ? (
-          <Empty icon="➕">Aún no has creado adicionales.</Empty>
+          <Empty icon="➕">{t.catalogAdmin.noAdditions}</Empty>
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {adicionales.map((a) => (
               <div key={a.id} className="border border-line rounded p-3.5 bg-paper2">
                 <div className="flex justify-between items-start mb-1">
                   <h4 className="font-semibold text-[14px]">{a.nombre}</h4>
-                  {!a.disponible && <Pill tone="cancelado">Inactivo</Pill>}
+                  {!a.disponible && <Pill tone="cancelado">{t.catalogAdmin.inactive}</Pill>}
                 </div>
                 <div className="font-mono font-bold text-champagne text-[13px] mb-2.5">+ {fmt$(a.precio)}</div>
                 <div className="flex gap-1.5 flex-wrap">
                   <Btn size="sm" variant="ghost" onClick={async () => { await updateProducto(a.id, { disponible: !a.disponible }); notify(`${a.nombre} ${a.disponible ? 'desactivado' : 'activado'}`); reload() }}>
                     {a.disponible ? 'Desactivar' : 'Activar'}
                   </Btn>
-                  <Btn size="sm" variant="ghost" onClick={() => setModal(a)}>Editar</Btn>
-                  <Btn size="sm" variant="danger" onClick={async () => { await deleteProducto(a.id); notify('Adicional eliminado'); reload() }}>Eliminar</Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => setModal(a)}>{t.catalogAdmin.edit}</Btn>
+                  <Btn size="sm" variant="danger" onClick={async () => { await deleteProducto(a.id); notify(t.catalogAdmin.additionalDeleted); reload() }}>{t.catalogAdmin.remove}</Btn>
                 </div>
               </div>
             ))}
@@ -186,7 +241,7 @@ export function TabProductos({ negocio, data, reload, notify }) {
           producto={modal === 'new' || modal === 'new-adicion' ? null : modal}
           esAdicionDefault={modal === 'new-adicion'}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); notify(typeof modal === 'string' ? 'Producto creado' : 'Producto actualizado'); reload() }}
+          onSaved={() => { setModal(null); notify(typeof modal === 'string' ? t.catalogAdmin.created : t.catalogAdmin.updated); reload() }}
         />
       )}
     </div>
@@ -194,9 +249,10 @@ export function TabProductos({ negocio, data, reload, notify }) {
 }
 
 function ProductoCard({ p, onToggle, onEdit, onDelete }) {
+  const { t } = useLanguage()
   return (
     <div className="group border border-line rounded overflow-hidden bg-paper2 hover:border-gold transition-colors relative">
-      {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">Agotado</span>}
+      {!p.disponible && <span className="absolute top-2 right-2 text-[9.5px] font-bold px-2 py-1 rounded-full bg-paper text-creamsoft border border-line uppercase">{t.catalogAdmin.outOfStock}</span>}
       <div className="h-24 flex items-center justify-center text-4xl relative border-b border-line overflow-hidden" style={{ background: thumbFor(p.emoji) }}>
         {p.imagen_url ? <img src={p.imagen_url} alt={p.nombre} className="w-full h-full object-cover" /> : p.emoji}
         <div className="absolute inset-x-0 bottom-0 top-0 pointer-events-none">
@@ -209,13 +265,13 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
         <div className="font-mono font-bold text-gold my-2">{fmt$(p.precio)}</div>
         {p.stock !== null && p.stock !== undefined && (
           <div className={`text-[11.5px] font-semibold mb-1.5 ${p.stock === 0 ? 'text-wine' : 'text-creamsoft'}`}>
-            {p.stock === 0 ? 'Sin stock' : `Quedan ${p.stock}`}
+            {p.stock === 0 ? t.catalogAdmin.noStock : t.catalogAdmin.remaining.replace('{count}', p.stock)}
           </div>
         )}
         <div className="flex gap-1.5 flex-wrap">
-          <Btn size="sm" variant="ghost" onClick={onToggle}>{p.disponible ? 'Marcar agotado' : 'Reactivar'}</Btn>
-          <Btn size="sm" variant="ghost" onClick={onEdit}>Editar</Btn>
-          <Btn size="sm" variant="danger" onClick={onDelete}>Eliminar</Btn>
+          <Btn size="sm" variant="ghost" onClick={onToggle}>{p.disponible ? t.catalogAdmin.markOut : t.catalogAdmin.reactivate}</Btn>
+          <Btn size="sm" variant="ghost" onClick={onEdit}>{t.catalogAdmin.edit}</Btn>
+          <Btn size="sm" variant="danger" onClick={onDelete}>{t.catalogAdmin.remove}</Btn>
         </div>
       </div>
     </div>
@@ -223,6 +279,7 @@ function ProductoCard({ p, onToggle, onEdit, onDelete }) {
 }
 
 function ProductoModal({ negocio, categorias, producto, esAdicionDefault, onClose, onSaved }) {
+  const { t } = useLanguage()
   const esAdicion = producto ? !!producto.es_adicion : !!esAdicionDefault
   const [nombre, setNombre] = useState(producto?.nombre || '')
   const [categoria, setCategoria] = useState(producto?.categoria || categorias[0]?.nombre || '')
@@ -267,13 +324,13 @@ function ProductoModal({ negocio, categorias, producto, esAdicionDefault, onClos
   if (esAdicion) {
     return (
       <Modal onClose={onClose}>
-        <h2 className="font-serif text-xl font-semibold mb-1">{producto ? 'Editar adicional' : 'Nuevo adicional'}</h2>
-        <p className="text-creamsoft text-[13px] mb-4">Va a quedar disponible para agregarse a cualquier producto del menú.</p>
+        <h2 className="font-serif text-xl font-semibold mb-1">{producto ? t.catalogAdmin.editAdditional : t.catalogAdmin.newAdditional}</h2>
+        <p className="text-creamsoft text-[13px] mb-4">{t.catalogAdmin.additionsDescription}</p>
         <form onSubmit={submit}>
-          <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Queso, Jamón, Huevo" /></Field>
-          <Field label="Precio adicional (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
+          <Field label={t.catalogAdmin.product}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Queso, Jamón, Huevo" /></Field>
+          <Field label={t.catalogAdmin.addPrice}><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
           <Btn variant="primary" className="w-full justify-center" disabled={saving}>
-            {saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear adicional'}
+            {saving ? t.catalogAdmin.saving : producto ? t.orderShared.save : t.catalogAdmin.createAdditional}
           </Btn>
         </form>
       </Modal>
@@ -282,35 +339,35 @@ function ProductoModal({ negocio, categorias, producto, esAdicionDefault, onClos
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{producto ? 'Editar producto' : 'Nuevo producto'}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{producto ? t.catalogAdmin.editProduct : t.catalogAdmin.newProduct}</h2>
       <form onSubmit={submit}>
-        <Field label="Foto del producto (opcional)">
+        <Field label={t.catalogAdmin.photo}>
           <div className="flex items-center gap-3">
             <div className="w-16 h-16 rounded border border-line overflow-hidden flex items-center justify-center text-2xl bg-paper shrink-0">
               {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : emoji}
             </div>
             <label className="text-[12.5px] text-gold cursor-pointer hover:text-champagne">
-              {preview ? 'Cambiar foto' : 'Subir foto'}
+              {preview ? t.catalogAdmin.changePhoto : t.catalogAdmin.uploadPhoto}
               <input type="file" accept="image/*" className="hidden" onChange={onPickFile} />
             </label>
           </div>
         </Field>
         <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Categoría">
+          <Field label={t.catalogAdmin.category}>
             <Select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
               {categorias.map((c) => <option key={c.id}>{c.nombre}</option>)}
             </Select>
           </Field>
-          <Field label="Precio (COP)"><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
+          <Field label={t.catalogAdmin.price}><Input required type="number" value={precio} onChange={(e) => setPrecio(e.target.value)} /></Field>
         </div>
-        <Field label="Descripción"><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
-        <Field label="Emoji / ícono (se usa si no hay foto)"><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
-        <Field label="Stock (cantidad disponible — déjalo vacío para no controlar cantidad)">
-          <Input type="number" min="0" placeholder="Sin límite" value={stock} onChange={(e) => setStock(e.target.value)} />
+        <Field label={t.catalogAdmin.description}><Textarea rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} /></Field>
+        <Field label={t.catalogAdmin.icon}><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
+        <Field label={t.catalogAdmin.stock}>
+          <Input type="number" min="0" placeholder={t.catalogAdmin.unlimited} value={stock} onChange={(e) => setStock(e.target.value)} />
         </Field>
         <Btn variant="primary" className="w-full justify-center" disabled={saving}>
-          {subiendo ? 'Subiendo foto…' : saving ? 'Guardando…' : producto ? 'Guardar cambios' : 'Crear producto'}
+          {subiendo ? t.catalogAdmin.uploading : saving ? t.catalogAdmin.saving : producto ? t.orderShared.save : t.catalogAdmin.createProduct}
         </Btn>
       </form>
     </Modal>
@@ -319,18 +376,19 @@ function ProductoModal({ negocio, categorias, producto, esAdicionDefault, onClos
 
 /* ---------------- Categorías ---------------- */
 export function TabCategorias({ negocio, data, reload, notify }) {
+  const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
 
   async function add() {
     if (!nombre.trim()) return
     await createCategoria(negocio.id, nombre.trim())
     setNombre('')
-    notify('Categoría agregada')
+    notify(t.inventory.categoryAdded)
     reload()
   }
   async function remove(cat) {
     if (data.productos.some((p) => p.categoria === cat.nombre)) {
-      notify('No se puede eliminar: hay productos en esta categoría')
+      notify(t.inventory.cannotDelete)
       return
     }
     await deleteCategoria(cat.id)
@@ -339,11 +397,11 @@ export function TabCategorias({ negocio, data, reload, notify }) {
 
   return (
     <div>
-      <SectionTitle title="Categorías" sub={`Organiza el catálogo de ${negocio.nombre}.`} />
+      <SectionTitle title={t.inventory.categories} sub={t.inventory.categoriesDescription.replace('{business}', negocio.nombre)} />
       <Card className="p-5 mb-4">
         <div className="flex gap-3 items-end">
-          <div className="flex-1"><Field label="Nueva categoría"><Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Postres" /></Field></div>
-          <Btn variant="mustard" onClick={add}>Agregar</Btn>
+          <div className="flex-1"><Field label={t.inventory.newCategory}><Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t.inventory.categoryPlaceholder} /></Field></div>
+          <Btn variant="mustard" onClick={add}>{t.inventory.add}</Btn>
         </div>
       </Card>
       <div className="flex flex-wrap gap-2">
@@ -360,37 +418,39 @@ export function TabCategorias({ negocio, data, reload, notify }) {
 
 /* ---------------- Inventario ---------------- */
 export function TabInventario({ negocio, data, reload, notify }) {
+  const { t } = useLanguage()
   const [modal, setModal] = useState(false)
   const [ajuste, setAjuste] = useState(null)
 
   return (
     <div>
-      <SectionTitle title="Inventario" sub="Existencias de ingredientes y materias primas."
-        action={<Btn variant="primary" onClick={() => setModal(true)}>➕ Nuevo ingrediente</Btn>} />
+      <SectionTitle title={t.inventory.inventory} sub={t.inventory.inventoryDescription}
+        action={<Btn variant="primary" onClick={() => setModal(true)}>➕ {t.inventory.newIngredient}</Btn>} />
       <Card className="p-5">
         <Table
-          head={['Ingrediente', 'Existencias', 'Mínimo', 'Estado', '']}
+          head={[t.inventory.ingredient, t.inventory.supplies, t.inventory.minimum, t.inventory.status, '']}
           rows={data.ingredientes.map((i) => [
             <b>{i.nombre}</b>,
             <span className="font-mono">{i.stock} {i.unidad}</span>,
             <span className="font-mono">{i.minimo} {i.unidad}</span>,
-            i.stock <= i.minimo ? <Pill tone="pausado">Bajo</Pill> : <Pill tone="listo">OK</Pill>,
-            <Btn size="sm" variant="ghost" onClick={() => setAjuste(i)}>Ajustar</Btn>,
+            i.stock <= i.minimo ? <Pill tone="pausado">{t.inventory.low}</Pill> : <Pill tone="listo">OK</Pill>,
+            <Btn size="sm" variant="ghost" onClick={() => setAjuste(i)}>{t.inventory.adjust}</Btn>,
           ])}
         />
       </Card>
       {modal && (
         <IngredienteModal negocio={negocio} onClose={() => setModal(false)}
-          onSaved={() => { setModal(false); notify('Ingrediente agregado'); reload() }} />
+          onSaved={() => { setModal(false); notify(t.inventory.ingredientAdded); reload() }} />
       )}
       {ajuste && (
         <AjusteModal ingrediente={ajuste} onClose={() => setAjuste(null)}
-          onSaved={() => { setAjuste(null); notify('Existencias actualizadas'); reload() }} />
+          onSaved={() => { setAjuste(null); notify(t.inventory.stockUpdated); reload() }} />
       )}
     </div>
   )
 }
 function IngredienteModal({ negocio, onClose, onSaved }) {
+  const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
   const [unidad, setUnidad] = useState('kg')
   const [stock, setStock] = useState(0)
@@ -402,11 +462,11 @@ function IngredienteModal({ negocio, onClose, onSaved }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">Nuevo ingrediente</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{t.inventory.newIngredientTitle}</h2>
       <form onSubmit={submit}>
-        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Carne de res, Gaseosa 400ml, Pan de hamburguesa" /></Field>
+        <Field label={t.catalogAdmin.product}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Carne de res, Gaseosa 400ml, Pan de hamburguesa" /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Unidad de medida">
+          <Field label={t.inventory.unit}>
             <Input list="unidades-sugeridas" required value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="kg" />
             <datalist id="unidades-sugeridas">
               <option value="kg" /><option value="g" /><option value="lb" />
@@ -414,20 +474,21 @@ function IngredienteModal({ negocio, onClose, onSaved }) {
               <option value="paquete" /><option value="display" /><option value="caja" /><option value="docena" />
             </datalist>
           </Field>
-          <Field label="Existencias iniciales"><Input required type="number" step="any" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
+          <Field label={t.inventory.initialStock}><Input required type="number" step="any" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
         </div>
         <p className="text-creamsoft text-[12px] -mt-2 mb-3.5">
           Usa la unidad en la que controlas ese producto: <b>kg</b> o <b>lb</b> para carnes que compras y pesas,
           <b> und</b> o <b>display</b> para bebidas y gaseosas (si las controlas por caja/display, pon ahí cuántos
           displays tienes), <b>paquete</b> para el pan, etc. Tú decides qué representa una unidad para cada producto.
         </p>
-        <Field label="Nivel mínimo (alerta de reposición)"><Input required type="number" step="any" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center">Guardar ingrediente</Btn>
+        <Field label={t.inventory.minimumAlert}><Input required type="number" step="any" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
+        <Btn variant="primary" className="w-full justify-center">{t.inventory.saveIngredient}</Btn>
       </form>
     </Modal>
   )
 }
 function AjusteModal({ ingrediente, onClose, onSaved }) {
+  const { t } = useLanguage()
   const [stock, setStock] = useState(ingrediente.stock)
   async function submit(e) {
     e.preventDefault()
@@ -436,10 +497,10 @@ function AjusteModal({ ingrediente, onClose, onSaved }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">Ajustar existencias — {ingrediente.nombre}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{t.inventory.adjustStock} — {ingrediente.nombre}</h2>
       <form onSubmit={submit}>
-        <Field label={`Nueva cantidad (${ingrediente.unidad})`}><Input required type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center">Guardar</Btn>
+        <Field label={`${t.inventory.newAmount} (${ingrediente.unidad})`}><Input required type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
+        <Btn variant="primary" className="w-full justify-center">{t.inventory.save}</Btn>
       </form>
     </Modal>
   )
@@ -447,15 +508,16 @@ function AjusteModal({ ingrediente, onClose, onSaved }) {
 
 /* ---------------- Compras ---------------- */
 export function TabCompras({ negocio, data, reload, notify }) {
+  const { t } = useLanguage()
   const [modal, setModal] = useState(false)
   return (
     <div>
-      <SectionTitle title="Compras" sub="Cada compra aumenta el inventario y se registra como egreso."
-        action={<Btn variant="primary" onClick={() => setModal(true)}>➕ Registrar compra</Btn>} />
+      <SectionTitle title={t.finance.purchases} sub={t.finance.purchasesDescription}
+        action={<Btn variant="primary" onClick={() => setModal(true)}>➕ {t.finance.registerPurchase}</Btn>} />
       <Card className="p-5">
-        {data.compras.length === 0 ? <Empty>Todavía no hay compras registradas.</Empty> : (
+        {data.compras.length === 0 ? <Empty>{t.finance.noPurchases}</Empty> : (
           <Table
-            head={['Fecha', 'Ingrediente', 'Cantidad', 'Valor']}
+            head={[t.finance.date, t.finance.ingredient, t.finance.quantity, t.finance.value]}
             rows={data.compras.map((c) => [
               <span className="font-mono">{fmtDate(c.creado_en)}</span>,
               c.ingredientes?.nombre || '—',
@@ -467,12 +529,13 @@ export function TabCompras({ negocio, data, reload, notify }) {
       </Card>
       {modal && (
         <CompraModal negocio={negocio} ingredientes={data.ingredientes} onClose={() => setModal(false)}
-          onSaved={() => { setModal(false); notify('Compra registrada — inventario actualizado'); reload() }} />
+          onSaved={() => { setModal(false); notify(t.finance.purchaseRegistered); reload() }} />
       )}
     </div>
   )
 }
 function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
+  const { t } = useLanguage()
   const [ingId, setIngId] = useState(ingredientes[0]?.id || '')
   const [cantidad, setCantidad] = useState(1)
   const [valor, setValor] = useState('')
@@ -484,30 +547,30 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-1">Registrar compra</h2>
-      <p className="text-creamsoft text-[13px] mb-4">Aumenta el inventario y se contabiliza como egreso.</p>
+      <h2 className="font-serif text-xl font-semibold mb-1">{t.finance.purchaseTitle}</h2>
+      <p className="text-creamsoft text-[13px] mb-4">{t.finance.purchaseDescription}</p>
       <form onSubmit={submit}>
-        <Field label="Ingrediente">
+        <Field label={t.finance.ingredient}>
           <Select value={ingId} onChange={(e) => setIngId(e.target.value)}>
             {ingredientes.map((i) => <option key={i.id} value={i.id}>{i.nombre}</option>)}
           </Select>
         </Field>
         {ing && (
           <p className="text-creamsoft text-[12px] -mt-2 mb-3">
-            Existencia actual: <b className="font-mono">{ing.stock} {ing.unidad}</b>
+            {t.finance.currentStock}: <b className="font-mono">{ing.stock} {ing.unidad}</b>
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">
-          <Field label={`Cantidad comprada${ing ? ` (${ing.unidad})` : ''}`}>
+          <Field label={`${t.finance.purchasedQuantity}${ing ? ` (${ing.unidad})` : ''}`}>
             <Input required type="number" step="any" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
           </Field>
-          <Field label="Valor total pagado (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
+          <Field label={t.finance.totalPaid}><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
         </div>
         <p className="text-creamsoft text-[12px] -mt-2 mb-3.5">
           La cantidad va en la misma unidad del ingrediente (arriba). Si compraste 5 kg de carne, pon 5; si compraste
           2 displays de gaseosa y ese ingrediente se maneja por display, pon 2.
         </p>
-        <Btn variant="primary" className="w-full justify-center">Registrar compra</Btn>
+        <Btn variant="primary" className="w-full justify-center">{t.finance.register}</Btn>
       </form>
     </Modal>
   )
@@ -759,30 +822,31 @@ function resumirProductosVendidos(ventas) {
 
 /* ---------------- Trabajadores ---------------- */
 export function TabTrabajadores({ negocio, data, reload, notify }) {
+  const { t } = useLanguage()
   const [modal, setModal] = useState(null) // null | 'new' | trabajador (para editar)
   const [pagoFor, setPagoFor] = useState(null)
 
   return (
     <div>
-      <SectionTitle title="Trabajadores" sub={`Equipo de ${negocio.nombre}.`}
-        action={<Btn variant="primary" onClick={() => setModal('new')}>➕ Nuevo trabajador</Btn>} />
+      <SectionTitle title={t.staff.title} sub={t.staff.description.replace('{business}', negocio.nombre)}
+        action={<Btn variant="primary" onClick={() => setModal('new')}>➕ {t.staff.new}</Btn>} />
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {data.trabajadores.map((w) => {
           const ultimoPago = w.pagos.length ? w.pagos[w.pagos.length - 1] : null
           return (
             <Card key={w.id} className="p-5">
-              <Pill tone={w.estado === 'Activo' ? 'activo' : 'pausado'}>{w.estado}</Pill>
+              <Pill tone={w.estado === 'Activo' ? 'activo' : 'pausado'}>{w.estado === 'Activo' ? t.staff.active : t.staff.paused}</Pill>
               <h4 className="font-serif font-semibold text-base mt-1.5 mb-0.5">{w.nombre}</h4>
               <p className="text-creamsoft text-[13px] mb-2">{w.cargo}</p>
               <p className="font-mono font-bold mb-3">{fmt$(w.pago)}/mes</p>
               <div className="flex gap-1.5 flex-wrap">
-                <Btn size="sm" variant="ghost" onClick={() => setModal(w)}>✏️ Editar salario</Btn>
-                <Btn size="sm" variant="mustard" onClick={() => setPagoFor(w)}>Registrar pago</Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setModal(w)}>✏️ {t.staff.editSalary}</Btn>
+                <Btn size="sm" variant="mustard" onClick={() => setPagoFor(w)}>{t.staff.registerPayment}</Btn>
                 <Btn size="sm" variant="ghost" onClick={async () => { await toggleTrabajadorEstado(w); reload() }}>
-                  {w.estado === 'Activo' ? 'Desactivar' : 'Activar'}
+                  {w.estado === 'Activo' ? t.staff.deactivate : t.staff.activate}
                 </Btn>
               </div>
-              {ultimoPago && <p className="mt-2.5 text-[11.5px] text-creamsoft">Último pago: {fmtDate(ultimoPago.creado_en)} · {fmt$(ultimoPago.valor)}</p>}
+              {ultimoPago && <p className="mt-2.5 text-[11.5px] text-creamsoft">{t.staff.lastPayment}: {fmtDate(ultimoPago.creado_en)} · {fmt$(ultimoPago.valor)}</p>}
             </Card>
           )
         })}
@@ -792,17 +856,18 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
           negocio={negocio}
           trabajador={modal === 'new' ? null : modal}
           onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); notify(modal === 'new' ? 'Trabajador agregado' : 'Salario actualizado'); reload() }}
+          onSaved={() => { setModal(null); notify(modal === 'new' ? t.staff.added : t.staff.salaryUpdated); reload() }}
         />
       )}
       {pagoFor && (
         <PagoModal negocio={negocio} trabajador={pagoFor} onClose={() => setPagoFor(null)}
-          onSaved={() => { setPagoFor(null); notify(`Pago registrado a ${pagoFor.nombre}`); reload() }} />
+          onSaved={() => { setPagoFor(null); notify(t.staff.paymentRegistered.replace('{name}', pagoFor.nombre)); reload() }} />
       )}
     </div>
   )
 }
 function TrabajadorModal({ negocio, trabajador, onClose, onSaved }) {
+  const { t } = useLanguage()
   const [nombre, setNombre] = useState(trabajador?.nombre || '')
   const [cargo, setCargo] = useState(trabajador?.cargo || '')
   const [pago, setPago] = useState(trabajador?.pago ?? '')
@@ -821,21 +886,22 @@ function TrabajadorModal({ negocio, trabajador, onClose, onSaved }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{trabajador ? `Editar a ${trabajador.nombre}` : 'Nuevo trabajador'}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{trabajador ? t.staff.edit.replace('{name}', trabajador.nombre) : t.staff.new}</h2>
       <form onSubmit={submit}>
-        <Field label="Nombre"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
+        <Field label={t.staff.name}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Cargo"><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>
-          <Field label="Pago mensual (COP)"><Input required type="number" value={pago} onChange={(e) => setPago(e.target.value)} /></Field>
+          <Field label={t.staff.role}><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>
+          <Field label={t.staff.monthlyPay}><Input required type="number" value={pago} onChange={(e) => setPago(e.target.value)} /></Field>
         </div>
         <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
-          {guardando ? 'Guardando…' : trabajador ? 'Guardar cambios' : 'Agregar trabajador'}
+          {guardando ? t.catalogAdmin.saving : trabajador ? t.orderShared.save : t.staff.add}
         </Btn>
       </form>
     </Modal>
   )
 }
 function PagoModal({ negocio, trabajador, onClose, onSaved }) {
+  const { t } = useLanguage()
   const [periodo, setPeriodo] = useState(new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }))
   const [valor, setValor] = useState(trabajador.pago)
   async function submit(e) {
@@ -845,11 +911,11 @@ function PagoModal({ negocio, trabajador, onClose, onSaved }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">Registrar pago — {trabajador.nombre}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{t.staff.payTitle} — {trabajador.nombre}</h2>
       <form onSubmit={submit}>
-        <Field label="Periodo"><Input required value={periodo} onChange={(e) => setPeriodo(e.target.value)} /></Field>
-        <Field label="Valor (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center">Confirmar pago</Btn>
+        <Field label={t.staff.period}><Input required value={periodo} onChange={(e) => setPeriodo(e.target.value)} /></Field>
+        <Field label={t.staff.value}><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
+        <Btn variant="primary" className="w-full justify-center">{t.staff.confirmPayment}</Btn>
       </form>
     </Modal>
   )
@@ -857,6 +923,7 @@ function PagoModal({ negocio, trabajador, onClose, onSaved }) {
 
 /* ---------------- Finanzas ---------------- */
 export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated }) {
+  const { t } = useLanguage()
   const [modal, setModal] = useState(null) // 'capital' | 'ingreso' | 'egreso'
   const capitalInicial = negocio.capital_inicial || 0
 
@@ -878,19 +945,19 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
 
   return (
     <div>
-      <SectionTitle title="Ingresos y egresos" sub="Compras, pagos y ventas se reflejan aquí automáticamente."
+      <SectionTitle title={t.finance.finances} sub={t.finance.financesDescription}
         action={<div className="flex gap-2">
-          <Btn size="sm" variant="ghost" onClick={() => setModal('capital')}>💰 Base inicial</Btn>
-          <Btn size="sm" variant="mustard" onClick={() => setModal('ingreso')}>➕ Ingreso</Btn>
-          <Btn size="sm" variant="danger" onClick={() => setModal('egreso')}>➕ Egreso</Btn>
+          <Btn size="sm" variant="ghost" onClick={() => setModal('capital')}>💰 {t.finance.initialCapital}</Btn>
+          <Btn size="sm" variant="mustard" onClick={() => setModal('ingreso')}>➕ {t.finance.income}</Btn>
+          <Btn size="sm" variant="danger" onClick={() => setModal('egreso')}>➕ {t.finance.expense}</Btn>
         </div>} />
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-3.5">
-        <StatCard label="Base inicial" value={fmt$(capitalInicial)} />
-        <StatCard label="Saldo actual del negocio" value={fmt$(saldoActual)} tone={saldoActual >= 0 ? 'sage' : 'wine'} />
+        <StatCard label={t.finance.initialCapital} value={fmt$(capitalInicial)} />
+        <StatCard label={t.finance.currentBalance} value={fmt$(saldoActual)} tone={saldoActual >= 0 ? 'sage' : 'wine'} />
       </div>
 
-      <p className="text-creamsoft text-[11.5px] mb-5">Este mes ↓</p>
+      <p className="text-creamsoft text-[11.5px] mb-5">{t.finance.thisMonth} ↓</p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
         <StatCard label="Ingresos (ventas + otros)" value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
         <StatCard label="Egresos (compras)" value={fmt$(egresosCompras)} tone="gold" />
@@ -940,6 +1007,7 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
 }
 
 function CapitalModal({ negocio, onClose, onSaved }) {
+  const { t } = useLanguage()
   const [valor, setValor] = useState(negocio.capital_inicial || 0)
   const [guardando, setGuardando] = useState(false)
   async function submit(e) {
@@ -955,17 +1023,17 @@ function CapitalModal({ negocio, onClose, onSaved }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-2">Base inicial del negocio</h2>
+      <h2 className="font-serif text-xl font-semibold mb-2">{t.finance.initialTitle}</h2>
       <p className="text-creamsoft text-[13px] mb-4">
         Es el dinero con el que arrancó el negocio, antes de empezar a registrar ventas, compras y gastos en Kiosko.
         Se suma a todos los movimientos para calcular el saldo actual real.
       </p>
       <form onSubmit={submit}>
-        <Field label="Base inicial (COP)">
+        <Field label={`${t.finance.initialCapital} (COP)`}>
           <Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} />
         </Field>
         <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
-          {guardando ? 'Guardando…' : 'Guardar base inicial'}
+          {guardando ? t.catalogAdmin.saving : t.finance.saveInitial}
         </Btn>
       </form>
     </Modal>
@@ -973,6 +1041,7 @@ function CapitalModal({ negocio, onClose, onSaved }) {
 }
 
 function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
+  const { t } = useLanguage()
   const [concepto, setConcepto] = useState('')
   const [valor, setValor] = useState('')
   async function submit(e) {
@@ -984,11 +1053,11 @@ function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
   }
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{tipo === 'ingreso' ? 'Nuevo ingreso' : 'Nuevo egreso'}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">{tipo === 'ingreso' ? t.finance.newIncome : t.finance.newExpense}</h2>
       <form onSubmit={submit}>
-        <Field label="Concepto"><Input required value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={tipo === 'ingreso' ? 'Ej: venta de excedente' : 'Ej: transporte, servicios'} /></Field>
-        <Field label="Valor (COP)"><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center">Guardar</Btn>
+        <Field label={t.finance.concept}><Input required value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={tipo === 'ingreso' ? 'Ej: venta de excedente' : 'Ej: transporte, servicios'} /></Field>
+        <Field label={`${t.finance.value} (COP)`}><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
+        <Btn variant="primary" className="w-full justify-center">{t.finance.save}</Btn>
       </form>
     </Modal>
   )
@@ -999,6 +1068,7 @@ function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
    El diálogo de impresión del navegador siempre trae la opción "Guardar como PDF",
    así que con este mismo botón se cubre imprimir en papel o generar el PDF para el banco. */
 function ReportePeriodo({ negocio, data }) {
+  const { t } = useLanguage()
   const [tipoRango, setTipoRango] = useState('mes') // 'dia' | 'mes'
   const [fecha, setFecha] = useState(todayStr())
   const [mes, setMes] = useState(monthStr(new Date()))
@@ -1032,20 +1102,20 @@ function ReportePeriodo({ negocio, data }) {
     <Card className="p-5">
       <div className="flex items-center justify-between flex-wrap gap-3 mb-4 no-print">
         <div>
-          <h3 className="font-serif text-lg font-semibold">Reporte por día o mes</h3>
-          <p className="text-creamsoft text-[12.5px]">Para llevar al banco o para tu control — imprime o guarda como PDF.</p>
+          <h3 className="font-serif text-lg font-semibold">{t.report.title}</h3>
+          <p className="text-creamsoft text-[12.5px]">{t.report.description}</p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={tipoRango} onChange={(e) => setTipoRango(e.target.value)} className="!w-auto">
-            <option value="dia">Por día</option>
-            <option value="mes">Por mes</option>
+            <option value="dia">{t.report.byDay}</option>
+            <option value="mes">{t.report.byMonth}</option>
           </Select>
           {tipoRango === 'dia' ? (
             <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="!w-auto" />
           ) : (
             <Input type="month" value={mes} onChange={(e) => setMes(e.target.value)} className="!w-auto" />
           )}
-          <Btn size="sm" variant="primary" onClick={() => window.print()}>🖨️ Imprimir / PDF</Btn>
+          <Btn size="sm" variant="primary" onClick={() => window.print()}>🖨️ {t.report.print}</Btn>
         </div>
       </div>
 
@@ -1056,19 +1126,19 @@ function ReportePeriodo({ negocio, data }) {
           <p className="text-[11px]">Generado el {fmtDateLong(new Date())}</p>
         </div>
 
-        <p className="text-creamsoft text-[12px] mb-3 print:hidden">Periodo: <b className="text-cream">{etiquetaPeriodo}</b></p>
+        <p className="text-creamsoft text-[12px] mb-3 print:hidden">{t.report.period}: <b className="text-cream">{etiquetaPeriodo}</b></p>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 mb-5">
           <StatCard label="Ventas" value={fmt$(totalVentas)} tone="sage" />
-          <StatCard label="Otros ingresos" value={fmt$(totalIngresos)} tone="sage" />
+          <StatCard label={t.report.otherIncome} value={fmt$(totalIngresos)} tone="sage" />
           <StatCard label="Compras" value={fmt$(totalCompras)} tone="gold" />
-          <StatCard label="Pagos personal" value={fmt$(totalPagos)} tone="champagne" />
+          <StatCard label={t.report.staffPayments} value={fmt$(totalPagos)} tone="champagne" />
           <StatCard label="Otros egresos" value={fmt$(totalEgresos)} />
-          <StatCard label="Resultado del periodo" value={fmt$(resultado)} tone={resultado >= 0 ? 'sage' : 'wine'} />
+          <StatCard label={t.report.result} value={fmt$(resultado)} tone={resultado >= 0 ? 'sage' : 'wine'} />
         </div>
 
         {movimientos.length === 0 ? (
-          <Empty>No hay movimientos registrados en este periodo.</Empty>
+          <Empty>{t.report.noMovements}</Empty>
         ) : (
           <Table
             head={['Fecha', 'Tipo', 'Concepto', 'Valor']}
@@ -1087,6 +1157,7 @@ function ReportePeriodo({ negocio, data }) {
 
 /* ---------------- Estadísticas ---------------- */
 export function TabEstadisticas({ negocio, data }) {
+  const { t } = useLanguage()
   const conteo = {}
   data.pedidos.forEach((p) => p.pedido_items.forEach((it) => { conteo[it.nombre] = (conteo[it.nombre] || 0) + it.cantidad }))
   const ranking = Object.entries(conteo).sort((a, b) => b[1] - a[1])
@@ -1095,11 +1166,11 @@ export function TabEstadisticas({ negocio, data }) {
 
   return (
     <div>
-      <SectionTitle title="Estadísticas" sub={`Lo que más se mueve en ${negocio.nombre}.`} />
+      <SectionTitle title={t.stats.title} sub={t.stats.description.replace('{business}', negocio.nombre)} />
       <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
         <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Productos más vendidos</h3>
-          {ranking.length === 0 ? <Empty icon="📉">Aún no hay ventas para graficar.</Empty> : (
+          <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.bestSellers}</h3>
+          {ranking.length === 0 ? <Empty icon="📉">{t.stats.noSales}</Empty> : (
             ranking.slice(0, 8).map(([nom, c]) => (
               <div key={nom} className="flex items-center gap-2.5 mb-2.5 text-[12.5px]">
                 <span className="w-[150px] font-semibold text-creamsoft">{nom}</span>
@@ -1112,7 +1183,7 @@ export function TabEstadisticas({ negocio, data }) {
           )}
         </Card>
         <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Panorama general</h3>
+          <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.overview}</h3>
           {[
             ['Productos activos', data.productos.length - agotados],
             ['Productos agotados', agotados],
