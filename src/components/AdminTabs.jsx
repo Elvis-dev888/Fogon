@@ -4,8 +4,10 @@ import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr
 import { getSubscriptionSummary, formatDaysLeft } from '../lib/subscription'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
-  createIngrediente, setIngredienteStock, registrarCompra, avanzarEstadoPedido, actualizarPedido, cancelarPedido,
-  createTrabajador, updateTrabajador, toggleTrabajadorEstado, registrarPago, createIngreso, createEgreso,
+  createIngrediente, updateIngrediente, deleteIngrediente, setIngredienteStock, registrarCompra, deleteCompra, registrarVentaInventario,
+  avanzarEstadoPedido, actualizarPedido, cancelarPedido,
+  createTrabajador, updateTrabajador, deleteTrabajador, toggleTrabajadorEstado, registrarPago, deletePago,
+  createIngreso, deleteIngreso, createEgreso, deleteEgreso,
   updateNegocio, subirLogoNegocio, updateCapitalInicial,
 } from '../lib/api'
 import { EditarPedidoModal, ConfirmCancelModal } from './PedidoCompartido'
@@ -20,6 +22,7 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
   const [nombre, setNombre] = useState(negocio.nombre || '')
   const [slogan, setSlogan] = useState(negocio.slogan || '')
   const [descripcion, setDescripcion] = useState(negocio.descripcion || '')
+  const [modoOperacion, setModoOperacion] = useState(negocio.modo_operacion || 'catalogo')
   const [preview, setPreview] = useState(negocio.logo_url || null)
   const [archivo, setArchivo] = useState(null)
   const [guardando, setGuardando] = useState(false)
@@ -42,7 +45,7 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
         logoUrl = await subirLogoNegocio(negocio.id, archivo)
         setSubiendo(false)
       }
-      const cambios = { nombre, slogan, descripcion, logo_url: logoUrl }
+      const cambios = { nombre, slogan, descripcion, logo_url: logoUrl, modo_operacion: modoOperacion }
       await updateNegocio(negocio.id, cambios)
       notify('Datos del negocio actualizados')
       if (onNegocioUpdated) await onNegocioUpdated(cambios)
@@ -53,7 +56,7 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
 
   return (
     <div>
-      <SectionTitle title="Mi negocio" sub="El logo y los datos que ven tus clientes en el catálogo." />
+      <SectionTitle title="Mi negocio" sub={modoOperacion === 'inventario' ? 'Datos y configuración de tu espacio de inventario.' : 'El logo y los datos que ven tus clientes en el catálogo.'} />
       <Card className="p-6 max-w-[520px]">
         <form onSubmit={guardar}>
           <Field label="Logo del negocio">
@@ -70,6 +73,17 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
           <Field label="Nombre del negocio"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
           <Field label="Eslogan"><Input value={slogan} onChange={(e) => setSlogan(e.target.value)} /></Field>
           <Field label="Descripción"><Textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></Field>
+          <Field label="Modo de uso">
+            <Select value={modoOperacion} onChange={(e) => setModoOperacion(e.target.value)}>
+              <option value="catalogo">Catálogo y pedidos</option>
+              <option value="inventario">Inventario y utilidades</option>
+            </Select>
+            <p className="mt-1.5 text-[11.5px] text-creamsoft">
+              {modoOperacion === 'inventario'
+                ? 'Oculta catálogo, productos, pedidos y ventas. Conserva inventario, compras, ingresos, gastos, trabajadores y estadísticas.'
+                : 'Muestra el catálogo público y habilita la gestión de pedidos y ventas.'}
+            </p>
+          </Field>
           <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
             {subiendo ? 'Subiendo logo…' : guardando ? 'Guardando…' : 'Guardar cambios'}
           </Btn>
@@ -85,7 +99,7 @@ export function TabMiSuscripcion({ negocio }) {
 
   return (
     <div>
-      <SectionTitle title="Mi suscripción" sub="Se deja preparada la monetización sin bloquear funciones durante los primeros 3 meses." />
+      <SectionTitle title="Mi suscripción" sub="Se deja preparada la monetización sin bloquear funciones durante los primeros 6 meses." />
       <Card className="p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -106,7 +120,7 @@ export function TabMiSuscripcion({ negocio }) {
           {summary.isTrialActive ? (
             <>
               <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Período gratuito</p>
-              <p className="font-semibold text-cream">🎉 Estás disfrutando de Kiosco Pro gratis.</p>
+              <p className="font-semibold text-cream">🎉 Estás disfrutando de Kiosko Pro gratis.</p>
               <p className="text-sm text-creamsoft mt-2">Tienes acceso completo durante tu período de prueba. Te quedan {formatDaysLeft(summary.remainingDays)}.</p>
             </>
           ) : summary.isTrialExpired ? (
@@ -115,13 +129,13 @@ export function TabMiSuscripcion({ negocio }) {
               <p className="font-semibold text-wine">🔴 Tu período gratuito ha finalizado.</p>
               <p className="text-sm text-creamsoft mt-2">Continúa utilizando todas las herramientas mediante una suscripción mensual de US$4.99. La funcionalidad sigue activa por ahora y la monetización se habilitará cuando corresponda.</p>
               <div className="mt-4">
-                <Btn variant="primary" className="justify-center">Actualizar a Kiosco Pro</Btn>
+                <Btn variant="primary" className="justify-center">Actualizar a Kiosko Pro</Btn>
               </div>
             </>
           ) : (
             <>
               <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Suscripción activa</p>
-              <p className="font-semibold text-cream">✅ Tu negocio tiene acceso completo a Kiosco Pro.</p>
+              <p className="font-semibold text-cream">✅ Tu negocio tiene acceso completo a Kiosko Pro.</p>
               <p className="text-sm text-creamsoft mt-2">Próxima renovación: {summary.renewedAt ? fmtDate(summary.renewedAt) : 'Sin fecha registrada aún'}.</p>
             </>
           )}
@@ -133,43 +147,57 @@ export function TabMiSuscripcion({ negocio }) {
 
 /* ---------------- Dashboard ---------------- */
 export function TabDashboard({ negocio, data }) {
+  const esModoInventario = negocio.modo_operacion === 'inventario'
   const ventasMes = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
+  const ingresosMes = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + i.valor, 0)
   const comprasMes = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + c.valor, 0)
   const pagosMes = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + p.valor, 0)
   const otrosMes = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + e.valor, 0)
-  const resultado = ventasMes - (comprasMes + pagosMes + otrosMes)
+  const entradasMes = esModoInventario ? ingresosMes : ventasMes
+  const resultado = entradasMes - (comprasMes + pagosMes + otrosMes)
   const pendientes = data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length
   const lowStock = data.ingredientes.filter((i) => i.stock <= i.minimo)
 
   return (
     <div>
-      <SectionTitle title="Resumen del mes" sub={new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })} />
+      <SectionTitle title={esModoInventario ? 'Resumen de inventario' : 'Resumen del mes'} sub={new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })} />
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label="Ventas" value={fmt$(ventasMes)} tone="gold" />
+        <StatCard label={esModoInventario ? 'Ingresos registrados' : 'Ventas'} value={fmt$(entradasMes)} tone="gold" />
         <StatCard label="Compras" value={fmt$(comprasMes)} tone="champagne" />
         <StatCard label="Pagos a trabajadores" value={fmt$(pagosMes)} />
         <StatCard label="Otros gastos" value={fmt$(otrosMes)} />
         <StatCard label="Resultado aprox." value={fmt$(resultado)} tone="sage" />
       </div>
       <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
-        <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">
-            Pedidos recientes {pendientes > 0 && <Pill tone="preparacion">{pendientes} en curso</Pill>}
-          </h3>
-          {data.pedidos.length === 0 ? (
-            <Empty icon="🧾">Aún no hay pedidos. Cuando un cliente confirme uno, aparecerá aquí.</Empty>
-          ) : (
-            <Table
-              head={['Pedido', 'Cliente', 'Total', 'Estado']}
-              rows={data.pedidos.slice(0, 6).map((p) => [
-                <span className="font-mono">#{p.numero}</span>,
-                p.cliente,
-                <span className="font-mono">{fmt$(p.total)}</span>,
-                <Pill tone={estadoTone(p.estado)}>{p.estado}</Pill>,
-              ])}
-            />
-          )}
-        </Card>
+        {esModoInventario ? (
+          <Card className="p-5">
+            <h3 className="font-serif text-lg font-semibold mb-3">Operación de inventario</h3>
+            <p className="text-creamsoft text-[13.5px] mb-3">Registra cada venta o entrada de dinero en “Ingresos / Egresos” para que la utilidad mensual sea precisa.</p>
+            <div className="grid grid-cols-2 gap-3 text-[13px]">
+              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">Existencias</span><b className="font-mono text-gold">{data.ingredientes.length}</b></div>
+              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">Compras este mes</span><b className="font-mono text-gold">{fmt$(comprasMes)}</b></div>
+            </div>
+          </Card>
+        ) : (
+          <Card className="p-5">
+            <h3 className="font-serif text-lg font-semibold mb-3">
+              Pedidos recientes {pendientes > 0 && <Pill tone="preparacion">{pendientes} en curso</Pill>}
+            </h3>
+            {data.pedidos.length === 0 ? (
+              <Empty icon="🧾">Aún no hay pedidos. Cuando un cliente confirme uno, aparecerá aquí.</Empty>
+            ) : (
+              <Table
+                head={['Pedido', 'Cliente', 'Total', 'Estado']}
+                rows={data.pedidos.slice(0, 6).map((p) => [
+                  <span className="font-mono">#{p.numero}</span>,
+                  p.cliente,
+                  <span className="font-mono">{fmt$(p.total)}</span>,
+                  <Pill tone={estadoTone(p.estado)}>{p.estado}</Pill>,
+                ])}
+              />
+            )}
+          </Card>
+        )}
         <Card className="p-5">
           <h3 className="font-serif text-lg font-semibold mb-3">Inventario bajo</h3>
           {lowStock.length === 0 ? (
@@ -421,72 +449,326 @@ export function TabInventario({ negocio, data, reload, notify }) {
   const { t } = useLanguage()
   const [modal, setModal] = useState(false)
   const [ajuste, setAjuste] = useState(null)
+  const [editar, setEditar] = useState(null)
+  const [venta, setVenta] = useState(null)
+  const esModoInventario = negocio.modo_operacion === 'inventario'
+
+  const totalArticulos = data.ingredientes.length
+  const valorTotalInventario = data.ingredientes.reduce(
+    (acc, i) => acc + ((Number(i.stock) || 0) * (Number(i.costo_unitario) || 0)),
+    0
+  )
+  const articulosBajoStock = data.ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0)).length
 
   return (
     <div>
-      <SectionTitle title={t.inventory.inventory} sub={t.inventory.inventoryDescription}
-        action={<Btn variant="primary" onClick={() => setModal(true)}>➕ {t.inventory.newIngredient}</Btn>} />
-      <Card className="p-5">
-        <Table
-          head={[t.inventory.ingredient, t.inventory.supplies, t.inventory.minimum, t.inventory.status, '']}
-          rows={data.ingredientes.map((i) => [
-            <b>{i.nombre}</b>,
-            <span className="font-mono">{i.stock} {i.unidad}</span>,
-            <span className="font-mono">{i.minimo} {i.unidad}</span>,
-            i.stock <= i.minimo ? <Pill tone="pausado">{t.inventory.low}</Pill> : <Pill tone="listo">OK</Pill>,
-            <Btn size="sm" variant="ghost" onClick={() => setAjuste(i)}>{t.inventory.adjust}</Btn>,
-          ])}
+      <SectionTitle
+        title={esModoInventario ? t.inventory.warehouseInventory : t.inventory.inventory}
+        sub={esModoInventario ? t.inventory.warehouseInventoryDescription : t.inventory.inventoryDescription}
+        action={
+          <div className="flex gap-2 flex-wrap">
+            <Btn variant="primary" onClick={() => setModal(true)}>
+              ➕ {esModoInventario ? t.inventory.newItem : t.inventory.newIngredient}
+            </Btn>
+            {data.ingredientes.length > 0 && (
+              <Btn variant="mustard" onClick={() => setVenta(data.ingredientes[0])}>
+                💸 {t.inventory.quickSale}
+              </Btn>
+            )}
+          </div>
+        }
+      />
+
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
+        <StatCard label={t.inventory.totalItems} value={totalArticulos} />
+        <StatCard label={t.inventory.totalInventoryValue} value={fmt$(valorTotalInventario)} tone="gold" />
+        <StatCard
+          label={t.inventory.lowStockItems}
+          value={articulosBajoStock}
+          tone={articulosBajoStock > 0 ? 'pausado' : 'listo'}
         />
+      </div>
+
+      <Card className="p-5">
+        {data.ingredientes.length === 0 ? (
+          <Empty icon="📦">
+            {esModoInventario
+              ? 'Aún no has registrado artículos en el inventario. Agrega el primero con el botón de arriba.'
+              : 'Aún no hay ingredientes registrados.'}
+          </Empty>
+        ) : esModoInventario ? (
+          <Table
+            head={[
+              t.inventory.item,
+              t.inventory.supplies,
+              t.inventory.cost,
+              t.inventory.salePrice,
+              t.inventory.margin,
+              t.inventory.minimum,
+              t.inventory.status,
+              '',
+            ]}
+            rows={data.ingredientes.map((i) => {
+              const costo = Number(i.costo_unitario) || 0
+              const precio = Number(i.precio_venta) || 0
+              const margen = precio - costo
+              const margenPct = costo > 0 ? Math.round((margen / costo) * 100) : (precio > 0 ? 100 : 0)
+
+              return [
+                <div>
+                  <b className="text-cream">{i.nombre}</b>
+                  <span className="block text-[11px] text-creamsoft">{i.unidad}</span>
+                </div>,
+                <span className="font-mono font-semibold">{i.stock} {i.unidad}</span>,
+                <span className="font-mono">{costo > 0 ? fmt$(costo) : '—'}</span>,
+                <span className="font-mono">{precio > 0 ? fmt$(precio) : '—'}</span>,
+                precio > 0 || costo > 0 ? (
+                  <span className={`font-mono text-xs ${margen >= 0 ? 'text-gold' : 'text-wine'}`}>
+                    {fmt$(margen)} {costo > 0 ? `(${margenPct}%)` : ''}
+                  </span>
+                ) : (
+                  <span className="text-creamsoft">—</span>
+                ),
+                <span className="font-mono text-creamsoft">{i.minimo} {i.unidad}</span>,
+                i.stock <= i.minimo ? <Pill tone="pausado">{t.inventory.low}</Pill> : <Pill tone="listo">OK</Pill>,
+                <div className="flex items-center gap-1 justify-end">
+                  <Btn size="sm" variant="ghost" title={t.inventory.adjustStock} onClick={() => setAjuste(i)}>⚡</Btn>
+                  <Btn size="sm" variant="ghost" title={t.inventory.edit} onClick={() => setEditar(i)}>✏️</Btn>
+                  <Btn size="sm" variant="mustard" title={t.inventory.quickSale} onClick={() => setVenta(i)}>💸</Btn>
+                </div>,
+              ]
+            })}
+          />
+        ) : (
+          <Table
+            head={[t.inventory.ingredient, t.inventory.supplies, t.inventory.minimum, t.inventory.status, '']}
+            rows={data.ingredientes.map((i) => [
+              <b>{i.nombre}</b>,
+              <span className="font-mono">{i.stock} {i.unidad}</span>,
+              <span className="font-mono">{i.minimo} {i.unidad}</span>,
+              i.stock <= i.minimo ? <Pill tone="pausado">{t.inventory.low}</Pill> : <Pill tone="listo">OK</Pill>,
+              <div className="flex gap-1.5 justify-end">
+                <Btn size="sm" variant="ghost" onClick={() => setAjuste(i)}>{t.inventory.adjust}</Btn>
+                <Btn size="sm" variant="ghost" onClick={() => setEditar(i)}>✏️</Btn>
+              </div>,
+            ])}
+          />
+        )}
       </Card>
+
       {modal && (
-        <IngredienteModal negocio={negocio} onClose={() => setModal(false)}
-          onSaved={() => { setModal(false); notify(t.inventory.ingredientAdded); reload() }} />
+        <IngredienteModal
+          negocio={negocio}
+          esModoInventario={esModoInventario}
+          onClose={() => setModal(false)}
+          onSaved={() => {
+            setModal(false)
+            notify(esModoInventario ? t.inventory.itemAdded : t.inventory.ingredientAdded)
+            reload()
+          }}
+        />
       )}
+
+      {editar && (
+        <EditarIngredienteModal
+          ingrediente={editar}
+          esModoInventario={esModoInventario}
+          onClose={() => setEditar(null)}
+          onSaved={() => {
+            setEditar(null)
+            notify(t.inventory.itemUpdated)
+            reload()
+          }}
+          onDeleted={() => {
+            setEditar(null)
+            notify(t.inventory.itemDeleted)
+            reload()
+          }}
+        />
+      )}
+
       {ajuste && (
-        <AjusteModal ingrediente={ajuste} onClose={() => setAjuste(null)}
-          onSaved={() => { setAjuste(null); notify(t.inventory.stockUpdated); reload() }} />
+        <AjusteModal
+          ingrediente={ajuste}
+          onClose={() => setAjuste(null)}
+          onSaved={() => {
+            setAjuste(null)
+            notify(t.inventory.stockUpdated)
+            reload()
+          }}
+        />
+      )}
+
+      {venta && (
+        <VentaInventarioModal
+          negocio={negocio}
+          ingredienteInicial={venta}
+          ingredientes={data.ingredientes}
+          onClose={() => setVenta(null)}
+          onSaved={() => {
+            setVenta(null)
+            notify(t.inventory.saleRegistered)
+            reload()
+          }}
+        />
       )}
     </div>
   )
 }
-function IngredienteModal({ negocio, onClose, onSaved }) {
+
+function IngredienteModal({ negocio, esModoInventario, onClose, onSaved }) {
   const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
-  const [unidad, setUnidad] = useState('kg')
+  const [unidad, setUnidad] = useState('und')
   const [stock, setStock] = useState(0)
+  const [costoUnitario, setCostoUnitario] = useState('')
+  const [precioVenta, setPrecioVenta] = useState('')
   const [minimo, setMinimo] = useState(1)
+  const [guardando, setGuardando] = useState(false)
+
   async function submit(e) {
     e.preventDefault()
-    await createIngrediente(negocio.id, { nombre, unidad: unidad.trim() || 'und', stock: parseFloat(stock) || 0, minimo: parseFloat(minimo) || 0 })
-    onSaved()
+    setGuardando(true)
+    try {
+      await createIngrediente(negocio.id, {
+        nombre: nombre.trim(),
+        unidad: unidad.trim() || 'und',
+        stock: parseFloat(stock) || 0,
+        costo_unitario: parseFloat(costoUnitario) || 0,
+        precio_venta: parseFloat(precioVenta) || 0,
+        minimo: parseFloat(minimo) || 0,
+      })
+      onSaved()
+    } finally {
+      setGuardando(false)
+    }
   }
+
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{t.inventory.newIngredientTitle}</h2>
+      <h2 className="font-serif text-xl font-semibold mb-4">
+        {esModoInventario ? t.inventory.newItemTitle : t.inventory.newIngredientTitle}
+      </h2>
       <form onSubmit={submit}>
-        <Field label={t.catalogAdmin.product}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Carne de res, Gaseosa 400ml, Pan de hamburguesa" /></Field>
+        <Field label={esModoInventario ? t.inventory.item : t.catalogAdmin.product}>
+          <Input
+            required
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder={esModoInventario ? 'Ej: Taladro percutor 1/2, Tornillo drywall 1 pulgada, Camisa Polo XL' : 'Ej: Carne de res, Gaseosa 400ml, Pan de hamburguesa'}
+          />
+        </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t.inventory.unit}>
-            <Input list="unidades-sugeridas" required value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="kg" />
+            <Input list="unidades-sugeridas" required value={unidad} onChange={(e) => setUnidad(e.target.value)} placeholder="und" />
             <datalist id="unidades-sugeridas">
-              <option value="kg" /><option value="g" /><option value="lb" />
-              <option value="l" /><option value="ml" /><option value="und" />
-              <option value="paquete" /><option value="display" /><option value="caja" /><option value="docena" />
+              <option value="und" /><option value="caja" /><option value="paquete" />
+              <option value="display" /><option value="docena" /><option value="kg" />
+              <option value="lb" /><option value="g" /><option value="l" /><option value="ml" />
             </datalist>
           </Field>
-          <Field label={t.inventory.initialStock}><Input required type="number" step="any" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
+          <Field label={t.inventory.initialStock}>
+            <Input required type="number" step="any" value={stock} onChange={(e) => setStock(e.target.value)} />
+          </Field>
         </div>
-        <p className="text-creamsoft text-[12px] -mt-2 mb-3.5">
-          Usa la unidad en la que controlas ese producto: <b>kg</b> o <b>lb</b> para carnes que compras y pesas,
-          <b> und</b> o <b>display</b> para bebidas y gaseosas (si las controlas por caja/display, pon ahí cuántos
-          displays tienes), <b>paquete</b> para el pan, etc. Tú decides qué representa una unidad para cada producto.
-        </p>
-        <Field label={t.inventory.minimumAlert}><Input required type="number" step="any" value={minimo} onChange={(e) => setMinimo(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center">{t.inventory.saveIngredient}</Btn>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={`${t.inventory.cost} (COP)`}>
+            <Input type="number" step="any" placeholder="0" value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} />
+          </Field>
+          <Field label={`${t.inventory.salePrice} (COP)`}>
+            <Input type="number" step="any" placeholder="0" value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} />
+          </Field>
+        </div>
+        <Field label={t.inventory.minimumAlert}>
+          <Input required type="number" step="any" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+        </Field>
+        <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
+          {guardando ? 'Guardando…' : esModoInventario ? t.inventory.saveItem : t.inventory.saveIngredient}
+        </Btn>
       </form>
     </Modal>
   )
 }
+
+function EditarIngredienteModal({ ingrediente, esModoInventario, onClose, onSaved, onDeleted }) {
+  const { t } = useLanguage()
+  const [nombre, setNombre] = useState(ingrediente.nombre || '')
+  const [unidad, setUnidad] = useState(ingrediente.unidad || 'und')
+  const [stock, setStock] = useState(ingrediente.stock || 0)
+  const [costoUnitario, setCostoUnitario] = useState(ingrediente.costo_unitario || '')
+  const [precioVenta, setPrecioVenta] = useState(ingrediente.precio_venta || '')
+  const [minimo, setMinimo] = useState(ingrediente.minimo || 0)
+  const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    setGuardando(true)
+    try {
+      await updateIngrediente(ingrediente.id, {
+        nombre: nombre.trim(),
+        unidad: unidad.trim() || 'und',
+        stock: parseFloat(stock) || 0,
+        costo_unitario: parseFloat(costoUnitario) || 0,
+        precio_venta: parseFloat(precioVenta) || 0,
+        minimo: parseFloat(minimo) || 0,
+      })
+      onSaved()
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm(`¿Seguro que deseas eliminar "${ingrediente.nombre}" del inventario?`)) return
+    setEliminando(true)
+    try {
+      await deleteIngrediente(ingrediente.id)
+      onDeleted()
+    } finally {
+      setEliminando(false)
+    }
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-serif text-xl font-semibold">{t.inventory.editItemTitle} — {ingrediente.nombre}</h2>
+        <Btn size="sm" variant="danger" type="button" disabled={eliminando || guardando} onClick={handleDelete}>
+          {eliminando ? 'Eliminando…' : t.inventory.delete}
+        </Btn>
+      </div>
+      <form onSubmit={submit}>
+        <Field label={esModoInventario ? t.inventory.item : t.catalogAdmin.product}>
+          <Input required value={nombre} onChange={(e) => setNombre(e.target.value)} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t.inventory.unit}>
+            <Input required value={unidad} onChange={(e) => setUnidad(e.target.value)} />
+          </Field>
+          <Field label={t.inventory.supplies}>
+            <Input required type="number" step="any" value={stock} onChange={(e) => setStock(e.target.value)} />
+          </Field>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={`${t.inventory.cost} (COP)`}>
+            <Input type="number" step="any" value={costoUnitario} onChange={(e) => setCostoUnitario(e.target.value)} />
+          </Field>
+          <Field label={`${t.inventory.salePrice} (COP)`}>
+            <Input type="number" step="any" value={precioVenta} onChange={(e) => setPrecioVenta(e.target.value)} />
+          </Field>
+        </div>
+        <Field label={t.inventory.minimumAlert}>
+          <Input required type="number" step="any" value={minimo} onChange={(e) => setMinimo(e.target.value)} />
+        </Field>
+        <Btn variant="primary" className="w-full justify-center" disabled={guardando || eliminando}>
+          {guardando ? 'Guardando…' : t.inventory.save}
+        </Btn>
+      </form>
+    </Modal>
+  )
+}
+
 function AjusteModal({ ingrediente, onClose, onSaved }) {
   const { t } = useLanguage()
   const [stock, setStock] = useState(ingrediente.stock)
@@ -499,8 +781,111 @@ function AjusteModal({ ingrediente, onClose, onSaved }) {
     <Modal onClose={onClose}>
       <h2 className="font-serif text-xl font-semibold mb-4">{t.inventory.adjustStock} — {ingrediente.nombre}</h2>
       <form onSubmit={submit}>
-        <Field label={`${t.inventory.newAmount} (${ingrediente.unidad})`}><Input required type="number" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
+        <Field label={`${t.inventory.newAmount} (${ingrediente.unidad})`}><Input required type="number" step="any" value={stock} onChange={(e) => setStock(e.target.value)} /></Field>
         <Btn variant="primary" className="w-full justify-center">{t.inventory.save}</Btn>
+      </form>
+    </Modal>
+  )
+}
+
+function VentaInventarioModal({ negocio, ingredienteInicial, ingredientes, onClose, onSaved }) {
+  const { t } = useLanguage()
+  const [ingId, setIngId] = useState(ingredienteInicial?.id || ingredientes[0]?.id || '')
+  const [cantidad, setCantidad] = useState(1)
+  const ing = ingredientes.find((i) => i.id === ingId) || ingredienteInicial
+  const [precioUnitario, setPrecioUnitario] = useState(ing?.precio_venta || '')
+  const [concepto, setConcepto] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  function onSelectIng(id) {
+    setIngId(id)
+    const selected = ingredientes.find((i) => i.id === id)
+    if (selected && selected.precio_venta > 0) {
+      setPrecioUnitario(selected.precio_venta)
+    }
+  }
+
+  const cantNum = parseFloat(cantidad) || 0
+  const precioNum = parseFloat(precioUnitario) || 0
+  const totalCobrar = cantNum * precioNum
+  const costoTotal = cantNum * (Number(ing?.costo_unitario) || 0)
+  const ganancia = totalCobrar - costoTotal
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!ing) return
+    setGuardando(true)
+    try {
+      const desc = concepto.trim() || `Venta de ${cantNum} ${ing.unidad} de ${ing.nombre}`
+      await registrarVentaInventario(negocio.id, {
+        ingredienteId: ing.id,
+        cantidad: cantNum,
+        precioUnitario: precioNum,
+        concepto: desc,
+      }, ing.stock)
+      onSaved()
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Modal onClose={onClose}>
+      <h2 className="font-serif text-xl font-semibold mb-1">{t.inventory.saleTitle}</h2>
+      <p className="text-creamsoft text-[13px] mb-4">{t.inventory.saleDescription}</p>
+      <form onSubmit={submit}>
+        <Field label={t.inventory.item}>
+          <Select value={ingId} onChange={(e) => onSelectIng(e.target.value)}>
+            {ingredientes.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nombre} (Stock: {i.stock} {i.unidad})
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        {ing && (
+          <div className="flex items-center justify-between text-xs text-creamsoft bg-paper p-2.5 rounded border border-line mb-3">
+            <span>Stock disponible: <b className="font-mono text-cream">{ing.stock} {ing.unidad}</b></span>
+            {ing.costo_unitario > 0 && <span>Costo compra: <b className="font-mono text-gold">{fmt$(ing.costo_unitario)}</b></span>}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={`${t.inventory.saleQty}${ing ? ` (${ing.unidad})` : ''}`}>
+            <Input required type="number" step="any" min="0.01" value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
+          </Field>
+          <Field label={t.inventory.salePriceLabel}>
+            <Input required type="number" step="any" value={precioUnitario} onChange={(e) => setPrecioUnitario(e.target.value)} />
+          </Field>
+        </div>
+
+        <Field label="Concepto / Nota (opcional)">
+          <Input value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder={`Ej: Venta ${ing?.nombre || ''}`} />
+        </Field>
+
+        <div className="rounded-lg border border-line bg-paper/60 p-3.5 mb-4 text-[13px] space-y-1.5">
+          <div className="flex justify-between">
+            <span className="text-creamsoft">{t.inventory.totalToCollect}:</span>
+            <b className="font-mono text-gold text-base">{fmt$(totalCobrar)}</b>
+          </div>
+          {costoTotal > 0 && (
+            <div className="flex justify-between text-xs text-creamsoft">
+              <span>Utilidad / Margen estimado:</span>
+              <span className={`font-mono ${ganancia >= 0 ? 'text-sage' : 'text-wine'}`}>{fmt$(ganancia)}</span>
+            </div>
+          )}
+          {ing && (
+            <div className="flex justify-between text-xs text-creamsoft">
+              <span>Stock restante:</span>
+              <span className="font-mono">{Math.max(0, ing.stock - cantNum)} {ing.unidad}</span>
+            </div>
+          )}
+        </div>
+
+        <Btn variant="primary" className="w-full justify-center" disabled={guardando || cantNum <= 0}>
+          {guardando ? 'Registrando…' : t.inventory.confirmSale}
+        </Btn>
       </form>
     </Modal>
   )
@@ -517,13 +902,19 @@ export function TabCompras({ negocio, data, reload, notify }) {
       <Card className="p-5">
         {data.compras.length === 0 ? <Empty>{t.finance.noPurchases}</Empty> : (
           <Table
-            head={[t.finance.date, t.finance.ingredient, t.finance.quantity, t.finance.value]}
-            rows={data.compras.map((c) => [
-              <span className="font-mono">{fmtDate(c.creado_en)}</span>,
-              c.ingredientes?.nombre || '—',
-              <span className="font-mono">{c.cantidad}</span>,
-              <span className="font-mono">{fmt$(c.valor)}</span>,
-            ])}
+            head={[t.finance.date, t.finance.ingredient, t.finance.quantity, 'Costo unitario', t.finance.value]}
+            rows={data.compras.map((c) => {
+              const cant = Number(c.cantidad) || 0
+              const val = Number(c.valor) || 0
+              const costoUnit = cant > 0 ? val / cant : 0
+              return [
+                <span className="font-mono">{fmtDate(c.creado_en)}</span>,
+                c.ingredientes?.nombre || '—',
+                <span className="font-mono">{c.cantidad} {c.ingredientes?.unidad || ''}</span>,
+                <span className="font-mono text-creamsoft">{fmt$(costoUnit)}</span>,
+                <span className="font-mono font-semibold text-gold">{fmt$(val)}</span>,
+              ]
+            })}
           />
         )}
       </Card>
@@ -542,7 +933,12 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
   const ing = ingredientes.find((i) => i.id === ingId)
   async function submit(e) {
     e.preventDefault()
-    await registrarCompra(negocio.id, { ingredienteId: ingId, cantidad: parseFloat(cantidad) || 0, valor: parseFloat(valor) || 0 }, ing.stock)
+    await registrarCompra(
+      negocio.id,
+      { ingredienteId: ingId, cantidad: parseFloat(cantidad) || 0, valor: parseFloat(valor) || 0 },
+      ing?.stock || 0,
+      ing?.costo_unitario || 0
+    )
     onSaved()
   }
   return (
@@ -558,6 +954,7 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
         {ing && (
           <p className="text-creamsoft text-[12px] -mt-2 mb-3">
             {t.finance.currentStock}: <b className="font-mono">{ing.stock} {ing.unidad}</b>
+            {ing.costo_unitario > 0 && <span className="ml-3">Costo actual: <b className="font-mono text-gold">{fmt$(ing.costo_unitario)}</b></span>}
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">
@@ -567,8 +964,7 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
           <Field label={t.finance.totalPaid}><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
         </div>
         <p className="text-creamsoft text-[12px] -mt-2 mb-3.5">
-          La cantidad va en la misma unidad del ingrediente (arriba). Si compraste 5 kg de carne, pon 5; si compraste
-          2 displays de gaseosa y ese ingrediente se maneja por display, pon 2.
+          La cantidad va en la misma unidad del ingrediente o artículo. El costo unitario se actualizará automáticamente en el inventario.
         </p>
         <Btn variant="primary" className="w-full justify-center">{t.finance.register}</Btn>
       </form>
@@ -654,10 +1050,36 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                 <p className="text-[12px] text-creamsoft px-1.5">Sin pedidos</p>
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
-                  <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
-                  <div className="my-1.5 text-creamsoft">{p.pedido_items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="font-semibold text-cream truncate">
+                      <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
+                      p.tipo_entrega === 'domicilio'
+                        ? 'bg-gold/15 text-gold border-gold/30'
+                        : 'bg-paper2 text-creamsoft border-line'
+                    }`}>
+                      {p.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ Local'}
+                    </span>
+                  </div>
+
+                  {p.tipo_entrega === 'domicilio' && (
+                    <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
+                      {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
+                      {p.telefono && (
+                        <div>
+                          📞 <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-gold hover:underline font-mono">
+                            {p.telefono}
+                          </a>
+                        </div>
+                      )}
+                      {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+                    </div>
+                  )}
+
+                  <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
                   <div className="flex justify-between items-center mt-2">
-                    <span className="font-mono">{fmt$(p.total)}</span>
+                    <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
                     {p.estado === 'Pendiente' && <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>✅ Pedido aceptado</Btn>}
                     {(p.estado === 'En preparación' || p.estado === 'Listo') && <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>📦 Entregado</Btn>}
                     {p.estado === 'Entregado' && <span className="text-[11px]">✅</span>}
@@ -690,10 +1112,36 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                 <p className="text-[12px] text-creamsoft px-1.5">Sin pedidos</p>
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
-                  <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
-                  <div className="my-1.5 text-creamsoft">{p.pedido_items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="font-semibold text-cream truncate">
+                      <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
+                      p.tipo_entrega === 'domicilio'
+                        ? 'bg-gold/15 text-gold border-gold/30'
+                        : 'bg-paper2 text-creamsoft border-line'
+                    }`}>
+                      {p.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ Local'}
+                    </span>
+                  </div>
+
+                  {p.tipo_entrega === 'domicilio' && (
+                    <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
+                      {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
+                      {p.telefono && (
+                        <div>
+                          📞 <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-gold hover:underline font-mono">
+                            {p.telefono}
+                          </a>
+                        </div>
+                      )}
+                      {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+                    </div>
+                  )}
+
+                  <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
                   <div className="flex justify-between items-center mt-2">
-                    <span className="font-mono">{fmt$(p.total)}</span>
+                    <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
                     {est !== 'Entregado'
                       ? <Btn size="sm" variant="avocado" onClick={() => advance(p)}>Pasar a {ESTADOS[ESTADOS.indexOf(est) + 1]}</Btn>
                       : <span className="text-[11px]">✅</span>}
@@ -714,10 +1162,13 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
           <p className="text-[12px] text-creamsoft">Ningún pedido cancelado.</p>
         ) : (
           <Table
-            head={['Pedido', 'Cliente', 'Total', 'Cancelado el', 'Por']}
+            head={['Pedido', 'Cliente', 'Tipo / Dirección', 'Total', 'Cancelado el', 'Por']}
             rows={cancelados.map((p) => [
               <span className="font-mono">#{p.numero}</span>,
               p.cliente,
+              <span className="text-[11.5px] text-creamsoft">
+                {p.tipo_entrega === 'domicilio' ? `🛵 Domicilio (${p.direccion || 'Sin dir'})` : '🍽️ En local'}
+              </span>,
               <span className="font-mono">{fmt$(p.total)}</span>,
               p.cancelado_en ? fmtDate(p.cancelado_en) : '—',
               p.cancelado_por || '—',
@@ -835,8 +1286,10 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
           const ultimoPago = w.pagos.length ? w.pagos[w.pagos.length - 1] : null
           return (
             <Card key={w.id} className="p-5">
-              <Pill tone={w.estado === 'Activo' ? 'activo' : 'pausado'}>{w.estado === 'Activo' ? t.staff.active : t.staff.paused}</Pill>
-              <h4 className="font-serif font-semibold text-base mt-1.5 mb-0.5">{w.nombre}</h4>
+              <div className="flex items-center justify-between mb-1.5">
+                <Pill tone={w.estado === 'Activo' ? 'activo' : 'pausado'}>{w.estado === 'Activo' ? t.staff.active : t.staff.paused}</Pill>
+              </div>
+              <h4 className="font-serif font-semibold text-base mb-0.5">{w.nombre}</h4>
               <p className="text-creamsoft text-[13px] mb-2">{w.cargo}</p>
               <p className="font-mono font-bold mb-3">{fmt$(w.pago)}/mes</p>
               <div className="flex gap-1.5 flex-wrap">
@@ -857,6 +1310,7 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
           trabajador={modal === 'new' ? null : modal}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); notify(modal === 'new' ? t.staff.added : t.staff.salaryUpdated); reload() }}
+          onDeleted={() => { setModal(null); notify('Trabajador eliminado'); reload() }}
         />
       )}
       {pagoFor && (
@@ -866,17 +1320,19 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
     </div>
   )
 }
-function TrabajadorModal({ negocio, trabajador, onClose, onSaved }) {
+function TrabajadorModal({ negocio, trabajador, onClose, onSaved, onDeleted }) {
   const { t } = useLanguage()
   const [nombre, setNombre] = useState(trabajador?.nombre || '')
   const [cargo, setCargo] = useState(trabajador?.cargo || '')
   const [pago, setPago] = useState(trabajador?.pago ?? '')
   const [guardando, setGuardando] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
+
   async function submit(e) {
     e.preventDefault()
     setGuardando(true)
     try {
-      const payload = { nombre, cargo, pago: parseFloat(pago) || 0 }
+      const payload = { nombre: nombre.trim(), cargo: cargo.trim(), pago: parseFloat(pago) || 0 }
       if (trabajador) await updateTrabajador(trabajador.id, payload)
       else await createTrabajador(negocio.id, payload)
       onSaved()
@@ -884,16 +1340,36 @@ function TrabajadorModal({ negocio, trabajador, onClose, onSaved }) {
       setGuardando(false)
     }
   }
+
+  async function handleDelete() {
+    if (!trabajador) return
+    if (!window.confirm(`¿Seguro que deseas eliminar a "${trabajador.nombre}"?`)) return
+    setEliminando(true)
+    try {
+      await deleteTrabajador(trabajador.id)
+      onDeleted()
+    } finally {
+      setEliminando(false)
+    }
+  }
+
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{trabajador ? t.staff.edit.replace('{name}', trabajador.nombre) : t.staff.new}</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-serif text-xl font-semibold">{trabajador ? t.staff.edit.replace('{name}', trabajador.nombre) : t.staff.new}</h2>
+        {trabajador && (
+          <Btn size="sm" variant="danger" type="button" disabled={eliminando || guardando} onClick={handleDelete}>
+            {eliminando ? 'Eliminando…' : 'Eliminar'}
+          </Btn>
+        )}
+      </div>
       <form onSubmit={submit}>
         <Field label={t.staff.name}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t.staff.role}><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>
           <Field label={t.staff.monthlyPay}><Input required type="number" value={pago} onChange={(e) => setPago(e.target.value)} /></Field>
         </div>
-        <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
+        <Btn variant="primary" className="w-full justify-center" disabled={guardando || eliminando}>
           {guardando ? t.catalogAdmin.saving : trabajador ? t.orderShared.save : t.staff.add}
         </Btn>
       </form>
@@ -925,23 +1401,35 @@ function PagoModal({ negocio, trabajador, onClose, onSaved }) {
 export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated }) {
   const { t } = useLanguage()
   const [modal, setModal] = useState(null) // 'capital' | 'ingreso' | 'egreso'
-  const capitalInicial = negocio.capital_inicial || 0
+  const capitalInicial = Number(negocio.capital_inicial) || 0
+  const esModoInventario = negocio.modo_operacion === 'inventario'
 
-  const ingresosVentas = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
-  const ingresosExtra = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + i.valor, 0)
-  const egresosCompras = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + c.valor, 0)
-  const egresosPagos = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + p.valor, 0)
-  const egresosOtros = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + e.valor, 0)
+  const ingresosVentas = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + (Number(v.total) || 0), 0)
+  const ingresosExtra = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + (Number(i.valor) || 0), 0)
+  const egresosCompras = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + (Number(c.valor) || 0), 0)
+  const egresosPagos = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + (Number(p.valor) || 0), 0)
+  const egresosOtros = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + (Number(e.valor) || 0), 0)
 
-  // Saldo real del negocio: base inicial + TODO lo que ha entrado y salido
-  // desde siempre (no solo este mes). Esto es lo que responde "¿cuánta plata
-  // tiene el negocio hoy, contando con lo que arrancó?".
-  const ventasTotal = data.ventas.reduce((a, v) => a + v.total, 0)
-  const ingresosTotal = data.ingresos.reduce((a, i) => a + i.valor, 0)
-  const comprasTotal = data.compras.reduce((a, c) => a + c.valor, 0)
-  const pagosTotal = data.trabajadores.flatMap((w) => w.pagos).reduce((a, p) => a + p.valor, 0)
-  const egresosOtrosTotal = data.egresos.reduce((a, e) => a + e.valor, 0)
+  const ventasTotal = data.ventas.reduce((a, v) => a + (Number(v.total) || 0), 0)
+  const ingresosTotal = data.ingresos.reduce((a, i) => a + (Number(i.valor) || 0), 0)
+  const comprasTotal = data.compras.reduce((a, c) => a + (Number(c.valor) || 0), 0)
+  const pagosTotal = data.trabajadores.flatMap((w) => w.pagos).reduce((a, p) => a + (Number(p.valor) || 0), 0)
+  const egresosOtrosTotal = data.egresos.reduce((a, e) => a + (Number(e.valor) || 0), 0)
   const saldoActual = capitalInicial + ventasTotal + ingresosTotal - comprasTotal - pagosTotal - egresosOtrosTotal
+
+  async function borrarIngreso(id) {
+    if (!window.confirm('¿Deseas eliminar este registro de ingreso?')) return
+    await deleteIngreso(id)
+    notify('Ingreso eliminado')
+    reload()
+  }
+
+  async function borrarEgreso(id) {
+    if (!window.confirm('¿Deseas eliminar este registro de gasto?')) return
+    await deleteEgreso(id)
+    notify('Gasto eliminado')
+    reload()
+  }
 
   return (
     <div>
@@ -959,7 +1447,7 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
 
       <p className="text-creamsoft text-[11.5px] mb-5">{t.finance.thisMonth} ↓</p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label="Ingresos (ventas + otros)" value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
+        <StatCard label={esModoInventario ? 'Ingresos totales' : 'Ingresos (ventas + otros)'} value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
         <StatCard label="Egresos (compras)" value={fmt$(egresosCompras)} tone="gold" />
         <StatCard label="Egresos (personal)" value={fmt$(egresosPagos)} tone="champagne" />
         <StatCard label="Otros egresos" value={fmt$(egresosOtros)} />
@@ -967,12 +1455,18 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
 
       <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1 mb-6">
         <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Ingresos extra registrados</h3>
-          {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos manuales aún.</p> :
+          <h3 className="font-serif text-lg font-semibold mb-3">Ingresos registrados</h3>
+          {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos registrados aún.</p> :
             data.ingresos.map((i) => (
-              <div key={i.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
-                <span>{i.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(i.creado_en)}</div></span>
-                <b className="font-mono">{fmt$(i.valor)}</b>
+              <div key={i.id} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] last:border-none">
+                <div>
+                  <span className="font-medium text-cream">{i.concepto}</span>
+                  <div className="text-creamsoft text-[11.5px]">{fmtDate(i.creado_en)}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <b className="font-mono text-sage">+{fmt$(i.valor)}</b>
+                  <button onClick={() => borrarIngreso(i.id)} className="text-creamsoft hover:text-wine text-xs px-1" title="Eliminar ingreso">✕</button>
+                </div>
               </div>
             ))}
         </Card>
@@ -980,9 +1474,15 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
           <h3 className="font-serif text-lg font-semibold mb-3">Otros gastos</h3>
           {data.egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
             data.egresos.map((e) => (
-              <div key={e.id} className="flex justify-between border-b border-line py-2.5 text-[13px]">
-                <span>{e.concepto}<div className="text-creamsoft text-[11.5px]">{fmtDate(e.creado_en)}</div></span>
-                <b className="font-mono">{fmt$(e.valor)}</b>
+              <div key={e.id} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] last:border-none">
+                <div>
+                  <span className="font-medium text-cream">{e.concepto}</span>
+                  <div className="text-creamsoft text-[11.5px]">{fmtDate(e.creado_en)}</div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <b className="font-mono text-wine">−{fmt$(e.valor)}</b>
+                  <button onClick={() => borrarEgreso(e.id)} className="text-creamsoft hover:text-wine text-xs px-1" title="Eliminar gasto">✕</button>
+                </div>
               </div>
             ))}
         </Card>
@@ -1158,9 +1658,63 @@ function ReportePeriodo({ negocio, data }) {
 /* ---------------- Estadísticas ---------------- */
 export function TabEstadisticas({ negocio, data }) {
   const { t } = useLanguage()
+  const esModoInventario = negocio.modo_operacion === 'inventario'
+
+  if (esModoInventario) {
+    const valorTotal = data.ingredientes.reduce((a, i) => a + ((Number(i.stock) || 0) * (Number(i.costo_unitario) || 0)), 0)
+    const rankingStock = [...data.ingredientes].sort((a, b) => ((b.stock || 0) * (b.costo_unitario || 0)) - ((a.stock || 0) * (a.costo_unitario || 0)))
+    const maxVal = rankingStock.length ? Math.max(1, (rankingStock[0].stock || 0) * (rankingStock[0].costo_unitario || 0)) : 1
+    const bajoStock = data.ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0)).length
+    const totalCompras = data.compras.reduce((a, c) => a + (Number(c.valor) || 0), 0)
+    const totalIngresos = data.ingresos.reduce((a, i) => a + (Number(i.valor) || 0), 0)
+    const totalEgresos = data.egresos.reduce((a, e) => a + (Number(e.valor) || 0), 0)
+
+    return (
+      <div>
+        <SectionTitle title={t.stats.title} sub={t.stats.description.replace('{business}', negocio.nombre)} />
+        <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
+          <Card className="p-5">
+            <h3 className="font-serif text-lg font-semibold mb-3">Artículos de mayor valor en stock</h3>
+            {rankingStock.length === 0 ? (
+              <Empty icon="📦">Aún no hay artículos registrados en el inventario.</Empty>
+            ) : (
+              rankingStock.slice(0, 8).map((art) => {
+                const val = (Number(art.stock) || 0) * (Number(art.costo_unitario) || 0)
+                return (
+                  <div key={art.id} className="flex items-center gap-2.5 mb-2.5 text-[12.5px]">
+                    <span className="w-[150px] font-semibold text-creamsoft truncate">{art.nombre}</span>
+                    <div className="flex-1 bg-paper border border-line rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-gold rounded-full" style={{ width: `${(val / maxVal) * 100}%` }} />
+                    </div>
+                    <span className="w-[110px] text-right font-mono text-gold">{fmt$(val)}</span>
+                  </div>
+                )
+              })
+            )}
+          </Card>
+          <Card className="p-5">
+            <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.overview}</h3>
+            {[
+              ['Artículos registrados', data.ingredientes.length],
+              ['Artículos con bajo stock', bajoStock],
+              ['Valor total en inventario', fmt$(valorTotal)],
+              ['Compras registradas', data.compras.length],
+              ['Trabajadores activos', data.trabajadores.filter((w) => w.estado === 'Activo').length],
+              ['Total ingresos registrados', fmt$(totalIngresos)],
+              ['Total egresos + compras', fmt$(totalEgresos + totalCompras)],
+            ].map(([label, val], i) => (
+              <div key={i} className="flex justify-between border-b border-line py-2.5 text-[13px] last:border-none">
+                <span>{label}</span><b className="font-mono">{val}</b>
+              </div>
+            ))}
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   const conteo = {}
-  data.pedidos.forEach((p) => p.pedido_items.forEach((it) => { conteo[it.nombre] = (conteo[it.nombre] || 0) + it.cantidad }))
-  const ranking = Object.entries(conteo).sort((a, b) => b[1] - a[1])
+  pedidosValidos.forEach((p) => (p.pedido_items || []).forEach((it) => { conteo[it.nombre] = (conteo[it.nombre] || 0) + it.cantidad }))
   const max = ranking.length ? ranking[0][1] : 1
   const agotados = data.productos.filter((p) => !p.disponible).length
 
@@ -1189,7 +1743,7 @@ export function TabEstadisticas({ negocio, data }) {
             ['Productos agotados', agotados],
             ['Ingredientes con bajo stock', data.ingredientes.filter((i) => i.stock <= i.minimo).length],
             ['Trabajadores activos', data.trabajadores.filter((w) => w.estado === 'Activo').length],
-            ['Pedidos totales', data.pedidos.length],
+            ['Pedidos activos / entregados', pedidosValidos.length],
             ['Total histórico vendido', fmt$(data.ventas.reduce((a, v) => a + v.total, 0))],
           ].map(([label, val], i) => (
             <div key={i} className="flex justify-between border-b border-line py-2.5 text-[13px] last:border-none">

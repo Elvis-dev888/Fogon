@@ -8,6 +8,7 @@ import {
   TabPedidos, TabVentas, TabTrabajadores, TabFinanzas, TabEstadisticas, TabMiNegocio,
   TabMiSuscripcion,
 } from './AdminTabs'
+import { FeedbackModal } from './FeedbackModal'
 import { supabase } from '../lib/supabaseClient'
 import { playPedidoNuevo, fmt$ } from '../lib/helpers'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
@@ -24,24 +25,26 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
   const [tab, setTab] = useState('dashboard')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [mostrarFeedback, setMostrarFeedback] = useState(false)
+  const esModoInventario = negocio.modo_operacion === 'inventario'
 
   const reload = useCallback(async () => {
     setLoading(true)
     const [categorias, productos, ingredientes, compras, pedidos, ventas, trabajadores, ingresos, egresos] =
       await Promise.all([
-        fetchCategorias(negocio.id),
-        fetchProductos(negocio.id),
+        esModoInventario ? Promise.resolve([]) : fetchCategorias(negocio.id),
+        esModoInventario ? Promise.resolve([]) : fetchProductos(negocio.id),
         fetchIngredientes(negocio.id),
         fetchCompras(negocio.id),
-        fetchPedidos(negocio.id),
-        fetchVentas(negocio.id),
+        esModoInventario ? Promise.resolve([]) : fetchPedidos(negocio.id),
+        esModoInventario ? Promise.resolve([]) : fetchVentas(negocio.id),
         fetchTrabajadores(negocio.id),
         fetchIngresos(negocio.id),
         fetchEgresos(negocio.id),
       ])
     setData({ categorias, productos, ingredientes, compras, pedidos, ventas, trabajadores, ingresos, egresos })
     setLoading(false)
-  }, [negocio.id])
+  }, [negocio.id, esModoInventario])
 
   useEffect(() => {
     reload()
@@ -51,6 +54,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
   // y le aparece de una vez al que esté administrando este negocio — sin
   // necesidad de recargar la página ni cambiar de pestaña.
   useEffect(() => {
+    if (esModoInventario) return undefined
     const channel = supabase
       .channel(`admin-pedidos-${negocio.id}`)
       .on(
@@ -69,13 +73,20 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
       )
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [negocio.id, reload, notify])
+  }, [negocio.id, reload, notify, esModoInventario])
+
+  useEffect(() => {
+    if (esModoInventario && ['productos', 'categorias', 'pedidos', 'ventas'].includes(tab)) setTab('dashboard')
+  }, [esModoInventario, tab])
 
   if (loading || !data) {
     return <p className="text-creamsoft text-sm">{t.loading} {negocio.nombre}…</p>
   }
 
   const props = { negocio, data, reload, notify, onNegocioUpdated }
+  const tabsVisibles = esModoInventario
+    ? TABS.filter(([key]) => !['productos', 'categorias', 'pedidos', 'ventas'].includes(key))
+    : TABS
 
   return (
     <div className="grid grid-cols-[220px_1fr] gap-5 items-start max-[820px]:grid-cols-1">
@@ -88,8 +99,8 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
           )}
           <span className="text-gold font-serif font-semibold text-base truncate">{negocio.nombre}</span>
         </div>
-        <CodigoEmpleado negocioId={negocio.id} notify={notify} />
-        {TABS.map(([k, icon]) => {
+        {!esModoInventario && <CodigoEmpleado negocioId={negocio.id} notify={notify} />}
+        {tabsVisibles.map(([k, icon]) => {
           const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length : 0
           return (
             <button
@@ -108,6 +119,12 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
             </button>
           )
         })}
+        <button
+          onClick={() => setMostrarFeedback(true)}
+          className="mt-2 text-left px-3 py-2 rounded-sm text-[12.5px] text-gold hover:bg-gold/10 transition-colors flex items-center gap-2 border border-gold/20"
+        >
+          {t.feedback.button}
+        </button>
         <button
           onClick={onExit}
           className="mt-2.5 pt-3 border-t border-line text-left px-3 py-2.5 text-[13px] text-creamsoft hover:text-cream"
@@ -129,6 +146,9 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
         {tab === 'finanzas' && <TabFinanzas {...props} />}
         {tab === 'estadisticas' && <TabEstadisticas {...props} />}
       </div>
+      {mostrarFeedback && (
+        <FeedbackModal negocio={negocio} onClose={() => setMostrarFeedback(false)} notify={notify} />
+      )}
     </div>
   )
 }

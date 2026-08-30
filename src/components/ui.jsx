@@ -1,8 +1,20 @@
 import { useEffect } from 'react'
 
-// Emblema de Kiosco: una marca circular inspirada en cocina, hogar y comunidad.
-export function BrandMark({ size = 38 }) {
-  return <img src="/Kiosko.jpg" width={size} height={size} className="shrink-0 rounded-full object-cover" alt="Logo de Kiosco" />
+export function BrandMark({ size = 38, className = '' }) {
+  return (
+    <img
+      src="/Kiosko.jpg"
+      width={size}
+      height={size}
+      className={`shrink-0 rounded-full object-cover border border-gold/40 shadow-sm ${className}`}
+      alt="Logo de Kiosko"
+      onError={(e) => {
+        if (!e.target.src.endsWith('/Kiosko.jpg')) {
+          e.target.src = '/Kiosko.jpg'
+        }
+      }}
+    />
+  )
 }
 
 export function Btn({ variant = 'default', size = 'md', className = '', children, ...props }) {

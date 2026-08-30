@@ -11,6 +11,43 @@ body {
   color: #F4EDDF;
 }
 
+.desktop-shell {
+  background: linear-gradient(180deg, #12100d 0%, #171511 100%);
+}
+
+.native-brand-background {
+  background: rgba(20, 17, 14, 0.62);
+}
+
+.native-brand-image {
+  opacity: 0.16;
+  mix-blend-mode: screen;
+  filter: saturate(0.8) contrast(0.9);
+}
+
+.desktop-shell .desktop-app-header {
+  background: rgba(22, 18, 15, 0.96);
+  border-color: rgba(199, 154, 60, 0.28);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.desktop-shell .desktop-app-main {
+  padding-top: 1rem;
+}
+
+.desktop-shell .desktop-app-nav {
+  background: rgba(18, 16, 13, 0.96);
+  border-color: rgba(199, 154, 60, 0.25);
+  box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.22);
+}
+
+@media (max-width: 820px) {
+  .native-brand-image {
+    width: min(115vw, 620px);
+    opacity: 0.13;
+  }
+}
+
 ::selection { background: #C79A3C; color: #14110E; }
 
 @keyframes ticker {

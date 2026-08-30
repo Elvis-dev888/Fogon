@@ -6,6 +6,7 @@ import AdminView from './components/AdminView'
 import EmpleadoView from './components/EmpleadoView'
 import ClienteView from './components/ClienteView'
 import { AdminAuth, SuperadminAuth, EmpleadoAuth, UnirseNegocioForm, CrearNegocioForm, SinPermiso } from './components/Auth'
+import { PrivacyModal } from './components/PrivacyModal'
 import { supabase } from './lib/supabaseClient'
 import { fetchPerfil, fetchNegocioPorId, signOut } from './lib/auth'
 import { fetchNegocios } from './lib/api'
@@ -28,6 +29,7 @@ export default function App() {
   const [role, setRole] = useState(isNativeApp ? 'admin' : 'cliente')
   const isDesktopShell = isNativeApp && isDesktopApp
   const [negocioId, setNegocioId] = useState(null) // solo lo usa el flujo de Cliente
+  const [mostrarPrivacidad, setMostrarPrivacidad] = useState(false)
   const [adminIntent, setAdminIntent] = useState(null) // null | 'entrar' | 'registrar' — solo lo usa el flujo de Admin
   const [negocios, setNegocios] = useState([])
   const [toast, setToast] = useState(null)
@@ -58,7 +60,7 @@ export default function App() {
       setNegocios(list)
       setLoadError(null)
     } catch (err) {
-      console.error('[Kiosco] Error cargando negocios:', err)
+      console.error('[Kiosko] Error cargando negocios:', err)
       setLoadError(err.message || String(err))
     }
   }, [])
@@ -107,7 +109,7 @@ export default function App() {
     loadNegocios()
   }
 
-  const negocioCliente = negocios.find((n) => n.id === negocioId) || null
+  const negocioCliente = negocios.find((n) => n.id === negocioId && n.modo_operacion !== 'inventario') || null
 
   // Botón físico "atrás" de Android: en vez de cerrar la app de golpe, primero
   // retrocede un nivel dentro de la navegación (como esperaría cualquier app nativa).
@@ -141,8 +143,10 @@ export default function App() {
   }
   return (
     <div className={`relative min-h-screen ${isDesktopShell ? 'desktop-shell' : ''}`}>
-      {!isDesktopShell && (
-        <img src="/Kiosko.jpg" alt="" aria-hidden="true" className="fixed pointer-events-none z-0 left-1/2 top-1/2 w-[min(86vw,860px)] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full object-cover opacity-[0.24] mix-blend-screen" />
+      {isNativeApp && (
+        <div className="native-brand-background fixed pointer-events-none z-0 inset-0" aria-hidden="true">
+          <img src="/Kiosko.jpg" alt="" className="native-brand-image absolute left-1/2 top-1/2 w-[min(86vw,860px)] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full object-cover" />
+        </div>
       )}
       {!isDesktopShell && (
         <div className="relative z-10 bg-paper text-creamsoft overflow-hidden whitespace-nowrap border-b border-line">
@@ -157,13 +161,10 @@ export default function App() {
       <header className={`sticky top-0 z-40 border-b ${isDesktopShell ? 'desktop-app-header' : 'bg-paper/90 backdrop-blur border-line'}`}>
         <div className={`max-w-[1200px] mx-auto px-5 py-4 flex items-center gap-3 ${!isNativeApp ? 'justify-between flex-wrap' : ''}`}>
           <div className="flex items-center gap-3">
-            <BrandMark size={isDesktopShell ? 40 : 48} />
-            <div>
-              <h1 className="font-serif text-xl font-semibold m-0">Kiosco</h1>
-              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wide">{t.platform}</span>
+            <BrandMark size={isDesktopShell ? 42 : 46} />
+              <h1 className="font-serif text-xl font-semibold m-0 leading-tight">Kiosko</h1>
+              <span className="block text-[10.5px] text-creamsoft uppercase tracking-wider font-medium">Catálogos y gestión de negocios</span>
             </div>
-          </div>
-
           {/* En la web se conserva la navegación original de arriba (pestañas + cerrar sesión).
               En la app, esto se reemplaza por la barra inferior de más abajo. */}
           {!isNativeApp && (
@@ -244,8 +245,23 @@ export default function App() {
         {/* ---------------- CLIENTE (público, sin cuenta) ---------------- */}
         {role === 'cliente' && (negocioCliente
           ? <ClienteView negocio={negocioCliente} onExit={exitNegocioCliente} notify={notify} />
-          : <PickNegocio negocios={negocios} onEnter={(id) => setNegocioId(id)} showWelcome={isNativeApp} showDownloads={!isNativeApp} />)}
+          : <PickNegocio negocios={negocios.filter((n) => n.modo_operacion !== 'inventario')} onEnter={(id) => setNegocioId(id)} showWelcome={isNativeApp} showDownloads={!isNativeApp} />)}
+
+        <footer className="mt-16 pt-6 border-t border-line text-center text-xs text-creamsoft flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span>&copy; {new Date().getFullYear()} Kiosko — Todos los derechos reservados.</span>
+          <button
+            type="button"
+            onClick={() => setMostrarPrivacidad(true)}
+            className="text-gold hover:underline cursor-pointer bg-transparent border-none p-0 text-xs font-semibold"
+          >
+            Política de Privacidad
+          </button>
+        </footer>
       </main>
+
+      {mostrarPrivacidad && (
+        <PrivacyModal onClose={() => setMostrarPrivacidad(false)} />
+      )}
 
       {isNativeApp && (
         <nav
@@ -294,29 +310,31 @@ export default function App() {
 }
 
 function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
+  const { t } = useLanguage()
+
   return (
     <div>
       <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-9 md:px-10 md:py-11 mb-8">
         <div className="absolute -right-10 -top-16 opacity-20"><BrandMark size={230} /></div>
         <div className="relative max-w-3xl">
           <div className="flex items-center gap-4 mb-5">
-            <BrandMark size={96} />
+            <BrandMark size={84} />
             <div>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Kiosco Negocios</p>
-              <p className="text-xs text-creamsoft">Centro de gestión para tu negocio</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-gold font-semibold">Kiosko Negocios</p>
+              <p className="text-xs text-creamsoft">{t.businessPanelDescription || 'Centro de gestión para tu negocio'}</p>
             </div>
           </div>
-          <h2 className="font-serif text-3xl md:text-4xl font-semibold mb-3 leading-tight">El saber de cada negocio en un solo lugar.</h2>
-          <p className="text-creamsoft text-sm md:text-base leading-relaxed max-w-2xl">Administra tu catálogo, pedidos, inventario, equipo, ventas y finanzas desde una plataforma organizada, pensada para que tengas toda la información de tu negocio al alcance.</p>
+          <h2 className="font-serif text-3xl md:text-4xl font-semibold mb-3 leading-tight">{t.heroAdminTitle}</h2>
+          <p className="text-creamsoft text-sm md:text-base leading-relaxed max-w-2xl">{t.heroAdminDescription}</p>
         </div>
       </section>
       <div className="mb-7 flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h2 className="font-serif text-3xl font-semibold mb-2">Panel de negocios</h2>
+          <h2 className="font-serif text-3xl font-semibold mb-2">{t.businessPanel}</h2>
           <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Elige tu negocio para entrar con tu correo, o registra uno nuevo si vas a usar Kiosko por primera vez.</p>
         </div>
         <button onClick={onRegistrar} className="bg-gold text-paper font-semibold text-[13px] rounded-full px-5 py-3 hover:bg-golddark whitespace-nowrap">
-          ➕ Registrar mi propio negocio
+          ➕ {t.authAdmin.register}
         </button>
       </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
@@ -348,14 +366,14 @@ function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = f
         <div className="absolute -right-16 -top-20 opacity-20"><BrandMark size={270} /></div>
         <div className="relative max-w-2xl">
           <div className="flex items-center gap-3 mb-6">
-            <BrandMark size={96} />
+            <BrandMark size={84} />
             <div>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-gold">Kiosco</p>
-              <p className="text-xs text-creamsoft">Plataforma multiempresa</p>
+              <p className="text-[11px] uppercase tracking-[0.22em] text-gold font-semibold">Kiosko</p>
+              <p className="text-xs text-creamsoft">{t.platform}</p>
             </div>
           </div>
-          <h2 className="font-serif text-4xl md:text-5xl font-semibold mb-4 leading-tight">El sabor de cada negocio, en un solo lugar.</h2>
-          <p className="text-creamsoft text-sm md:text-base max-w-xl leading-relaxed">Kiosco conecta a tus clientes con sus negocios favoritos. Explora catálogos, arma pedidos y síguelos en tiempo real desde cualquier dispositivo.</p>
+          <h2 className="font-serif text-4xl md:text-5xl font-semibold mb-4 leading-tight">{t.heroClientTitle}</h2>
+          <p className="text-creamsoft text-sm md:text-base max-w-xl leading-relaxed">{t.heroClientDescription}</p>
         </div>
       </section>}
 

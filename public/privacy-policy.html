@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Política de Privacidad | Kiosko</title>
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <style>
+    :root {
+      --bg: #0f0d0b;
+      --card-bg: #1a1612;
+      --card-border: #2e261d;
+      --gold: #d4af37;
+      --text: #f5f0eb;
+      --text-muted: #a89f91;
+      --link: #e5c158;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+      padding: 40px 20px;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    header {
+      border-b: 1px solid var(--card-border);
+      padding-bottom: 24px;
+      margin-bottom: 30px;
+      text-align: center;
+    }
+    .logo {
+      font-family: Georgia, serif;
+      font-size: 32px;
+      font-weight: bold;
+      color: var(--gold);
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    .date {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+    h2 {
+      font-size: 18px;
+      color: var(--gold);
+      margin-top: 28px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(212, 175, 55, 0.15);
+      padding-bottom: 6px;
+    }
+    p, ul {
+      color: var(--text);
+      font-size: 14.5px;
+      margin-bottom: 16px;
+    }
+    ul {
+      padding-left: 24px;
+    }
+    li {
+      margin-bottom: 8px;
+    }
+    a {
+      color: var(--link);
+      text-decoration: underline;
+    }
+    a:hover {
+      color: #fff;
+    }
+    .contact-box {
+      background: rgba(212, 175, 55, 0.08);
+      border: 1px solid rgba(212, 175, 55, 0.25);
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 30px;
+    }
+    .contact-box p {
+      margin-bottom: 6px;
+    }
+    footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .back-btn {
+      display: inline-block;
+      margin-top: 20px;
+      padding: 10px 20px;
+      background: var(--gold);
+      color: #111;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+    .back-btn:hover {
+      background: #f0cb54;
+      color: #000;
+    }
+    @media (max-width: 600px) {
+      body { padding: 15px; }
+      .container { padding: 20px; }
+      h1 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo">Kiosko</div>
+      <h1>Política de Privacidad</h1>
+      <div class="date">Última actualización: 30 de agosto de 2026</div>
+    </header>
+
+    <section>
+      <p>
+        Bienvenido a <strong>Kiosko</strong> ("la Aplicación", "la Plataforma"). Esta Política de Privacidad describe cómo recopilamos, utilizamos, almacenamos y protegemos la información personal y comercial que usted proporciona al utilizar nuestra aplicación en sus versiones para Windows (Microsoft Store), Android, iOS y Web.
+      </p>
+
+      <h2>1. Información que recopilamos</h2>
+      <p>Para el correcto funcionamiento de los servicios comerciales de Kiosko, podemos recopilar los siguientes datos:</p>
+      <ul>
+        <li><strong>Información de cuenta y contacto:</strong> Correo electrónico y contraseñas cifradas al momento de registrarse como administrador o trabajador del negocio.</li>
+        <li><strong>Información del negocio:</strong> Nombre del establecimiento, eslogan, logotipo, catálogo de productos, categorías, ingredientes, existencias de inventario, precios y costos unitarios.</li>
+        <li><strong>Información de pedidos y clientes:</strong> Nombre proporcionado por el cliente para el pedido, detalle de productos seleccionados, subtotales, notas de preparación y estado de entrega.</li>
+        <li><strong>Información operativa y financiera:</strong> Registros de compras a proveedores, ingresos, egresos manuales y pagos salariales a trabajadores (utilizados exclusivamente para los balances internos del negocio).</li>
+      </ul>
+
+      <h2>2. Uso de la información</h2>
+      <p>La información recopilada se utiliza exclusivamente para:</p>
+      <ul>
+        <li>Permitir la administración integral de catálogos, pedidos y control de inventarios.</li>
+        <li>Sincronizar en tiempo real los pedidos entre la cocina/despacho y los clientes.</li>
+        <li>Calcular balances financieros, utilidades estimadas y reportes contables privados para el propietario.</li>
+        <li>Procesar sugerencias, mejoras y soporte técnico solicitados por los usuarios.</li>
+      </ul>
+
+      <h2>3. Protección y almacenamiento de datos</h2>
+      <p>
+        Los datos se almacenan de manera segura en servidores de base de datos en la nube (Supabase / PostgreSQL) con cifrado SSL/TLS en tránsito y controles de seguridad por filas (Row Level Security - RLS). Las contraseñas de acceso nunca se almacenan en texto plano y se gestionan mediante estándares criptográficos seguros.
+      </p>
+
+      <h2>4. No compartición con terceros</h2>
+      <p>
+        <strong>Kiosko no vende, no alquila y no comercializa su información personal ni los datos de su negocio con terceras partes ajenas al servicio.</strong> La información solo es accesible por el propietario y los usuarios expresamente autorizados de cada negocio.
+      </p>
+
+      <h2>5. Derechos del usuario (Acceso, Rectificación y Eliminación)</h2>
+      <p>
+        Usted tiene derecho a consultar, actualizar, corregir o solicitar la eliminación total de sus datos personales y de su negocio en cualquier momento. Para ejercer estos derechos, puede hacerlo directamente desde la configuración de su panel o enviando una solicitud a nuestro correo de soporte.
+      </p>
+
+      <h2>6. Contacto y Soporte</h2>
+      <div class="contact-box">
+        <p>Si tiene preguntas, inquietudes o solicitudes sobre esta Política de Privacidad o el tratamiento de sus datos en Kiosko, puede comunicarse directamente con nosotros:</p>
+        <p><strong>Correo oficial de soporte:</strong> <a href="mailto:kkiosko440@gmail.com">kkiosko440@gmail.com</a></p>
+        <p><strong>Desarrollador:</strong> Qelvis / Kiosko Platform</p>
+      </div>
+
+      <div style="text-align: center;">
+        <a href="/" class="back-btn">← Volver a Kiosko</a>
+      </div>
+    </section>
+
+    <footer>
+      &copy; 2026 Kiosko. Todos los derechos reservados.
+    </footer>
+  </div>
+</body>
+</html>
+

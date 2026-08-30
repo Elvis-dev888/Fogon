@@ -1,5 +1,5 @@
 {
   "appId": "com.fogon.app",
-  "appName": "Kiosco",
-  "webDir": "dist"
+  "appName": "Kiosko",
+  "webDir": "web-dist"
 }

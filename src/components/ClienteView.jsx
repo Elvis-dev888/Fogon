@@ -105,13 +105,38 @@ export default function ClienteView({ negocio, onExit, notify }) {
 function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
   const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
+  const [tipoEntrega, setTipoEntrega] = useState('local') // 'local' | 'domicilio'
+  const [direccion, setDireccion] = useState('')
+  const [telefono, setTelefono] = useState('')
+  const [notasEntrega, setNotasEntrega] = useState('')
+  const [errorValidacion, setErrorValidacion] = useState('')
   const [saving, setSaving] = useState(false)
   const total = cart.reduce((a, c) => a + c.subtotal, 0)
 
   async function confirmar() {
+    setErrorValidacion('')
+    if (tipoEntrega === 'domicilio') {
+      if (!direccion.trim()) {
+        setErrorValidacion(t.customer.addressRequired)
+        return
+      }
+      if (!telefono.trim()) {
+        setErrorValidacion(t.customer.phoneRequired)
+        return
+      }
+    }
+
     setSaving(true)
     try {
-      const pedido = await crearPedido(negocio.id, { cliente: nombre.trim() || 'Cliente', items: cart, total })
+      const pedido = await crearPedido(negocio.id, {
+        cliente: nombre.trim() || 'Cliente',
+        items: cart,
+        total,
+        tipo_entrega: tipoEntrega,
+        direccion,
+        telefono,
+        notas_entrega: notasEntrega,
+      })
       onConfirmed(pedido)
     } finally {
       setSaving(false)
@@ -120,34 +145,115 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
 
   return (
     <div className="fixed inset-0 bg-black/70 z-[60] flex justify-end" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="w-full max-w-[420px] bg-paper border-l border-line h-full p-6 overflow-y-auto animate-slidein">
-        <button className="float-right text-creamsoft hover:text-gold text-lg" onClick={onClose}>✕</button>
-        <h2 className="font-serif text-xl font-semibold mb-4">{t.customer.order}</h2>
+      <div className="w-full max-w-[420px] bg-paper border-l border-line h-full p-6 overflow-y-auto animate-slidein flex flex-col">
+        <div className="flex items-center justify-between pb-3 border-b border-line mb-4">
+          <h2 className="font-serif text-xl font-semibold">{t.customer.order}</h2>
+          <button className="text-creamsoft hover:text-gold text-lg px-2" onClick={onClose}>✕</button>
+        </div>
+
         {cart.length === 0 ? <Empty icon="🧺">{t.customer.emptyCart}</Empty> : (
           <>
-            {cart.map((c, i) => (
-              <div key={i} className="flex justify-between gap-2.5 py-2.5 border-b border-line text-[13px]">
-                <span>
-                  <span className="font-semibold">{c.nombre}</span>
-                  {c.adiciones.length > 0 && <div className="text-creamsoft text-[11.5px]">+ {c.adiciones.join(', ')}</div>}
-                  {c.obs && <div className="text-creamsoft text-[11.5px]">"{c.obs}"</div>}
-                </span>
-                <span className="flex flex-col items-end gap-1.5">
-                  <b className="font-mono">{fmt$(c.subtotal)}</b>
-                  <div className="flex items-center gap-2">
-                    <QtyStepper value={c.cantidad} onChange={(q) => onQty(i, q)} />
-                    <button onClick={() => onRemove(i)} className="text-[11px] text-creamsoft hover:text-wine">{t.customer.remove}</button>
-                  </div>
-                </span>
-              </div>
-            ))}
-            <div className="flex justify-between my-4 font-bold text-lg">
-              <span>Total</span><span className="font-mono">{fmt$(total)}</span>
+            <div className="flex-1 divide-y divide-line overflow-y-auto mb-4">
+              {cart.map((c, i) => (
+                <div key={i} className="flex justify-between gap-2.5 py-3 text-[13px]">
+                  <span>
+                    <span className="font-semibold text-cream">{c.nombre}</span>
+                    {c.adiciones.length > 0 && <div className="text-creamsoft text-[11.5px] mt-0.5">+ {c.adiciones.join(', ')}</div>}
+                    {c.obs && <div className="text-creamsoft text-[11.5px] italic mt-0.5">"{c.obs}"</div>}
+                  </span>
+                  <span className="flex flex-col items-end gap-1.5 shrink-0">
+                    <b className="font-mono text-gold">{fmt$(c.subtotal)}</b>
+                    <div className="flex items-center gap-2">
+                      <QtyStepper value={c.cantidad} onChange={(q) => onQty(i, q)} />
+                      <button onClick={() => onRemove(i)} className="text-[11px] text-creamsoft hover:text-wine">{t.customer.remove}</button>
+                    </div>
+                  </span>
+                </div>
+              ))}
             </div>
-            <Field label={t.customer.name}><Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t.customer.namePlaceholder} /></Field>
-            <Btn variant="primary" className="w-full justify-center" disabled={saving} onClick={confirmar}>
-              {saving ? t.customer.confirming : t.customer.confirm}
-            </Btn>
+
+            <div className="space-y-3.5 pt-2 border-t border-line">
+              <div className="flex justify-between font-bold text-lg">
+                <span>Total</span><span className="font-mono text-gold">{fmt$(total)}</span>
+              </div>
+
+              {/* Selector de entrega */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-creamsoft mb-1.5">
+                  {t.customer.orderType}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setTipoEntrega('local'); setErrorValidacion('') }}
+                    className={`py-2 px-2.5 rounded text-center text-xs font-semibold border transition-colors ${
+                      tipoEntrega === 'local'
+                        ? 'border-gold bg-gold/15 text-gold'
+                        : 'border-line bg-paper2 text-creamsoft hover:text-cream'
+                    }`}
+                  >
+                    {t.customer.localOrder}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setTipoEntrega('domicilio'); setErrorValidacion('') }}
+                    className={`py-2 px-2.5 rounded text-center text-xs font-semibold border transition-colors ${
+                      tipoEntrega === 'domicilio'
+                        ? 'border-gold bg-gold/15 text-gold'
+                        : 'border-line bg-paper2 text-creamsoft hover:text-cream'
+                    }`}
+                  >
+                    {t.customer.deliveryOrder}
+                  </button>
+                </div>
+              </div>
+
+              <Field label={t.customer.name}>
+                <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t.customer.namePlaceholder} />
+              </Field>
+
+              {tipoEntrega === 'domicilio' && (
+                <div className="space-y-3 p-3.5 bg-paper2 border border-line rounded">
+                  <p className="text-[11.5px] text-gold font-semibold flex items-center gap-1.5">
+                    🛵 Datos para la entrega a domicilio
+                  </p>
+                  <Field label={t.customer.address + ' *'}>
+                    <Input
+                      required
+                      value={direccion}
+                      onChange={(e) => setDireccion(e.target.value)}
+                      placeholder={t.customer.addressPlaceholder}
+                    />
+                  </Field>
+                  <Field label={t.customer.phone + ' *'}>
+                    <Input
+                      required
+                      type="tel"
+                      value={telefono}
+                      onChange={(e) => setTelefono(e.target.value)}
+                      placeholder={t.customer.phonePlaceholder}
+                    />
+                  </Field>
+                  <Field label={t.customer.deliveryNotes}>
+                    <Input
+                      value={notasEntrega}
+                      onChange={(e) => setNotasEntrega(e.target.value)}
+                      placeholder={t.customer.deliveryNotesPlaceholder}
+                    />
+                  </Field>
+                </div>
+              )}
+
+              {errorValidacion && (
+                <p className="text-xs text-wine font-semibold bg-wine/10 border border-wine/30 rounded p-2 text-center">
+                  ⚠️ {errorValidacion}
+                </p>
+              )}
+
+              <Btn variant="primary" className="w-full justify-center py-3" disabled={saving} onClick={confirmar}>
+                {saving ? t.customer.confirming : t.customer.confirm}
+              </Btn>
+            </div>
           </>
         )}
       </div>
@@ -160,6 +266,7 @@ function Tracking({ negocio, pedido, productos, onPedidoActualizado, onNuevo }) 
   const idx = ESTADOS.indexOf(pedido.estado)
   const cancelado = pedido.estado === 'Cancelado'
   const puedeModificar = pedido.estado === 'Pendiente'
+  const esDomicilio = pedido.tipo_entrega === 'domicilio'
   const [modal, setModal] = useState(null) // 'editar' | 'cancelar'
   const items = pedido.pedido_items || pedido.items || []
 
@@ -171,8 +278,23 @@ function Tracking({ negocio, pedido, productos, onPedidoActualizado, onNuevo }) 
       <h2 className="font-serif text-2xl font-semibold mt-4 mb-1">Pedido #{pedido.numero || '—'}</h2>
       <p className="text-creamsoft mb-1.5">{negocio.nombre} · <b className="font-mono">{fmt$(pedido.total)}</b></p>
 
+      {/* Resumen de entrega en tracking */}
+      <div className="my-3 p-3 bg-paper border border-line rounded text-xs text-left">
+        <div className="flex items-center gap-1.5 font-semibold text-cream">
+          <span>{esDomicilio ? '🛵 Domicilio' : '🍽️ En local / Para llevar'}</span>
+          <span className="text-creamsoft">· {pedido.cliente}</span>
+        </div>
+        {esDomicilio && (
+          <div className="mt-1.5 text-creamsoft space-y-0.5">
+            {pedido.direccion && <div>📍 <b>Dirección:</b> {pedido.direccion}</div>}
+            {pedido.telefono && <div>📞 <b>Teléfono:</b> {pedido.telefono}</div>}
+            {pedido.notas_entrega && <div className="italic">📝 <b>Indicaciones:</b> "{pedido.notas_entrega}"</div>}
+          </div>
+        )}
+      </div>
+
       {items.length > 0 && (
-        <div className="text-left border border-line rounded-sm mb-5 mt-4 divide-y divide-line">
+        <div className="text-left border border-line rounded-sm mb-5 mt-3 divide-y divide-line">
           {items.map((it, i) => (
             <div key={i} className="px-3.5 py-2.5 text-[13px] flex justify-between">
               <span>

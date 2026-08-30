@@ -1,5 +1,4 @@
-import { app, BrowserWindow } from 'electron'
-import { fileURLToPath } from 'node:url'
+import { app, BrowserWindow, Menu, shell } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -7,7 +6,7 @@ import http from 'node:http'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-const writableAppData = path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Kiosco')
+const writableAppData = path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Kiosko')
 
 app.disableHardwareAcceleration()
 app.setPath('userData', writableAppData)
@@ -43,7 +42,7 @@ function startBuiltAppServer(distDirectory) {
       fs.readFile(targetPath, (error, content) => {
         if (error) {
           response.writeHead(500)
-          response.end('No se pudo cargar Kiosco')
+          response.end('No se pudo cargar Kiosko')
           return
         }
         response.writeHead(200, { 'Content-Type': contentType(targetPath) })
@@ -57,8 +56,11 @@ function startBuiltAppServer(distDirectory) {
 }
 
 function createWindow() {
-  const appIcon = path.join(__dirname, '../public/Kiosko.jpg')
-  const distPath = path.join(__dirname, '../dist/index.html')
+  const webDirectory = path.join(__dirname, '../web-dist')
+  const buildIcon = path.join(__dirname, '../build/icon.ico')
+  const webIcon = path.join(webDirectory, 'icon-512.png')
+  const appIcon = fs.existsSync(buildIcon) ? buildIcon : (fs.existsSync(webIcon) ? webIcon : path.join(webDirectory, 'Kiosko.jpg'))
+  const distPath = path.join(webDirectory, 'index.html')
 
   const win = new BrowserWindow({
     width: 1400,
@@ -66,8 +68,9 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 720,
     backgroundColor: '#151515',
-    title: 'Kiosco',
+    title: 'Kiosko',
     icon: appIcon,
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -78,17 +81,21 @@ function createWindow() {
     win.setIcon(appIcon)
   } catch {}
 
+  const splash = `<html><body style="margin:0;background:#151515;color:#f4e8d0;font-family:Segoe UI,sans-serif;display:grid;place-items:center;height:100vh"><main style="text-align:center"><img src="http://127.0.0.1:0/Kiosko.jpg" style="width:72px;height:72px;border-radius:50%;object-fit:cover;opacity:.9" onerror="this.style.display='none'"><h1 style="font-family:Georgia,serif;font-size:30px;margin:18px 0 8px">Kiosko</h1><p style="margin:0;color:#b9aa91;font-size:14px">Iniciando Kiosko...</p></main></body></html>`
+  win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(splash)}`)
+  win.once('ready-to-show', () => win.show())
+
   win.webContents.on('console-message', (_event, level, message) => {
-    console.log(`[Kiosco renderer ${level}] ${message}`)
+    console.log(`[Kiosko renderer ${level}] ${message}`)
   })
   win.webContents.on('did-fail-load', (_event, errorCode, errorDescription) => {
-    console.error(`[Kiosco] Fallo al cargar: ${errorCode} ${errorDescription}`)
+    console.error(`[Kiosko] Fallo al cargar: ${errorCode} ${errorDescription}`)
   })
   win.webContents.on('render-process-gone', (_event, details) => {
-    console.error(`[Kiosco] El proceso visual terminó: ${details.reason}`)
+    console.error(`[Kiosko] El proceso visual terminó: ${details.reason}`)
   })
 
-  if (fs.existsSync(distPath)) {
+  win.webContents.setWindowOpenHandler(({ url }) => {
     startBuiltAppServer(path.dirname(distPath))
       .then((server) => {
         win.once('closed', () => server.close())
@@ -96,8 +103,8 @@ function createWindow() {
         return win.loadURL(`http://127.0.0.1:${port}/?desktop=1`)
       })
       .catch((error) => {
-        console.error('[Kiosco] No se pudo iniciar el servidor local:', error)
-        win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent('<h1 style="font-family:sans-serif;padding:32px">Kiosco no pudo iniciar</h1><p style="font-family:sans-serif;padding:0 32px">Ejecuta npm run build y vuelve a abrir la aplicación.</p>')}`)
+        console.error('[Kiosko] No se pudo iniciar el servidor local:', error)
+        win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent('<h1 style="font-family:sans-serif;padding:32px">Kiosko no pudo iniciar</h1><p style="font-family:sans-serif;padding:0 32px">Ejecuta npm run build y vuelve a abrir la aplicación.</p>')}`)
       })
   } else {
     win.loadURL('http://localhost:5173/?desktop=1')
@@ -105,6 +112,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
   createWindow()
 
   app.on('activate', () => {

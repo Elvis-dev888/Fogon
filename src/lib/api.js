@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient'
+import { shouldCreateSale } from './orderSales'
 
 /* =========================================================
    NEGOCIOS
@@ -16,14 +17,15 @@ export async function fetchNegocios() {
         const [{ count: productosCount, error: e1 }, { count: pedidosCount, error: e2 }, { data: ventas, error: e3 }] =
           await Promise.all([
             supabase.from('productos').select('id', { count: 'exact', head: true }).eq('negocio_id', n.id),
-            supabase.from('pedidos').select('id', { count: 'exact', head: true }).eq('negocio_id', n.id),
-            supabase.from('ventas').select('total, creado_en').eq('negocio_id', n.id),
+            supabase.from('pedidos').select('id', { count: 'exact', head: true }).eq('negocio_id', n.id).neq('estado', 'Cancelado'),
+            supabase.from('ventas').select('total, creado_en, pedidos(estado)').eq('negocio_id', n.id),
           ])
         if (e1) throw e1
         if (e2) throw e2
         if (e3) throw e3
         const now = new Date()
         const ventasMes = (ventas || [])
+          .filter((v) => (!v.pedidos || v.pedidos.estado !== 'Cancelado'))
           .filter((v) => {
             const d = new Date(v.creado_en)
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
@@ -141,9 +143,33 @@ export async function createIngrediente(negocioId, ingrediente) {
   const { error } = await supabase.from('ingredientes').insert({ negocio_id: negocioId, ...ingrediente })
   if (error) throw error
 }
+export async function updateIngrediente(id, cambios) {
+  const { error } = await supabase.from('ingredientes').update(cambios).eq('id', id)
+  if (error) throw error
+}
+export async function deleteIngrediente(id) {
+  const { error } = await supabase.from('ingredientes').delete().eq('id', id)
+  if (error) throw error
+}
 export async function setIngredienteStock(id, stock) {
   const { error } = await supabase.from('ingredientes').update({ stock }).eq('id', id)
   if (error) throw error
+}
+export async function registrarVentaInventario(negocioId, { ingredienteId, cantidad, precioUnitario, concepto }, stockActual) {
+  const cant = Number(cantidad) || 0
+  const precio = Number(precioUnitario) || 0
+  const total = cant * precio
+  const nuevoStock = Math.max(0, (Number(stockActual) || 0) - cant)
+
+  const { error: e1 } = await supabase.from('ingredientes').update({ stock: nuevoStock }).eq('id', ingredienteId)
+  if (e1) throw e1
+
+  const { error: e2 } = await supabase.from('ingresos').insert({
+    negocio_id: negocioId,
+    concepto: concepto || `Venta de inventario (${cant} und)`,
+    valor: total,
+  })
+  if (e2) throw e2
 }
 
 /* =========================================================
@@ -152,13 +178,13 @@ export async function setIngredienteStock(id, stock) {
 export async function fetchCompras(negocioId) {
   const { data, error } = await supabase
     .from('compras')
-    .select('*, ingredientes(nombre)')
+    .select('*, ingredientes(nombre, unidad)')
     .eq('negocio_id', negocioId)
     .order('creado_en', { ascending: false })
   if (error) throw error
   return data
 }
-export async function registrarCompra(negocioId, { ingredienteId, cantidad, valor }, stockActual) {
+export async function registrarCompra(negocioId, { ingredienteId, cantidad, valor }, stockActual = 0, costoActual = 0) {
   const { error: e1 } = await supabase.from('compras').insert({
     negocio_id: negocioId,
     ingrediente_id: ingredienteId,
@@ -166,9 +192,21 @@ export async function registrarCompra(negocioId, { ingredienteId, cantidad, valo
     valor,
   })
   if (e1) throw e1
+
+  const nuevoStock = Number(stockActual) + Number(cantidad)
+  const costoUnitarioCompra = Number(cantidad) > 0 ? Number(valor) / Number(cantidad) : 0
+  const nuevoCosto = nuevoStock > 0 && Number(costoActual) > 0
+    ? ((Number(stockActual) * Number(costoActual)) + Number(valor)) / nuevoStock
+    : costoUnitarioCompra
+
+  const updates = { stock: nuevoStock }
+  if (costoUnitarioCompra > 0) {
+    updates.costo_unitario = Math.round(nuevoCosto * 100) / 100
+  }
+
   const { error: e2 } = await supabase
     .from('ingredientes')
-    .update({ stock: stockActual + cantidad })
+    .update(updates)
     .eq('id', ingredienteId)
   if (e2) throw e2
 }
@@ -186,10 +224,19 @@ export async function fetchPedidos(negocioId) {
   return data
 }
 
-export async function crearPedido(negocioId, { cliente, items, total }) {
+export async function crearPedido(negocioId, { cliente, items, total, tipo_entrega, direccion, telefono, notas_entrega }) {
   const { data: pedido, error: e1 } = await supabase
     .from('pedidos')
-    .insert({ negocio_id: negocioId, cliente, total, estado: 'Pendiente' })
+    .insert({
+      negocio_id: negocioId,
+      cliente: cliente || 'Cliente',
+      total,
+      estado: 'Pendiente',
+      tipo_entrega: tipo_entrega || 'local',
+      direccion: direccion ? direccion.trim() : '',
+      telefono: telefono ? telefono.trim() : '',
+      notas_entrega: notas_entrega ? notas_entrega.trim() : '',
+    })
     .select()
     .single()
   if (e1) throw e1
@@ -206,18 +253,38 @@ export async function crearPedido(negocioId, { cliente, items, total }) {
   const { error: e2 } = await supabase.from('pedido_items').insert(itemsPayload)
   if (e2) throw e2
 
-  // La venta se genera automáticamente al confirmar el pedido
-  const { error: e3 } = await supabase.from('ventas').insert({
-    negocio_id: negocioId,
-    pedido_id: pedido.id,
-    total,
-  })
-  if (e3) throw e3
-
   return pedido
 }
 
 export async function avanzarEstadoPedido(pedidoId, nuevoEstado) {
+  const { data: pedidoActual, error: ePedido } = await supabase
+    .from('pedidos')
+    .select('estado, total, negocio_id')
+    .eq('id', pedidoId)
+    .single()
+
+  if (ePedido) throw ePedido
+
+  if (shouldCreateSale(pedidoActual?.estado, nuevoEstado)) {
+    const { data: ventaExistente } = await supabase
+      .from('ventas')
+      .select('id')
+      .eq('pedido_id', pedidoId)
+      .maybeSingle()
+
+    if (!ventaExistente) {
+      const { error: e3 } = await supabase.from('ventas').insert({
+        negocio_id: pedidoActual.negocio_id,
+        pedido_id: pedidoId,
+        total: pedidoActual.total,
+      })
+      if (e3) throw e3
+    }
+  } else if (nuevoEstado === 'Cancelado') {
+    // Si se cancela un pedido que ya tenía venta, borrar la venta de inmediato
+    await supabase.from('ventas').delete().eq('pedido_id', pedidoId)
+  }
+
   const { error } = await supabase.from('pedidos').update({ estado: nuevoEstado }).eq('id', pedidoId)
   if (error) throw error
 }
@@ -300,11 +367,12 @@ export function suscribirsePedido(pedidoId, onChange) {
 export async function fetchVentas(negocioId) {
   const { data, error } = await supabase
     .from('ventas')
-    .select('*')
+    .select('*, pedidos(id, estado, numero, cliente, pedido_items(*))')
     .eq('negocio_id', negocioId)
     .order('creado_en', { ascending: false })
   if (error) throw error
-  return data
+  // Asegurar que ninguna venta de un pedido cancelado sea devuelta o sumada
+  return (data || []).filter((v) => !v.pedidos || v.pedidos.estado !== 'Cancelado')
 }
 
 /* =========================================================
@@ -327,6 +395,10 @@ export async function updateTrabajador(id, cambios) {
   const { error } = await supabase.from('trabajadores').update(cambios).eq('id', id)
   if (error) throw error
 }
+export async function deleteTrabajador(id) {
+  const { error } = await supabase.from('trabajadores').delete().eq('id', id)
+  if (error) throw error
+}
 export async function toggleTrabajadorEstado(trabajador) {
   const nuevoEstado = trabajador.estado === 'Activo' ? 'Inactivo' : 'Activo'
   const { error } = await supabase.from('trabajadores').update({ estado: nuevoEstado }).eq('id', trabajador.id)
@@ -334,6 +406,10 @@ export async function toggleTrabajadorEstado(trabajador) {
 }
 export async function registrarPago(trabajadorId, negocioId, { periodo, valor }) {
   const { error } = await supabase.from('pagos').insert({ trabajador_id: trabajadorId, negocio_id: negocioId, periodo, valor })
+  if (error) throw error
+}
+export async function deletePago(id) {
+  const { error } = await supabase.from('pagos').delete().eq('id', id)
   if (error) throw error
 }
 
@@ -354,7 +430,60 @@ export async function createIngreso(negocioId, { concepto, valor }) {
   const { error } = await supabase.from('ingresos').insert({ negocio_id: negocioId, concepto, valor })
   if (error) throw error
 }
+export async function deleteIngreso(id) {
+  const { error } = await supabase.from('ingresos').delete().eq('id', id)
+  if (error) throw error
+}
 export async function createEgreso(negocioId, { concepto, valor }) {
   const { error } = await supabase.from('egresos').insert({ negocio_id: negocioId, concepto, valor })
+  if (error) throw error
+}
+export async function deleteEgreso(id) {
+  const { error } = await supabase.from('egresos').delete().eq('id', id)
+  if (error) throw error
+}
+export async function deleteCompra(id) {
+  const { error } = await supabase.from('compras').delete().eq('id', id)
+  if (error) throw error
+}
+
+/* =========================================================
+   SUGERENCIAS Y FEEDBACK (Para Superadmin)
+   ========================================================= */
+export async function enviarSugerencia({ negocioId, negocioNombre, usuarioEmail, tipo, titulo, mensaje }) {
+  const { error } = await supabase.from('sugerencias').insert({
+    negocio_id: negocioId || null,
+    negocio_nombre: negocioNombre || '',
+    usuario_email: usuarioEmail || '',
+    tipo: tipo || 'idea',
+    titulo: titulo ? titulo.trim() : '',
+    mensaje: mensaje.trim(),
+    estado: 'Pendiente',
+  })
+  if (error) throw error
+}
+
+export async function fetchSugerencias() {
+  const { data, error } = await supabase
+    .from('sugerencias')
+    .select('*')
+    .order('creado_en', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function actualizarEstadoSugerencia(id, nuevoEstado) {
+  const { error } = await supabase
+    .from('sugerencias')
+    .update({ estado: nuevoEstado })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function eliminarSugerencia(id) {
+  const { error } = await supabase
+    .from('sugerencias')
+    .delete()
+    .eq('id', id)
   if (error) throw error
 }

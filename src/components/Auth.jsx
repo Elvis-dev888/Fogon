@@ -319,12 +319,24 @@ export function CrearNegocioForm({ onCreated, notify }) {
 function FormNegocioNuevo({ onCreated, notify, onVolver }) {
   const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
+  const [modoOperacion, setModoOperacion] = useState('catalogo')
   const [tipo, setTipo] = useState('Comidas rápidas')
   const [descripcion, setDescripcion] = useState('')
   const [slogan, setSlogan] = useState('')
   const [emoji, setEmoji] = useState('🍴')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  function seleccionarModo(modo) {
+    setModoOperacion(modo)
+    if (modo === 'inventario') {
+      if (emoji === '🍴') setEmoji('📦')
+      if (tipo === 'Comidas rápidas') setTipo('Tienda / Abarrotes')
+    } else {
+      if (emoji === '📦') setEmoji('🍴')
+      if (tipo === 'Tienda / Abarrotes') setTipo('Comidas rápidas')
+    }
+  }
 
   async function submit(e) {
     e.preventDefault()
@@ -337,6 +349,7 @@ function FormNegocioNuevo({ onCreated, notify, onVolver }) {
         emoji,
         tipo,
         descripcion: descripcion.trim(),
+        modoOperacion,
       })
       notify(t.businessSetup.businessCreated.replace('{business}', negocio.nombre))
       onCreated(negocio)
@@ -348,30 +361,117 @@ function FormNegocioNuevo({ onCreated, notify, onVolver }) {
   }
 
   return (
-    <div className="max-w-[460px] mx-auto mt-10">
+    <div className="max-w-[500px] mx-auto mt-8">
       <h2 className="font-serif text-2xl font-semibold mb-1 text-center">{t.businessSetup.title}</h2>
-      <p className="text-creamsoft text-sm text-center mb-6">{t.businessSetup.description}</p>
+      <p className="text-creamsoft text-sm text-center mb-5">{t.businessSetup.description}</p>
       <Card className="p-6">
         <form onSubmit={submit}>
-          <Field label={t.businessSetup.name}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Fritanga La 15" /></Field>
+          <div className="mb-5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-creamsoft mb-2">
+              ¿Qué tipo de negocio vas a registrar?
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => seleccionarModo('catalogo')}
+                className={`p-3.5 rounded-lg border text-left transition-all ${
+                  modoOperacion === 'catalogo'
+                    ? 'border-gold bg-gold/10 shadow-[0_0_15px_rgba(199,154,60,0.15)]'
+                    : 'border-line bg-paper hover:border-creamsoft/50'
+                }`}
+              >
+                <div className="text-2xl mb-1.5">🍔</div>
+                <div className="font-serif font-bold text-[14px] text-cream">Menú y pedidos</div>
+                <div className="text-[11px] text-creamsoft mt-1 leading-tight">
+                  Para restaurantes, comidas y ventas con catálogo público.
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => seleccionarModo('inventario')}
+                className={`p-3.5 rounded-lg border text-left transition-all ${
+                  modoOperacion === 'inventario'
+                    ? 'border-gold bg-gold/10 shadow-[0_0_15px_rgba(199,154,60,0.15)]'
+                    : 'border-line bg-paper hover:border-creamsoft/50'
+                }`}
+              >
+                <div className="text-2xl mb-1.5">📦</div>
+                <div className="font-serif font-bold text-[14px] text-cream">Solo inventario</div>
+                <div className="text-[11px] text-creamsoft mt-1 leading-tight">
+                  Para bodegas, tiendas, ferreterías y control interno.
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <Field label={t.businessSetup.name}>
+            <Input
+              required
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder={modoOperacion === 'inventario' ? 'Ej: Distribuidora El Paisa, Ferretería Central' : 'Ej: Fritanga La 15, Burger House'}
+            />
+          </Field>
+
           <Field label={t.businessSetup.type}>
             <Select value={tipo} onChange={(e) => setTipo(e.target.value)}>
-              <option>Comidas rápidas</option>
-              <option>Fritanga</option>
-              <option>Pizzería</option>
-              <option>Arepas y asados</option>
-              <option>Restaurante</option>
-              <option>Postres y panadería</option>
-              <option>Otro</option>
+              {modoOperacion === 'inventario' ? (
+                <>
+                  <option>Tienda / Abarrotes</option>
+                  <option>Bodega / Distribuidora</option>
+                  <option>Ferretería</option>
+                  <option>Ropa y calzado</option>
+                  <option>Papelería y miscelánea</option>
+                  <option>Repuestos y taller</option>
+                  <option>Servicios / PyME</option>
+                  <option>Otro</option>
+                </>
+              ) : (
+                <>
+                  <option>Comidas rápidas</option>
+                  <option>Fritanga</option>
+                  <option>Pizzería</option>
+                  <option>Arepas y asados</option>
+                  <option>Restaurante</option>
+                  <option>Postres y panadería</option>
+                  <option>Cafetería / Bar</option>
+                  <option>Otro</option>
+                </>
+              )}
             </Select>
           </Field>
+
           <Field label={t.businessSetup.descriptionLabel}>
-            <Textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej: Vendemos hamburguesas, arepas y bebidas en el barrio..." />
+            <Textarea
+              rows={3}
+              value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder={
+                modoOperacion === 'inventario'
+                  ? 'Ej: Venta de artículos al por mayor y detal, existencias y distribución...'
+                  : 'Ej: Vendemos hamburguesas, arepas y bebidas en el barrio...'
+              }
+            />
           </Field>
-          <Field label={t.businessSetup.slogan}><Input value={slogan} onChange={(e) => setSlogan(e.target.value)} placeholder="Ej: Fritos con actitud" /></Field>
-          <Field label={t.businessSetup.icon}><Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} /></Field>
+
+          <div className="grid grid-cols-[1fr_80px] gap-3">
+            <Field label={t.businessSetup.slogan}>
+              <Input
+                value={slogan}
+                onChange={(e) => setSlogan(e.target.value)}
+                placeholder={modoOperacion === 'inventario' ? 'Ej: Variedad y economía' : 'Ej: Fritos con actitud'}
+              />
+            </Field>
+            <Field label={t.businessSetup.icon}>
+              <Input maxLength={2} value={emoji} onChange={(e) => setEmoji(e.target.value)} className="text-center text-lg" />
+            </Field>
+          </div>
+
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
-          <Btn variant="primary" className="w-full justify-center" disabled={loading}>{loading ? t.businessSetup.creating : t.businessSetup.create}</Btn>
+          <Btn variant="primary" className="w-full justify-center mt-2" disabled={loading}>
+            {loading ? t.businessSetup.creating : t.businessSetup.create}
+          </Btn>
         </form>
       </Card>
       {onVolver && (

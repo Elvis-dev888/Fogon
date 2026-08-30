@@ -24,13 +24,14 @@ export async function fetchPerfil(userId) {
 }
 
 // Solo funciona UNA vez por cuenta (lo controla la función en la base de datos)
-export async function crearNegocioPropio({ nombre, slogan, emoji, tipo, descripcion }) {
+export async function crearNegocioPropio({ nombre, slogan, emoji, tipo, descripcion, modoOperacion }) {
   const { data, error } = await supabase.rpc('crear_negocio_propio', {
     p_nombre: nombre,
     p_slogan: slogan,
     p_emoji: emoji,
     p_tipo: tipo || null,
     p_descripcion: descripcion || null,
+    p_modo_operacion: modoOperacion || 'catalogo',
   })
   if (error) throw error
   return data

@@ -1,5 +1,11 @@
 node_modules
 dist
+web-dist
+release
 .env
 .env.local
 .DS_Store
+.idea
+android/.gradle
+android/app/build
+
