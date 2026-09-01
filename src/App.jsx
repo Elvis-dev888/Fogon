@@ -69,6 +69,17 @@ export default function App() {
     loadNegocios()
   }, [loadNegocios])
 
+  // Detección de enlace directo a negocio (ej: https://administraciondenegocios.netlify.app/?negocio=ID o ?n=ID)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const directNegocio = params.get('negocio') || params.get('n')
+    if (directNegocio) {
+      setNegocioId(directNegocio)
+      setRole('cliente')
+    }
+  }, [])
+
   // Sesión de Supabase Auth: se revisa al cargar y se escucha cualquier cambio (login/logout)
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))

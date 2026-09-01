@@ -18,7 +18,7 @@ const estadoTone = (e) => (
 )
 
 /* ---------------- Mi negocio (logo + datos básicos) ---------------- */
-export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
+export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMenu }) {
   const [nombre, setNombre] = useState(negocio.nombre || '')
   const [slogan, setSlogan] = useState(negocio.slogan || '')
   const [descripcion, setDescripcion] = useState(negocio.descripcion || '')
@@ -27,6 +27,7 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
   const [archivo, setArchivo] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [subiendo, setSubiendo] = useState(false)
+  const esModoInventario = modoOperacion === 'inventario'
 
   function onPickFile(e) {
     const file = e.target.files?.[0]
@@ -57,6 +58,23 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated }) {
   return (
     <div>
       <SectionTitle title="Mi negocio" sub={modoOperacion === 'inventario' ? 'Datos y configuración de tu espacio de inventario.' : 'El logo y los datos que ven tus clientes en el catálogo.'} />
+
+      {!esModoInventario && onOpenShareMenu && (
+        <div className="mb-6 p-4 rounded bg-paper2 border border-gold/40 flex items-center justify-between gap-3 flex-wrap max-w-[520px]">
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-gold flex items-center gap-1.5">
+              🔗 Menú Digital & Código QR
+            </span>
+            <p className="text-xs text-cream mt-0.5 font-medium">
+              Enlace público y código QR para tus clientes
+            </p>
+          </div>
+          <Btn size="sm" variant="avocado" onClick={onOpenShareMenu}>
+            📱 Abrir y Compartir
+          </Btn>
+        </div>
+      )}
+
       <Card className="p-6 max-w-[520px]">
         <form onSubmit={guardar}>
           <Field label="Logo del negocio">
@@ -146,7 +164,7 @@ export function TabMiSuscripcion({ negocio }) {
 }
 
 /* ---------------- Dashboard ---------------- */
-export function TabDashboard({ negocio, data }) {
+export function TabDashboard({ negocio, data, onOpenShareMenu }) {
   const esModoInventario = negocio.modo_operacion === 'inventario'
   const ventasMes = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
   const ingresosMes = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + i.valor, 0)
@@ -161,6 +179,24 @@ export function TabDashboard({ negocio, data }) {
   return (
     <div>
       <SectionTitle title={esModoInventario ? 'Resumen de inventario' : 'Resumen del mes'} sub={new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })} />
+
+      {!esModoInventario && onOpenShareMenu && (
+        <div className="mb-6 p-4 rounded bg-paper2 border border-gold/30 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">📱</span>
+            <div>
+              <h4 className="font-serif text-sm font-semibold text-cream">Menú Digital & QR para tus clientes</h4>
+              <p className="text-xs text-creamsoft">
+                Tus clientes pueden ver tu catálogo en vivo y hacer pedidos desde su celular.
+              </p>
+            </div>
+          </div>
+          <Btn size="sm" variant="avocado" onClick={onOpenShareMenu}>
+            🔗 Ver enlace y Código QR
+          </Btn>
+        </div>
+      )}
+
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
         <StatCard label={esModoInventario ? 'Ingresos registrados' : 'Ventas'} value={fmt$(entradasMes)} tone="gold" />
         <StatCard label="Compras" value={fmt$(comprasMes)} tone="champagne" />

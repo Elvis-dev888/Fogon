@@ -33,3 +33,4 @@ end;
 $$;
 
 grant execute on function eliminar_negocio_superadmin(uuid) to authenticated;
+

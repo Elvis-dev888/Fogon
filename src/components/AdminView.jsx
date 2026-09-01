@@ -9,6 +9,7 @@ import {
   TabMiSuscripcion,
 } from './AdminTabs'
 import { FeedbackModal } from './FeedbackModal'
+import { ShareMenuModal } from './ShareMenuModal'
 import { supabase } from '../lib/supabaseClient'
 import { playPedidoNuevo, fmt$ } from '../lib/helpers'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
@@ -26,6 +27,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [mostrarFeedback, setMostrarFeedback] = useState(false)
+  const [mostrarShareMenu, setMostrarShareMenu] = useState(false)
   const esModoInventario = negocio.modo_operacion === 'inventario'
 
   const reload = useCallback(async () => {
@@ -83,7 +85,14 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
     return <p className="text-creamsoft text-sm">{t.loading} {negocio.nombre}…</p>
   }
 
-  const props = { negocio, data, reload, notify, onNegocioUpdated }
+  const props = {
+    negocio,
+    data,
+    reload,
+    notify,
+    onNegocioUpdated,
+    onOpenShareMenu: () => setMostrarShareMenu(true),
+  }
   const tabsVisibles = esModoInventario
     ? TABS.filter(([key]) => !['productos', 'categorias', 'pedidos', 'ventas'].includes(key))
     : TABS
@@ -99,7 +108,17 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
           )}
           <span className="text-gold font-serif font-semibold text-base truncate">{negocio.nombre}</span>
         </div>
-        {!esModoInventario && <CodigoEmpleado negocioId={negocio.id} notify={notify} />}
+        {!esModoInventario && (
+          <>
+            <button
+              onClick={() => setMostrarShareMenu(true)}
+              className="mb-2 text-left px-3 py-2 rounded-sm text-[12.5px] font-semibold text-gold bg-gold/10 hover:bg-gold/20 transition-colors flex items-center gap-2 border border-gold/30"
+            >
+              🔗 Menú Digital / QR
+            </button>
+            <CodigoEmpleado negocioId={negocio.id} notify={notify} />
+          </>
+        )}
         {tabsVisibles.map(([k, icon]) => {
           const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length : 0
           return (
@@ -148,6 +167,9 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
       </div>
       {mostrarFeedback && (
         <FeedbackModal negocio={negocio} onClose={() => setMostrarFeedback(false)} notify={notify} />
+      )}
+      {mostrarShareMenu && (
+        <ShareMenuModal negocio={negocio} onClose={() => setMostrarShareMenu(false)} notify={notify} />
       )}
     </div>
   )
