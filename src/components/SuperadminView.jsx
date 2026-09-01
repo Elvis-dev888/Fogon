@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Btn, StatCard, Pill, NegocioLogo, Card, Empty, Select } from './ui'
+import { Btn, StatCard, Pill, NegocioLogo, Card, Empty, Select, Modal } from './ui'
 import { fmt$, fmtDateLong } from '../lib/helpers'
-import { toggleNegocioEstado, fetchSugerencias, actualizarEstadoSugerencia, eliminarSugerencia } from '../lib/api'
+import { toggleNegocioEstado, eliminarNegocio, fetchSugerencias, actualizarEstadoSugerencia, eliminarSugerencia } from '../lib/api'
 import { useLanguage } from '../lib/i18n.jsx'
 
 export default function SuperadminView({ negocios, onChanged, notify }) {
@@ -9,6 +9,8 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
   const [seccion, setSeccion] = useState('negocios') // 'negocios' | 'sugerencias'
   const [sugerencias, setSugerencias] = useState([])
   const [cargandoSugerencias, setCargandoSugerencias] = useState(false)
+  const [negocioAEliminar, setNegocioAEliminar] = useState(null)
+  const [eliminando, setEliminando] = useState(false)
 
   const totalVentasMes = negocios.reduce((s, n) => s + (n.ventasMes || 0), 0)
   const totalPedidos = negocios.reduce((s, n) => s + (n.pedidosCount || 0), 0)
@@ -33,6 +35,21 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
     await toggleNegocioEstado(n)
     notify(`${n.nombre} ahora está ${n.estado === 'Activo' ? 'pausado' : 'activo'}`)
     onChanged()
+  }
+
+  async function handleConfirmarEliminacion() {
+    if (!negocioAEliminar) return
+    setEliminando(true)
+    try {
+      await eliminarNegocio(negocioAEliminar.id)
+      notify(`Negocio "${negocioAEliminar.nombre}" eliminado exitosamente`)
+      setNegocioAEliminar(null)
+      onChanged()
+    } catch (err) {
+      notify('Error al eliminar negocio: ' + (err.message || String(err)))
+    } finally {
+      setEliminando(false)
+    }
   }
 
   async function handleCambiarEstadoSugerencia(id, nuevoEstado) {
@@ -107,7 +124,12 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
               {negocios.map((n) => (
-                <NegocioCard key={n.id} n={n} onToggle={() => handleToggle(n)} />
+                <NegocioCard
+                  key={n.id}
+                  n={n}
+                  onToggle={() => handleToggle(n)}
+                  onDelete={() => setNegocioAEliminar(n)}
+                />
               ))}
             </div>
           )}
@@ -149,16 +171,14 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
                         {s.tipo === 'error' && '🐞 Reporte de error'}
                         {s.tipo === 'otro' && '💬 Comentario'}
                       </span>
-                      <h4 className="font-serif text-base font-semibold text-cream">
-                        {s.titulo || 'Sin título'}
-                      </h4>
+                      <h4 className="font-serif text-base font-semibold text-cream">{s.titulo}</h4>
                     </div>
 
                     <div className="flex items-center gap-2">
                       <Select
                         value={s.estado}
                         onChange={(e) => handleCambiarEstadoSugerencia(s.id, e.target.value)}
-                        className="!w-auto !py-1 text-xs"
+                        className="text-xs py-1 px-2 font-semibold"
                       >
                         <option value="Pendiente">⏳ Pendiente</option>
                         <option value="En revisión">🔍 En revisión</option>
@@ -167,15 +187,15 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
                       </Select>
                       <button
                         onClick={() => handleEliminarSugerencia(s.id)}
-                        className="text-creamsoft hover:text-wine text-sm p-1.5 rounded hover:bg-wine/10"
-                        title="Eliminar del buzón"
+                        className="text-creamsoft hover:text-wine text-sm p-1 transition-colors"
+                        title="Eliminar sugerencia"
                       >
                         🗑️
                       </button>
                     </div>
                   </div>
 
-                  <p className="text-[13.5px] text-cream whitespace-pre-wrap leading-relaxed mb-4">
+                  <p className="text-creamsoft text-[13px] leading-relaxed mb-3 whitespace-pre-wrap">
                     {s.mensaje}
                   </p>
 
@@ -193,37 +213,80 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
           )}
         </div>
       )}
+
+      {/* Modal de confirmación de eliminación de negocio */}
+      {negocioAEliminar && (
+        <Modal onClose={() => !eliminando && setNegocioAEliminar(null)}>
+          <div className="space-y-4 text-left">
+            <div className="border-b border-line pb-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-wine">⚠️ Acción irreversible</span>
+              <h3 className="font-serif text-xl font-semibold text-cream mt-1">
+                ¿Eliminar negocio "{negocioAEliminar.nombre}"?
+              </h3>
+            </div>
+
+            <p className="text-creamsoft text-sm leading-relaxed">
+              Esta acción borrará permanentemente el negocio <b className="text-cream">{negocioAEliminar.nombre}</b> de la plataforma Kiosko, junto con:
+            </p>
+
+            <ul className="text-xs text-creamsoft space-y-1.5 list-disc list-inside bg-paper2 p-3 rounded border border-line">
+              <li>Todos sus productos y categorías ({negocioAEliminar.productosCount || 0} productos).</li>
+              <li>Todo su inventario y registro de compras.</li>
+              <li>Historial de pedidos y ventas registradas ({negocioAEliminar.pedidosCount || 0} pedidos).</li>
+              <li>Movimientos de finanzas y cuentas de trabajadores vinculados.</li>
+            </ul>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-line">
+              <Btn variant="ghost" disabled={eliminando} onClick={() => setNegocioAEliminar(null)}>
+                Cancelar
+              </Btn>
+              <Btn variant="danger" disabled={eliminando} onClick={handleConfirmarEliminacion}>
+                {eliminando ? 'Eliminando negocio…' : '🗑️ Sí, eliminar permanentemente'}
+              </Btn>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
 
-function NegocioCard({ n, onToggle }) {
+function NegocioCard({ n, onToggle, onDelete }) {
   return (
-    <div className="rounded border border-line bg-paper2 overflow-hidden">
-      <div className="h-[74px] bg-gradient-to-br from-paper3 to-paper2 border-b border-line relative overflow-hidden">
-        {n.logo_url
-          ? <img src={n.logo_url} alt={n.nombre} className="w-full h-full object-cover" />
-          : <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(199,154,60,.18)_0%,transparent_60%)]" />}
+    <div className="rounded border border-line bg-paper2 overflow-hidden flex flex-col justify-between">
+      <div>
+        <div className="h-[74px] bg-gradient-to-br from-paper3 to-paper2 border-b border-line relative overflow-hidden">
+          {n.logo_url
+            ? <img src={n.logo_url} alt={n.nombre} className="w-full h-full object-cover" />
+            : <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(199,154,60,.18)_0%,transparent_60%)]" />}
+        </div>
+        <div className="p-5 pb-3">
+          <div className="mb-2.5">
+            <Pill tone={n.estado === 'Activo' ? 'activo' : 'pausado'}>{n.estado}</Pill>
+          </div>
+          <h3 className="font-serif text-lg font-semibold mb-0.5 flex items-center gap-1.5">
+            <NegocioLogo negocio={n} size={20} /> {n.nombre}
+          </h3>
+          <p className="text-[12.5px] text-creamsoft mb-3">{n.slogan}</p>
+          <div className="flex gap-4 mb-2 font-mono text-[11.5px] text-creamsoft">
+            <div>
+              <b className="block font-serif text-base text-cream font-semibold">{n.productosCount ?? 0}</b>productos
+            </div>
+            <div>
+              <b className="block font-serif text-base text-cream font-semibold">{fmt$(n.ventasMes || 0)}</b>ventas/mes
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="p-5">
-        <div className="mb-2.5">
-          <Pill tone={n.estado === 'Activo' ? 'activo' : 'pausado'}>{n.estado}</Pill>
+      <div className="p-5 pt-0">
+        <div className="flex items-center justify-between gap-2 pt-3 border-t border-line">
+          <Btn size="sm" variant="ghost" onClick={onToggle}>
+            {n.estado === 'Activo' ? 'Pausar' : 'Activar'}
+          </Btn>
+          <Btn size="sm" variant="danger" onClick={onDelete} title="Eliminar negocio de la plataforma">
+            🗑️ Eliminar
+          </Btn>
         </div>
-        <h3 className="font-serif text-lg font-semibold mb-0.5 flex items-center gap-1.5">
-          <NegocioLogo negocio={n} size={20} /> {n.nombre}
-        </h3>
-        <p className="text-[12.5px] text-creamsoft mb-3">{n.slogan}</p>
-        <div className="flex gap-4 mb-4 font-mono text-[11.5px] text-creamsoft">
-          <div>
-            <b className="block font-serif text-base text-cream font-semibold">{n.productosCount ?? 0}</b>productos
-          </div>
-          <div>
-            <b className="block font-serif text-base text-cream font-semibold">{fmt$(n.ventasMes || 0)}</b>ventas/mes
-          </div>
-        </div>
-        <Btn size="sm" variant="ghost" onClick={onToggle}>
-          {n.estado === 'Activo' ? 'Pausar' : 'Activar'}
-        </Btn>
       </div>
     </div>
   )

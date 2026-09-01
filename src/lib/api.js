@@ -57,6 +57,19 @@ export async function toggleNegocioEstado(negocio) {
   if (error) throw error
 }
 
+export async function eliminarNegocio(id) {
+  // 1. Desvincular perfiles asociados para evitar inconsistencias
+  await supabase.from('perfiles').update({ negocio_id: null, rol: 'pendiente' }).eq('negocio_id', id)
+  
+  // 2. Intentar RPC de borrado atómico
+  const { error: rpcError } = await supabase.rpc('eliminar_negocio_superadmin', { p_negocio_id: id })
+  if (rpcError) {
+    // 3. Fallback directo a delete sobre la tabla negocios
+    const { error: directError } = await supabase.from('negocios').delete().eq('id', id)
+    if (directError) throw directError
+  }
+}
+
 export async function updateNegocio(id, cambios) {
   const { error } = await supabase.from('negocios').update(cambios).eq('id', id)
   if (error) throw error
