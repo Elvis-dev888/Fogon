@@ -117,13 +117,16 @@ export function TabMiSuscripcion({ negocio }) {
 
   return (
     <div>
-      <SectionTitle title="Mi suscripción" sub="Se deja preparada la monetización sin bloquear funciones durante los primeros 6 meses." />
+      <SectionTitle
+        title="Mi suscripción"
+        sub="Período de prueba de 6 meses con acceso completo. Sin cobros automáticos ni tarjetas requeridas durante el trial."
+      />
       <Card className="p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-1">Plan actual</p>
             <h3 className="font-serif text-2xl text-gold">{summary.plan}</h3>
-            <p className="text-sm text-creamsoft mt-1">Acceso {summary.accessGranted ? 'completo' : 'pendiente de suscripción'}</p>
+            <p className="text-sm text-creamsoft mt-1">Acceso {summary.accessGranted ? 'completo a todas las funciones' : 'pendiente de suscripción'}</p>
           </div>
           <Pill tone={estadoTone}>{summary.statusLabel}</Pill>
         </div>
@@ -137,17 +140,21 @@ export function TabMiSuscripcion({ negocio }) {
         <div className="mt-6 border border-line rounded p-4 bg-paper">
           {summary.isTrialActive ? (
             <>
-              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Período gratuito</p>
-              <p className="font-semibold text-cream">🎉 Estás disfrutando de Kiosko Pro gratis.</p>
-              <p className="text-sm text-creamsoft mt-2">Tienes acceso completo durante tu período de prueba. Te quedan {formatDaysLeft(summary.remainingDays)}.</p>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Período de prueba gratuito (6 meses)</p>
+              <p className="font-semibold text-cream">🎉 Estás disfrutando de Kiosko Pro gratis con acceso total.</p>
+              <p className="text-sm text-creamsoft mt-2">
+                Tienes acceso completo a todas las funciones durante tu período de prueba de 180 días. Te quedan {formatDaysLeft(summary.remainingDays)}. No se aplican cargos automáticos.
+              </p>
             </>
           ) : summary.isTrialExpired ? (
             <>
-              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Próxima renovación</p>
-              <p className="font-semibold text-wine">🔴 Tu período gratuito ha finalizado.</p>
-              <p className="text-sm text-creamsoft mt-2">Continúa utilizando todas las herramientas mediante una suscripción mensual de US$4.99. La funcionalidad sigue activa por ahora y la monetización se habilitará cuando corresponda.</p>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Renovación de suscripción</p>
+              <p className="font-semibold text-wine">🔴 Tu período gratuito de 6 meses ha finalizado.</p>
+              <p className="text-sm text-creamsoft mt-2">
+                Para continuar utilizando todas las herramientas avanzadas, puedes suscribirte a Kiosko Pro por $4.99 USD/mes.
+              </p>
               <div className="mt-4">
-                <Btn variant="primary" className="justify-center">Actualizar a Kiosko Pro</Btn>
+                <Btn variant="primary" className="justify-center">Suscribirme a Kiosko Pro</Btn>
               </div>
             </>
           ) : (

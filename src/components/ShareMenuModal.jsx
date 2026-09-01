@@ -191,3 +191,4 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
     </Modal>
   )
 }
+

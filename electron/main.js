@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu, shell } from 'electron'
+import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
@@ -96,6 +97,14 @@ function createWindow() {
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http:') || url.startsWith('https:') || url.startsWith('mailto:') || url.startsWith('tel:')) {
+      shell.openExternal(url)
+      return { action: 'deny' }
+    }
+    return { action: 'allow' }
+  })
+
+  if (fs.existsSync(distPath)) {
     startBuiltAppServer(path.dirname(distPath))
       .then((server) => {
         win.once('closed', () => server.close())
