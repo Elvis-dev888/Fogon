@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Kiosko — Documentación Técnica, Funcional y de Arquitectura</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 20mm 15mm 20mm 15mm;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+      line-height: 1.6;
+      background: #ffffff;
+      font-size: 13px;
+    }
+    .header-box {
+      border-bottom: 2px solid #b8860b;
+      padding-bottom: 15px;
+      margin-bottom: 25px;
+    }
+    h1 {
+      font-size: 26px;
+      color: #b8860b;
+      margin: 0 0 6px;
+      font-family: Georgia, serif;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #555;
+      margin: 0;
+    }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      background: #fdfbf7;
+      border: 1px solid #ebdcb9;
+      padding: 12px 16px;
+      border-radius: 6px;
+      margin-top: 12px;
+      font-size: 12px;
+    }
+    h2 {
+      font-size: 18px;
+      color: #111;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 4px;
+      margin-top: 28px;
+      margin-bottom: 12px;
+      font-family: Georgia, serif;
+    }
+    h3 {
+      font-size: 14px;
+      color: #333;
+      margin-top: 16px;
+      margin-bottom: 6px;
+    }
+    p, ul {
+      margin-top: 0;
+      margin-bottom: 10px;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    li {
+      margin-bottom: 4px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+      font-size: 12px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px 10px;
+      text-align: left;
+    }
+    th {
+      background-color: #f8f6f0;
+      color: #444;
+      font-weight: 600;
+    }
+    .card {
+      background: #fafafa;
+      border: 1px solid #eaeaea;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 12px;
+    }
+    .formula-box {
+      background: #f7f9fc;
+      border-left: 4px solid #b8860b;
+      padding: 10px 14px;
+      margin: 10px 0;
+      font-family: "Courier New", Courier, monospace;
+      font-size: 12px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      background: #fdf3d8;
+      color: #8c6d1f;
+    }
+    .tree-box {
+      background: #222;
+      color: #eee;
+      padding: 12px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      line-height: 1.4;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-box">
+    <h1>📘 KIOSKO — Documentación Técnica, Funcional y de Arquitectura</h1>
+    <p class="subtitle">Manual maestro y especificación integral de la plataforma comercial y gastronómica.</p>
+    <div class="meta-grid">
+      <div><b>Versión del Ecosistema:</b> 0.1.7</div>
+      <div><b>Estado:</b> Producción Web / Store / Android</div>
+      <div><b>Contacto oficial:</b> kkiosko440@gmail.com</div>
+      <div><b>URL Producción:</b> https://administraciondenegocios.netlify.app/</div>
+    </div>
+  </div>
+
+  <h2>1. 🌟 Resumen Ejecutivo y Propósito</h2>
+  <p><b>Kiosko</b> es una plataforma tecnológica multinegocio de alto rendimiento diseñada para resolver la operación, pedidos, inventario comercial y control contable en dos modalidades:</p>
+  <ul>
+    <li><b>Sector Gastronómico y Servicios (Modo Menú y Pedidos):</b> Restaurantes, cafeterías, pizzerías y barberías con catálogo digital, adiciones personalizadas, recepción de pedidos con timbre sonoro en vivo y despacho.</li>
+    <li><b>Sector Comercial, Bodegas y PyMEs (Modo Solo Inventario):</b> Abarrotes, distribuidoras y misceláneas con control estricto de existencias, cálculo automático de costo promedio ponderado, margen de ganancia comercial (% de utilidad), valuación monetaria total del inventario y ventas rápidas de mostrador.</li>
+  </ul>
+
+  <h2>2. 🏗️ Arquitectura Tecnológica Multiplataforma</h2>
+  <p>El sistema está construido bajo una arquitectura de código unificado (Single Codebase):</p>
+  <ul>
+    <li><b>Frontend Web & UI:</b> React 18.3, Vite 5.4, TailwindCSS, CSS Variables y diseño responsivo adaptativo (Dark Luxury & Gold).</li>
+    <li><b>Backend & Base de Datos:</b> Supabase (PostgreSQL 15), WebSockets en tiempo real (<code>supabase-js</code>), Criptografía y Row Level Security (RLS).</li>
+    <li><b>Escritorio Windows:</b> Electron 44 con servidor HTTP interno para alto aislamiento, empaquetado con <code>electron-builder</code> para binarios portables (<code>.exe</code>) y paquetes de tienda (<code>.appx</code>).</li>
+    <li><b>Móvil (Android / iOS):</b> Capacitor 6 con puente nativo, íconos adaptativos mipmap y pantallas de carga.</li>
+    <li><b>Internacionalización:</b> Soporte multi-idioma instantáneo para Español (ES) 🇪🇸, Inglés (EN) 🇺🇸 y Portugués (PT) 🇧🇷.</li>
+  </ul>
+
+  <h2>3. 👥 Ecosistema de Roles y Funcionalidades</h2>
+
+  <h3>👑 A. Superadministrador (Dueño de la Plataforma)</h3>
+  <ul>
+    <li><b>Panel de Control Global:</b> Vista macro de todos los negocios registrados en la plataforma.</li>
+    <li><b>Métricas Globales:</b> Total de ventas acumuladas del mes, volumen de pedidos y negocios activos.</li>
+    <li><b>Gestión de Negocios:</b> Activación, pausa y <b>eliminación definitiva</b> con ventana de seguridad y purgado en cascada.</li>
+    <li><b>Buzón de Ideas y Sugerencias:</b> Recepción en tiempo real de sugerencias y reportes enviados por los dueños con estados (<i>Pendiente, En revisión, Planeada, Implementada</i>).</li>
+  </ul>
+
+  <h3>🏪 B. Administrador de Negocio (Dueño del Establecimiento)</h3>
+  <ul>
+    <li><b>Selector de Modo:</b> 🍔 Menú y Pedidos vs. 📦 Solo Inventario.</li>
+    <li><b>Menú Digital & Código QR:</b> Enlace web directo único (<code>https://administraciondenegocios.netlify.app/?negocio=ID</code>), botón para compartir por WhatsApp y generador de Código QR en alta resolución para imprimir en mesas o mostrador.</li>
+    <li><b>Control de Acceso de Trabajadores:</b> Código único alfanumérico de 6 caracteres para vinculación de empleados.</li>
+    <li><b>Periodo de Prueba Transparente:</b> 180 días (6 meses) de acceso completo a Kiosko Pro sin tarjetas requeridas.</li>
+  </ul>
+
+  <h3>🧑‍🍳 C. Empleado / Cocina / Despacho</h3>
+  <ul>
+    <li><b>Timbre Sonoro:</b> Alerta automática en tiempo real al ingresar nuevos pedidos.</li>
+    <li><b>Tablero Kanban:</b> Flujo <i>Pendiente ➔ En preparación ➔ Listo ➔ Entregado</i> con distintivo de Domicilio vs. Local.</li>
+  </ul>
+
+  <h3>🛍️ D. Cliente (Público / Comensal Web)</h3>
+  <ul>
+    <li><b>Acceso Directo:</b> Sin necesidad de registrarse ni descargar aplicaciones.</li>
+    <li><b>Módulo de Entrega:</b> Selección entre En el local / Para llevar y Domicilio (con dirección, teléfono e indicaciones).</li>
+    <li><b>Seguimiento en Vivo:</b> Pantalla de rastreo que actualiza el estado en tiempo real.</li>
+  </ul>
+
+  <div class="page-break"></div>
+
+  <h2>4. 🧮 Fórmulas Matemáticas y Lógica Contable</h2>
+
+  <div class="card">
+    <b>1. Costo Promedio Ponderado de Compra:</b>
+    <div class="formula-box">
+      Costo Ponderado = ((Stock Actual × Costo Unitario Actual) + Valor Nueva Compra) / (Stock Actual + Cantidad Comprada)
+    </div>
+  </div>
+
+  <div class="card">
+    <b>2. Margen de Ganancia Comercial (% de Utilidad):</b>
+    <div class="formula-box">
+      Utilidad Bruta por Unidad = Precio de Venta - Costo Unitario<br>
+      Margen de Ganancia (%) = ((Precio de Venta - Costo Unitario) / Precio de Venta) × 100
+    </div>
+  </div>
+
+  <div class="card">
+    <b>3. Valuación Total del Inventario:</b>
+    <div class="formula-box">
+      Valor Total en Dinero = Sumatoria(Stock de cada artículo × Costo Unitario)
+    </div>
+  </div>
+
+  <div class="card">
+    <b>4. Flujo de Caja Neto:</b>
+    <div class="formula-box">
+      Resultado del Período = (Ventas + Ingresos Extra) - (Compras + Nómina + Gastos Varios)
+    </div>
+  </div>
+
+  <h2>5. 🗄️ Esquema de Base de Datos (Supabase / PostgreSQL)</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Tabla</th>
+        <th>Descripción y Propósito</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><b>negocios</b></td><td>Datos comerciales, modo de operación (<code>catalogo</code> / <code>inventario</code>), logo, slogan y estado.</td></tr>
+      <tr><td><b>perfiles</b></td><td>Usuarios autenticados, roles (<code>superadmin</code>, <code>admin</code>, <code>empleado</code>) y negocio asignado.</td></tr>
+      <tr><td><b>negocio_codigos</b></td><td>Código alfanumérico único de 6 caracteres para vincular empleados.</td></tr>
+      <tr><td><b>categorias</b></td><td>Categorías del menú gastronómico o catálogo de servicios.</td></tr>
+      <tr><td><b>productos</b></td><td>Artículos de venta con precio, foto, stock, disponibilidad y adiciones.</td></tr>
+      <tr><td><b>ingredientes</b></td><td>Materias primas o mercancía de bodega (stock, costo ponderado, precio venta, mínimo).</td></tr>
+      <tr><td><b>compras</b></td><td>Compras a proveedores que aumentan existencias y se registran como egresos.</td></tr>
+      <tr><td><b>pedidos</b></td><td>Órdenes de clientes con estado, tipo de entrega (local / domicilio), dirección y teléfono.</td></tr>
+      <tr><td><b>pedido_items</b></td><td>Detalle de ítems, adiciones y observaciones por pedido.</td></tr>
+      <tr><td><b>ventas</b></td><td>Registro contable oficial de pedidos despachados o ventas rápidas de mostrador.</td></tr>
+      <tr><td><b>trabajadores</b></td><td>Plantilla de colaboradores con cargo y asignación salarial.</td></tr>
+      <tr><td><b>pagos</b></td><td>Comprobantes de nómina emitidos a colaboradores.</td></tr>
+      <tr><td><b>ingresos / egresos</b></td><td>Movimientos de caja manuales y gastos operativos del negocio.</td></tr>
+      <tr><td><b>sugerencias</b></td><td>Buzón de feedback de los comercios dirigido al Superadministrador.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. 📱 Certificaciones y Tiendas Oficiales</h2>
+  <ul>
+    <li><b>Microsoft Store (Partner Center):</b> Product ID <code>9NSSBH34P6NP</code>, Publisher <code>Qelvis.Kiosko</code>, Mosaicos adaptativos en alta resolución (Norma 10.1.1.11), Política de Privacidad web y descripción de prueba gratuita transparente (Norma 10.8.4).</li>
+    <li><b>Google Play / Android:</b> Package <code>com.fogon.app</code>, íconos adaptativos mipmap y pantallas de inicio.</li>
+  </ul>
+
+  <h2>7. 📁 Estructura del Código Fuente</h2>
+  <div class="tree-box">
+Kiosko/
+├── android/                 # Proyecto nativo Android (Capacitor / Gradle)
+├── build/                   # Recursos de empaquetado Windows (icon.ico, appx tiles)
+├── electron/main.js         # Backend de Electron y servidor web local
+├── public/                  # Archivos estáticos (_redirects, privacy-policy.html)
+├── release/                 # Compilados (.appx para Store, .exe para escritorio)
+├── src/
+│   ├── components/          # Vistas (Admin, Cliente, Empleado, Superadmin, QR Modal)
+│   ├── lib/                 # Capa lógica (API, Auth, Inventory, i18n, Supabase)
+│   ├── App.jsx              # Enrutador principal y layout
+│   └── index.css            # Estilos globales TailwindCSS
+├── supabase/                # Migraciones SQL (v1 a v17)
+└── package.json             # Dependencias y scripts de compilación
+  </div>
+
+  <p style="text-align:center; font-size:11px; color:#888; margin-top:30px;">
+    &copy; 2026 Kiosko Platform — Documentación Confidencial de Producto.
+  </p>
+
+</body>
+</html>
+

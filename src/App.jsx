@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { AdMob, BannerAdPosition, BannerAdSize } from '@capacitor-community/admob'
 import { Toast, Btn, NegocioLogo, NegocioBanner, BrandMark } from './components/ui'
 import SuperadminView from './components/SuperadminView'
 import AdminView from './components/AdminView'
@@ -40,6 +41,38 @@ export default function App() {
   const [miNegocio, setMiNegocio] = useState(null)
   const [online, setOnline] = useState(navigator.onLine)
   const [menuAbierto, setMenuAbierto] = useState(false)
+
+  // Inicialización de Google AdMob Banner en dispositivos móviles nativos
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || isDesktopApp) return
+
+    async function initAdMobBanner() {
+      try {
+        await AdMob.initialize({
+          requestTrackingAuthorization: true,
+          initializeForTesting: false,
+        })
+
+        await AdMob.showBanner({
+          adId: 'ca-app-pub-8313905774163042/7995054363',
+          adSize: BannerAdSize.ADAPTIVE_BANNER,
+          position: BannerAdPosition.BOTTOM_CENTER,
+          margin: 0,
+          isTesting: false,
+        })
+      } catch (error) {
+        console.warn('[AdMob] Error al inicializar banner:', error)
+      }
+    }
+
+    initAdMobBanner()
+
+    return () => {
+      if (Capacitor.isNativePlatform() && !isDesktopApp) {
+        AdMob.hideBanner().catch(() => {})
+      }
+    }
+  }, [isDesktopApp])
 
   useEffect(() => {
     const goOnline = () => setOnline(true)

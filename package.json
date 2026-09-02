@@ -1,7 +1,7 @@
 {
   "name": "kiosko",
   "private": true,
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Kiosco para administrar negocios, inventario, pedidos y ventas",
   "author": "Qelvis",
   "main": "electron/main.js",
@@ -29,7 +29,9 @@
     ],
     "asar": true,
     "win": {
-      "target": ["portable"],
+      "target": [
+        "portable"
+      ],
       "icon": "build/icon.ico"
     },
     "appx": {
@@ -40,6 +42,7 @@
     }
   },
   "dependencies": {
+    "@capacitor-community/admob": "^6.2.0",
     "@capacitor/android": "^6.2.0",
     "@capacitor/app": "^6.0.2",
     "@capacitor/core": "^6.2.0",
