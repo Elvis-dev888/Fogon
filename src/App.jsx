@@ -431,7 +431,7 @@ function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = f
           <div className="flex flex-wrap gap-2.5">
             <a href={DOWNLOAD_LINKS.android} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full bg-gold text-paper font-semibold text-[12.5px] px-4 py-2.5 hover:bg-golddark">📱 {t.android}</a>
             <a href={DOWNLOAD_LINKS.ios} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">🍎 {t.iphone}</a>
-            <a href={DOWNLOAD_LINKS.windows} className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">💻 {t.windows}</a>
+            <a href={DOWNLOAD_LINKS.windows} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded-full border border-line text-cream font-semibold text-[12.5px] px-4 py-2.5 hover:border-gold hover:text-gold">💻 {t.windows}</a>
           </div>
         </div>
       </section>}
