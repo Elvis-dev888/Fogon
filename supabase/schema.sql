@@ -103,12 +103,14 @@ create table pedido_items (
   subtotal numeric not null default 0
 );
 
--- numera los pedidos de forma consecutiva DENTRO de cada negocio (#001, #002, ...)
+-- numera los pedidos de forma consecutiva DENTRO de cada negocio y se reinicia cada día (#1, #2, #3...)
 create or replace function set_pedido_numero()
 returns trigger as $$
 begin
   select coalesce(max(numero), 0) + 1 into new.numero
-  from pedidos where negocio_id = new.negocio_id;
+  from pedidos
+  where negocio_id = new.negocio_id
+    and date(creado_en at time zone 'America/Bogota') = date(now() at time zone 'America/Bogota');
   return new;
 end;
 $$ language plpgsql;
