@@ -3,6 +3,20 @@ export const fmt$ = (n) => '$' + Math.round(n || 0).toLocaleString('es-CO')
 export const fmtDate = (d) =>
   new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
 
+export const fmtTime = (d) => {
+  if (!d) return ''
+  const date = new Date(d)
+  return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
+}
+
+export const fmtDateTime = (d) => {
+  if (!d) return ''
+  const date = new Date(d)
+  const time = date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
+  const day = date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
+  return `${day} · ${time}`
+}
+
 export const fmtDateLong = (d) =>
   new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
 
