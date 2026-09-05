@@ -1,7 +1,7 @@
 {
   "name": "kiosko",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Kiosco para administrar negocios, inventario, pedidos y ventas",
   "author": "Qelvis",
   "main": "electron/main.cjs",
