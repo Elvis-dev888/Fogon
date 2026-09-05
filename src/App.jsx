@@ -450,7 +450,7 @@ function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = f
       {showDownloads && <section className="mb-8 rounded border border-line bg-paper2 p-5 md:p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-gold mb-2">¿Tienes un negocio?</p>
+            <p className="text-[11px] uppercase tracking-[0.2em] text-gold mb-2">{t.haveBusiness}</p>
             <h3 className="font-serif text-2xl font-semibold mb-1">{t.manageBusiness}</h3>
             <p className="text-creamsoft text-sm max-w-xl leading-relaxed">{t.manageBusinessDescription}</p>
           </div>
@@ -475,12 +475,12 @@ function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = f
               <p className="text-[12.5px] text-creamsoft mb-3">{n.slogan}</p>
               <button onClick={() => onEnter(n.id)}
                 className="w-full bg-gold text-paper font-semibold text-[13px] rounded py-2.5 hover:bg-golddark">
-                Ver catálogo
+                {t.customer?.viewCatalog || 'Ver catálogo'}
               </button>
             </div>
           </div>
         ))}
-        {negocios.length === 0 && <p className="text-creamsoft text-sm">Todavía no hay negocios registrados en la plataforma.</p>}
+        {negocios.length === 0 && <p className="text-creamsoft text-sm">{t.noBusinesses}</p>}
       </div>
     </div>
   )
