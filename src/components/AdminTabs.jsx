@@ -1234,6 +1234,7 @@ export function TabVentas({ data }) {
   const todasVentas = data.ventas || []
   const hoyStr = todayStr()
 
+  // Filtrado flexible por rango de fechas
   const dAyer = new Date()
   dAyer.setDate(dAyer.getDate() - 1)
   const ayerStr = dateStr(dAyer)
