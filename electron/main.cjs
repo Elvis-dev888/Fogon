@@ -33,7 +33,7 @@ function startBuiltAppServer(distDirectory) {
       const relativePath = requestedPath === '/' ? 'index.html' : requestedPath.replace(/^\/+/, '')
       const rootPath = path.resolve(distDirectory)
       const filePath = path.resolve(rootPath, relativePath)
-      const safePath = filePath === rootPath || filePath.startsWith(${rootPath})
+      const safePath = filePath === rootPath || filePath.startsWith(rootPath + path.sep)
       const targetPath = safePath && fs.existsSync(filePath) ? filePath : path.join(rootPath, 'index.html')
 
       fs.readFile(targetPath, (error, content) => {
