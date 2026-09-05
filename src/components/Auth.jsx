@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Btn, Card, Field, Input, Select, Textarea } from './ui'
-import { signUp, signIn, signOut, crearNegocioPropio, unirseComoEmpleado, reclamarSuperadmin, fetchNegociosSinAdmin, reclamarNegocioExistente } from '../lib/auth'
+import { Btn, Card, Field, Input, Select, Textarea, Modal } from './ui'
+import { signUp, signIn, signOut, crearNegocioPropio, unirseComoEmpleado, reclamarSuperadmin, fetchNegociosSinAdmin, reclamarNegocioExistente, recuperarPassword, actualizarPassword } from '../lib/auth'
 import { useLanguage } from '../lib/i18n.jsx'
 
 /* ---------------- Login / registro para Admin de negocio ---------------- */
@@ -12,6 +12,7 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mostrarRecuperar, setMostrarRecuperar] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
@@ -71,6 +72,17 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
         <form onSubmit={submit}>
           <Field label={t.authAdmin.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
           <Field label={t.authAdmin.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          {modo === 'login' && (
+            <div className="text-right -mt-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setMostrarRecuperar(true)}
+                className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
           <Btn variant="primary" className="w-full justify-center" disabled={loading}>
             {loading ? t.authAdmin.wait : modo === 'login' ? t.authAdmin.enter : t.authAdmin.createContinue}
@@ -81,6 +93,14 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
         <button onClick={onVolver} className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-4">
           ← {t.authAdmin.back}
         </button>
+      )}
+
+      {mostrarRecuperar && (
+        <RecuperarPasswordModal
+          initialEmail={email}
+          onClose={() => setMostrarRecuperar(false)}
+          notify={notify}
+        />
       )}
     </div>
   )
@@ -95,6 +115,7 @@ export function EmpleadoAuth({ onDone, notify }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mostrarRecuperar, setMostrarRecuperar] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
@@ -135,6 +156,17 @@ export function EmpleadoAuth({ onDone, notify }) {
         <form onSubmit={submit}>
           <Field label={t.authEmployee.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
           <Field label={t.authEmployee.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          {modo === 'login' && (
+            <div className="text-right -mt-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setMostrarRecuperar(true)}
+                className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
           <Btn variant="primary" className="w-full justify-center" disabled={loading}>
             {loading ? t.authEmployee.wait : modo === 'login' ? t.authEmployee.login : t.authEmployee.create}
@@ -147,6 +179,14 @@ export function EmpleadoAuth({ onDone, notify }) {
           {modo === 'login' ? t.authEmployee.createQuestion : t.authEmployee.loginQuestion}
         </button>
       </Card>
+
+      {mostrarRecuperar && (
+        <RecuperarPasswordModal
+          initialEmail={email}
+          onClose={() => setMostrarRecuperar(false)}
+          notify={notify}
+        />
+      )}
     </div>
   )
 }
@@ -194,7 +234,7 @@ export function UnirseNegocioForm({ onJoined, notify }) {
 }
 
 /* ---------------- Login para Superadmin (sin registro público) ---------------- */
-export function SuperadminAuth({ onDone }) {
+export function SuperadminAuth({ onDone, notify }) {
   const { t } = useLanguage()
   const [modo, setModo] = useState('login') // login | registro (registro solo sirve si nadie es superadmin todavía)
   const [email, setEmail] = useState('')
@@ -202,6 +242,7 @@ export function SuperadminAuth({ onDone }) {
   const [error, setError] = useState('')
   const [aviso, setAviso] = useState('')
   const [loading, setLoading] = useState(false)
+  const [mostrarRecuperar, setMostrarRecuperar] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
@@ -240,6 +281,17 @@ export function SuperadminAuth({ onDone }) {
         <form onSubmit={submit}>
           <Field label={t.authSuper.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
           <Field label={t.authSuper.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          {modo === 'login' && (
+            <div className="text-right -mt-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setMostrarRecuperar(true)}
+                className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
           {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
           <Btn variant="primary" className="w-full justify-center" disabled={loading}>
             {loading ? t.authSuper.wait : modo === 'login' ? t.authSuper.enter : t.authSuper.claim}
@@ -252,6 +304,14 @@ export function SuperadminAuth({ onDone }) {
           {modo === 'login' ? t.authSuper.firstQuestion : t.authSuper.loginQuestion}
         </button>
       </Card>
+
+      {mostrarRecuperar && (
+        <RecuperarPasswordModal
+          initialEmail={email}
+          onClose={() => setMostrarRecuperar(false)}
+          notify={notify}
+        />
+      )}
     </div>
   )
 }
@@ -496,6 +556,138 @@ export function SinPermiso({ mensaje }) {
         <h2 className="font-serif text-xl font-semibold mb-2">{t.access.deniedTitle}</h2>
         <p className="text-creamsoft text-sm mb-5">{mensaje}</p>
         <Btn onClick={() => signOut().then(() => window.location.reload())}>{t.access.signOut}</Btn>
+      </Card>
+    </div>
+  )
+}
+
+/* ---------------- Modal: Solicitar enlace de recuperación de contraseña ---------------- */
+export function RecuperarPasswordModal({ onClose, notify, initialEmail = '' }) {
+  const [email, setEmail] = useState(initialEmail)
+  const [enviado, setEnviado] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await recuperarPassword(email.trim())
+      setEnviado(true)
+      if (notify) notify('Enlace de recuperación enviado')
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="🔑 Recuperar contraseña" onClose={onClose}>
+      {enviado ? (
+        <div className="text-center py-3 space-y-3">
+          <div className="text-4xl">✉️</div>
+          <h3 className="font-serif text-lg font-semibold text-gold">¡Correo de recuperación enviado!</h3>
+          <p className="text-creamsoft text-sm leading-relaxed max-w-sm mx-auto">
+            Hemos enviado un enlace seguro a <b className="text-cream">{email}</b>. Revisa tu bandeja de entrada (y la carpeta de spam o no deseados) para reestablecer tu contraseña.
+          </p>
+          <div className="pt-2">
+            <Btn variant="primary" onClick={onClose} className="justify-center mx-auto">
+              Entendido
+            </Btn>
+          </div>
+        </div>
+      ) : (
+        <form onSubmit={submit} className="space-y-4">
+          <p className="text-creamsoft text-sm leading-relaxed">
+            Ingresa tu correo electrónico registrado y te enviaremos un enlace oficial para que puedas crear una nueva contraseña.
+          </p>
+          <Field label="Correo electrónico">
+            <Input
+              required
+              type="email"
+              placeholder="ejemplo@correo.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
+          {error && <p className="text-wine text-xs">{error}</p>}
+          <div className="flex justify-end gap-2 pt-2">
+            <Btn variant="ghost" onClick={onClose} type="button">
+              Cancelar
+            </Btn>
+            <Btn variant="primary" disabled={loading}>
+              {loading ? 'Enviando…' : 'Enviar enlace'}
+            </Btn>
+          </div>
+        </form>
+      )}
+    </Modal>
+  )
+}
+
+/* ---------------- Modal: Establecer nueva contraseña tras hacer clic en el correo ---------------- */
+export function EstablecerNuevaPasswordModal({ onDone, notify }) {
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    setError('')
+    if (password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+    setLoading(true)
+    try {
+      await actualizarPassword(password)
+      if (notify) notify('¡Contraseña actualizada exitosamente!')
+      onDone()
+    } catch (err) {
+      setError(err.message || String(err))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+      <Card className="max-w-[420px] w-full p-6">
+        <h2 className="font-serif text-2xl font-semibold mb-2 text-center text-gold">🔐 Nueva Contraseña</h2>
+        <p className="text-creamsoft text-sm text-center mb-6">
+          Ingresa y confirma tu nueva contraseña para recuperar el acceso a tu cuenta.
+        </p>
+        <form onSubmit={submit} className="space-y-4">
+          <Field label="Nueva contraseña (mínimo 6 caracteres)">
+            <Input
+              required
+              type="password"
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </Field>
+          <Field label="Confirmar nueva contraseña">
+            <Input
+              required
+              type="password"
+              minLength={6}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </Field>
+          {error && <p className="text-wine text-xs">{error}</p>}
+          <Btn variant="primary" className="w-full justify-center mt-2" disabled={loading}>
+            {loading ? 'Guardando…' : 'Guardar nueva contraseña'}
+          </Btn>
+        </form>
       </Card>
     </div>
   )

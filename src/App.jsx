@@ -6,7 +6,7 @@ import SuperadminView from './components/SuperadminView'
 import AdminView from './components/AdminView'
 import EmpleadoView from './components/EmpleadoView'
 import ClienteView from './components/ClienteView'
-import { AdminAuth, SuperadminAuth, EmpleadoAuth, UnirseNegocioForm, CrearNegocioForm, SinPermiso } from './components/Auth'
+import { AdminAuth, SuperadminAuth, EmpleadoAuth, UnirseNegocioForm, CrearNegocioForm, SinPermiso, EstablecerNuevaPasswordModal } from './components/Auth'
 import { PrivacyModal } from './components/PrivacyModal'
 import { supabase } from './lib/supabaseClient'
 import { fetchPerfil, fetchNegocioPorId, signOut } from './lib/auth'
@@ -31,6 +31,7 @@ export default function App() {
   const isDesktopShell = isNativeApp && isDesktopApp
   const [negocioId, setNegocioId] = useState(null) // solo lo usa el flujo de Cliente
   const [mostrarPrivacidad, setMostrarPrivacidad] = useState(false)
+  const [modoRecuperacion, setModoRecuperacion] = useState(false)
   const [adminIntent, setAdminIntent] = useState(null) // null | 'entrar' | 'registrar' — solo lo usa el flujo de Admin
   const [negocios, setNegocios] = useState([])
   const [toast, setToast] = useState(null)
@@ -113,10 +114,25 @@ export default function App() {
     }
   }, [])
 
-  // Sesión de Supabase Auth: se revisa al cargar y se escucha cualquier cambio (login/logout)
+  // Sesión de Supabase Auth: se revisa al cargar y se escucha cualquier cambio (login/logout/recovery)
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s)
+      if (event === 'PASSWORD_RECOVERY') {
+        setModoRecuperacion(true)
+      }
+    })
+
+    // Detectar si la URL contiene token o parámetro de recuperación
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || ''
+      const search = window.location.search || ''
+      if (hash.includes('type=recovery') || search.includes('recovery=1')) {
+        setModoRecuperacion(true)
+      }
+    }
+
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -305,6 +321,16 @@ export default function App() {
 
       {mostrarPrivacidad && (
         <PrivacyModal onClose={() => setMostrarPrivacidad(false)} />
+      )}
+
+      {modoRecuperacion && (
+        <EstablecerNuevaPasswordModal
+          onDone={() => {
+            setModoRecuperacion(false)
+            loadPerfil()
+          }}
+          notify={notify}
+        />
       )}
 
       {isNativeApp && (

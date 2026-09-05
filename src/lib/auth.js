@@ -82,3 +82,22 @@ export async function regenerarCodigoNegocio() {
   if (error) throw error
   return data
 }
+
+export async function recuperarPassword(email) {
+  const redirectTo = typeof window !== 'undefined'
+    ? `${window.location.origin}/?recovery=1`
+    : 'https://administraciondenegocios.netlify.app/?recovery=1'
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function actualizarPassword(newPassword) {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword,
+  })
+  if (error) throw error
+  return data
+}
