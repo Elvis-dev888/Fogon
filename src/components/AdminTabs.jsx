@@ -1232,32 +1232,40 @@ export function TabVentas({ data }) {
   const [fechaFin, setFechaFin] = useState(todayStr())
 
   const todasVentas = data.ventas || []
-  const now = new Date()
   const hoyStr = todayStr()
-  const hace2Dias = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
-  const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
-  // Filtrado flexible por rango de fechas
+  const dAyer = new Date()
+  dAyer.setDate(dAyer.getDate() - 1)
+  const ayerStr = dateStr(dAyer)
+
+  const d7 = new Date()
+  d7.setDate(d7.getDate() - 6)
+  const hace7DiasStr = dateStr(d7)
+
+  const dMesAnt = new Date()
+  dMesAnt.setDate(1)
+  dMesAnt.setMonth(dMesAnt.getMonth() - 1)
+  const mesAnteriorStr = dateStr(dMesAnt).slice(0, 7)
+
+  // Filtrado robusto por fechas calendario local
   const ventasFiltradas = todasVentas.filter((v) => {
     if (!v.creado_en) return true
-    const fVenta = new Date(v.creado_en)
     const fVentaStr = dateStr(v.creado_en)
 
     if (filtroPeriodo === 'hoy') {
       return fVentaStr === hoyStr
     }
     if (filtroPeriodo === '2dias') {
-      return fVenta >= hace2Dias
+      return fVentaStr >= ayerStr && fVentaStr <= hoyStr
     }
     if (filtroPeriodo === 'semana') {
-      return fVenta >= hace7Dias
+      return fVentaStr >= hace7DiasStr && fVentaStr <= hoyStr
     }
     if (filtroPeriodo === 'mes') {
-      return sameMonth(v.creado_en)
+      return fVentaStr.slice(0, 7) === hoyStr.slice(0, 7)
     }
     if (filtroPeriodo === 'mes_anterior') {
-      const mesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      return fVenta.getFullYear() === mesAnterior.getFullYear() && fVenta.getMonth() === mesAnterior.getMonth()
+      return fVentaStr.slice(0, 7) === mesAnteriorStr
     }
     if (filtroPeriodo === 'personalizado') {
       if (fechaInicio && fVentaStr < fechaInicio) return false
