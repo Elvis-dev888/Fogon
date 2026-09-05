@@ -108,10 +108,18 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
   const [tipoEntrega, setTipoEntrega] = useState('local') // 'local' | 'domicilio'
   const [direccion, setDireccion] = useState('')
   const [telefono, setTelefono] = useState('')
+  const [metodoPago, setMetodoPago] = useState('efectivo') // 'efectivo' | 'transferencia'
+  const [pagaCon, setPagaCon] = useState('')
+  const [pagoExacto, setPagoExacto] = useState(false)
   const [notasEntrega, setNotasEntrega] = useState('')
   const [errorValidacion, setErrorValidacion] = useState('')
   const [saving, setSaving] = useState(false)
   const total = cart.reduce((a, c) => a + c.subtotal, 0)
+
+  // Cálculo de cambio si paga en efectivo
+  const montoPagaCon = pagoExacto ? total : parseFloat(String(pagaCon).replace(/\D/g, '')) || 0
+  const cambio = montoPagaCon > total ? montoPagaCon - total : 0
+  const esInsuficiente = !pagoExacto && montoPagaCon > 0 && montoPagaCon < total
 
   async function confirmar() {
     setErrorValidacion('')
@@ -124,10 +132,31 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
         setErrorValidacion(t.customer.phoneRequired)
         return
       }
+      if (metodoPago === 'efectivo' && !pagoExacto && montoPagaCon > 0 && montoPagaCon < total) {
+        setErrorValidacion(`El monto a pagar ($${montoPagaCon.toLocaleString('es-CO')}) debe ser igual o mayor al total ($${total.toLocaleString('es-CO')})`)
+        return
+      }
     }
 
     setSaving(true)
     try {
+      let resumenPago = ''
+      if (tipoEntrega === 'domicilio') {
+        if (metodoPago === 'efectivo') {
+          if (pagoExacto || montoPagaCon === total) {
+            resumenPago = `💵 Efectivo (Pago exacto: ${fmt$(total)})`
+          } else if (montoPagaCon > total) {
+            resumenPago = `💵 Efectivo (Paga con: ${fmt$(montoPagaCon)} | 🔙 Llevar cambio: ${fmt$(cambio)})`
+          } else {
+            resumenPago = '💵 Pago en Efectivo'
+          }
+        } else {
+          resumenPago = '📲 Pago por Transferencia'
+        }
+      }
+
+      const fullNotas = [resumenPago, notasEntrega.trim()].filter(Boolean).join(' · ')
+
       const pedido = await crearPedido(negocio.id, {
         cliente: nombre.trim() || 'Cliente',
         items: cart,
@@ -135,7 +164,7 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
         tipo_entrega: tipoEntrega,
         direccion,
         telefono,
-        notas_entrega: notasEntrega,
+        notas_entrega: fullNotas,
       })
       onConfirmed(pedido)
     } finally {
@@ -234,11 +263,129 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
                       placeholder={t.customer.phonePlaceholder}
                     />
                   </Field>
+
+                  {/* Método de Pago para Domicilio */}
+                  <div className="pt-2 border-t border-line/60">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-creamsoft mb-1.5">
+                      💳 ¿Cómo vas a pagar?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 mb-2.5">
+                      <button
+                        type="button"
+                        onClick={() => { setMetodoPago('efectivo'); setErrorValidacion('') }}
+                        className={`py-2 px-2 rounded text-center text-xs font-semibold border transition-colors ${
+                          metodoPago === 'efectivo'
+                            ? 'border-gold bg-gold/15 text-gold'
+                            : 'border-line bg-paper text-creamsoft hover:text-cream'
+                        }`}
+                      >
+                        💵 Efectivo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setMetodoPago('transferencia'); setErrorValidacion('') }}
+                        className={`py-2 px-2 rounded text-center text-xs font-semibold border transition-colors ${
+                          metodoPago === 'transferencia'
+                            ? 'border-gold bg-gold/15 text-gold'
+                            : 'border-line bg-paper text-creamsoft hover:text-cream'
+                        }`}
+                      >
+                        📲 Transferencia
+                      </button>
+                    </div>
+
+                    {/* Si paga en Efectivo: Preguntar con cuánto paga y calcular cambio */}
+                    {metodoPago === 'efectivo' && (
+                      <div className="bg-paper p-3 rounded border border-line/80 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-cream">
+                            ¿Con cuánto vas a pagar?
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPagoExacto(!pagoExacto)
+                              if (!pagoExacto) setPagaCon('')
+                            }}
+                            className={`text-[11px] px-2 py-0.5 rounded font-semibold transition-colors ${
+                              pagoExacto
+                                ? 'bg-gold text-paper'
+                                : 'bg-paper2 border border-line text-creamsoft hover:text-cream'
+                            }`}
+                          >
+                            Pago exacto ({fmt$(total)})
+                          </button>
+                        </div>
+
+                        {!pagoExacto && (
+                          <>
+                            <Input
+                              type="number"
+                              min={total}
+                              step="1000"
+                              placeholder={`Ej: ${Math.ceil(total / 10000) * 10000 || 50000}`}
+                              value={pagaCon}
+                              onChange={(e) => {
+                                setPagaCon(e.target.value)
+                                setPagoExacto(false)
+                              }}
+                              className="font-mono text-sm"
+                            />
+
+                            {/* Botones de sugerencia rápida de billetes */}
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {[20000, 50000, 100000].filter((b) => b >= total).map((billete) => (
+                                <button
+                                  key={billete}
+                                  type="button"
+                                  onClick={() => {
+                                    setPagaCon(String(billete))
+                                    setPagoExacto(false)
+                                  }}
+                                  className={`text-[10.5px] font-mono px-2 py-1 rounded border transition-colors ${
+                                    montoPagaCon === billete
+                                      ? 'bg-gold/20 text-gold border-gold'
+                                      : 'bg-paper2 border-line text-creamsoft hover:text-cream'
+                                  }`}
+                                >
+                                  Billete ${billete.toLocaleString('es-CO')}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Resultado del cambio calculado */}
+                            {cambio > 0 && (
+                              <div className="p-2 bg-sage/10 border border-sage/30 rounded text-xs text-sage font-semibold flex items-center justify-between">
+                                <span>🔙 Cambio que te llevamos:</span>
+                                <span className="font-mono text-sm font-bold">{fmt$(cambio)}</span>
+                              </div>
+                            )}
+
+                            {esInsuficiente && (
+                              <p className="text-[11px] text-wine font-medium">
+                                ⚠️ El valor debe ser al menos de {fmt$(total)}
+                              </p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {metodoPago === 'transferencia' && (
+                      <div className="p-2.5 bg-gold/10 border border-gold/25 rounded text-[11.5px] text-champagne space-y-1">
+                        <p className="font-semibold text-gold">📲 Transferencia / Pago móvil</p>
+                        <p className="text-creamsoft leading-relaxed">
+                          El negocio te confirmará el número de Nequi, Daviplata o cuenta bancaria al recibir tu orden.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   <Field label={t.customer.deliveryNotes}>
                     <Input
                       value={notasEntrega}
                       onChange={(e) => setNotasEntrega(e.target.value)}
-                      placeholder={t.customer.deliveryNotesPlaceholder}
+                      placeholder="Ej: Apto 302, dejar en portería, sin cebolla..."
                     />
                   </Field>
                 </div>

@@ -1156,8 +1156,15 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
             </div>
           )}
           {p.notas_entrega && (
-            <div className="italic text-[10.5px] text-champagne/90 bg-gold/5 px-2 py-1 rounded border border-gold/15">
-              "{p.notas_entrega}"
+            <div className="p-2 bg-gold/10 rounded border border-gold/25 text-[11.5px] text-champagne space-y-1">
+              <div className="font-semibold text-gold flex items-center gap-1.5">
+                <span>💰</span> <span>{p.notas_entrega.split(' · ')[0] || p.notas_entrega}</span>
+              </div>
+              {p.notas_entrega.split(' · ').length > 1 && (
+                <div className="text-[10.5px] text-creamsoft italic border-t border-gold/15 pt-1 mt-1">
+                  "{p.notas_entrega.split(' · ').slice(1).join(' · ')}"
+                </div>
+              )}
             </div>
           )}
         </div>
