@@ -115,7 +115,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
               onClick={() => setMostrarShareMenu(true)}
               className="mb-2 text-left px-3 py-2 rounded-sm text-[12.5px] font-semibold text-gold bg-gold/10 hover:bg-gold/20 transition-colors flex items-center gap-2 border border-gold/30"
             >
-              🔗 Menú Digital / QR
+              🔗 {t.digitalMenu?.button || 'Menú Digital / QR'}
             </button>
             <CodigoEmpleado negocioId={negocio.id} notify={notify} />
           </>

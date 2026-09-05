@@ -19,6 +19,7 @@ const estadoTone = (e) => (
 
 /* ---------------- Mi negocio (logo + datos básicos) ---------------- */
 export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMenu }) {
+  const { t } = useLanguage()
   const [nombre, setNombre] = useState(negocio.nombre || '')
   const [slogan, setSlogan] = useState(negocio.slogan || '')
   const [descripcion, setDescripcion] = useState(negocio.descripcion || '')
@@ -48,7 +49,7 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
       }
       const cambios = { nombre, slogan, descripcion, logo_url: logoUrl, modo_operacion: modoOperacion }
       await updateNegocio(negocio.id, cambios)
-      notify('Datos del negocio actualizados')
+      notify(t.myBusinessTab?.saved || 'Datos del negocio actualizados')
       if (onNegocioUpdated) await onNegocioUpdated(cambios)
     } finally {
       setGuardando(false)
@@ -57,53 +58,62 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
 
   return (
     <div>
-      <SectionTitle title="Mi negocio" sub={modoOperacion === 'inventario' ? 'Datos y configuración de tu espacio de inventario.' : 'El logo y los datos que ven tus clientes en el catálogo.'} />
+      <SectionTitle
+        title={t.myBusinessTab?.title || 'Mi negocio'}
+        sub={t.myBusinessTab?.description?.replace('{business}', negocio.nombre) || 'Datos y configuración de tu negocio.'}
+      />
 
       {!esModoInventario && onOpenShareMenu && (
         <div className="mb-6 p-4 rounded bg-paper2 border border-gold/40 flex items-center justify-between gap-3 flex-wrap max-w-[520px]">
           <div>
             <span className="text-[11px] font-semibold uppercase tracking-wider text-gold flex items-center gap-1.5">
-              🔗 Menú Digital & Código QR
+              🔗 {t.digitalMenu?.button || 'Menú Digital & Código QR'}
             </span>
             <p className="text-xs text-cream mt-0.5 font-medium">
-              Enlace público y código QR para tus clientes
+              {t.digitalMenu?.sub || 'Enlace público y código QR para tus clientes'}
             </p>
           </div>
           <Btn size="sm" variant="avocado" onClick={onOpenShareMenu}>
-            📱 Abrir y Compartir
+            📱 {t.myBusinessTab?.openMenu || 'Abrir y Compartir'}
           </Btn>
         </div>
       )}
 
       <Card className="p-6 max-w-[520px]">
         <form onSubmit={guardar}>
-          <Field label="Logo del negocio">
+          <Field label={t.myBusinessTab?.logoHelp || 'Logo del negocio'}>
             <div className="flex items-center gap-4">
               <div className="w-20 h-20 rounded-full border border-line overflow-hidden flex items-center justify-center text-3xl bg-paper shrink-0">
                 {preview ? <img src={preview} alt="" className="w-full h-full object-cover" /> : negocio.emoji}
               </div>
               <label className="text-[12.5px] text-gold cursor-pointer hover:text-champagne">
-                {preview ? 'Cambiar logo' : 'Subir logo'}
+                {preview ? (t.myBusinessTab?.changeLogo || 'Cambiar logo') : (t.myBusinessTab?.uploadLogo || 'Subir logo')}
                 <input type="file" accept="image/*" className="hidden" onChange={onPickFile} />
               </label>
             </div>
           </Field>
-          <Field label="Nombre del negocio"><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
-          <Field label="Eslogan"><Input value={slogan} onChange={(e) => setSlogan(e.target.value)} /></Field>
-          <Field label="Descripción"><Textarea rows={3} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} /></Field>
-          <Field label="Modo de uso">
+          <Field label={t.myBusinessTab?.nameLabel || 'Nombre del negocio'}>
+            <Input required value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          </Field>
+          <Field label={t.myBusinessTab?.sloganLabel || 'Eslogan'}>
+            <Input value={slogan} placeholder={t.myBusinessTab?.sloganPlaceholder || ''} onChange={(e) => setSlogan(e.target.value)} />
+          </Field>
+          <Field label={t.myBusinessTab?.descLabel || 'Descripción'}>
+            <Textarea rows={3} value={descripcion} placeholder={t.myBusinessTab?.descPlaceholder || ''} onChange={(e) => setDescripcion(e.target.value)} />
+          </Field>
+          <Field label={t.myBusinessTab?.modeLabel || 'Modo de uso'}>
             <Select value={modoOperacion} onChange={(e) => setModoOperacion(e.target.value)}>
-              <option value="catalogo">Catálogo y pedidos</option>
-              <option value="inventario">Inventario y utilidades</option>
+              <option value="catalogo">{t.myBusinessTab?.modeCatalog || 'Catálogo y pedidos'}</option>
+              <option value="inventario">{t.myBusinessTab?.modeInventory || 'Inventario y utilidades'}</option>
             </Select>
             <p className="mt-1.5 text-[11.5px] text-creamsoft">
               {modoOperacion === 'inventario'
-                ? 'Oculta catálogo, productos, pedidos y ventas. Conserva inventario, compras, ingresos, gastos, trabajadores y estadísticas.'
-                : 'Muestra el catálogo público y habilita la gestión de pedidos y ventas.'}
+                ? (t.myBusinessTab?.modeInventoryDesc || 'Existencias, compras, precio de venta y ventas directas.')
+                : (t.myBusinessTab?.modeCatalogDesc || 'Menú digital interactivo y pedidos en vivo.')}
             </p>
           </Field>
           <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
-            {subiendo ? 'Subiendo logo…' : guardando ? 'Guardando…' : 'Guardar cambios'}
+            {subiendo ? (t.myBusinessTab?.uploading || 'Subiendo logo…') : guardando ? (t.myBusinessTab?.saving || 'Guardando…') : (t.myBusinessTab?.saveChanges || 'Guardar cambios')}
           </Btn>
         </form>
       </Card>
@@ -112,56 +122,61 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
 }
 
 export function TabMiSuscripcion({ negocio }) {
+  const { t } = useLanguage()
   const summary = getSubscriptionSummary(negocio)
   const estadoTone = summary.isTrialActive ? 'activo' : summary.isTrialExpired ? 'pausado' : 'activo'
 
   return (
     <div>
       <SectionTitle
-        title="Mi suscripción"
-        sub="Período de prueba de 6 meses con acceso completo. Sin cobros automáticos ni tarjetas requeridas durante el trial."
+        title={t.tabs?.suscripcion || 'Mi suscripción'}
+        sub={t.subscriptionTab?.fullAccess || 'Período de prueba de 6 meses con acceso completo. Sin cobros automáticos.'}
       />
       <Card className="p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-1">Plan actual</p>
+            <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-1">{t.subscriptionTab?.proPlan || 'Plan actual'}</p>
             <h3 className="font-serif text-2xl text-gold">{summary.plan}</h3>
-            <p className="text-sm text-creamsoft mt-1">Acceso {summary.accessGranted ? 'completo a todas las funciones' : 'pendiente de suscripción'}</p>
+            <p className="text-sm text-creamsoft mt-1">
+              {summary.accessGranted
+                ? (t.subscriptionTab?.fullAccess || 'Acceso completo a todas las funciones')
+                : (t.subscriptionTab?.subscribeToContinue || 'Pendiente de suscripción')}
+            </p>
           </div>
           <Pill tone={estadoTone}>{summary.statusLabel}</Pill>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
-          <StatCard label="Estado" value={summary.statusLabel} tone={summary.isTrialActive ? 'sage' : 'wine'} />
-          <StatCard label="Inicio del trial" value={summary.trialStartedAt ? fmtDate(summary.trialStartedAt) : '—'} tone="gold" />
-          <StatCard label="Fin del trial" value={summary.trialEndsAt ? fmtDate(summary.trialEndsAt) : '—'} tone="champagne" />
+          <StatCard label={t.inventory?.status || 'Estado'} value={summary.statusLabel} tone={summary.isTrialActive ? 'sage' : 'wine'} />
+          <StatCard label={t.report?.period || 'Inicio'} value={summary.trialStartedAt ? fmtDate(summary.trialStartedAt) : '—'} tone="gold" />
+          <StatCard label={t.subscriptionTab?.daysLeft || 'Días restantes'} value={summary.isTrialActive ? formatDaysLeft(summary.remainingDays) : (summary.trialEndsAt ? fmtDate(summary.trialEndsAt) : '—')} tone="champagne" />
         </div>
 
         <div className="mt-6 border border-line rounded p-4 bg-paper">
           {summary.isTrialActive ? (
             <>
-              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Período de prueba gratuito (6 meses)</p>
-              <p className="font-semibold text-cream">🎉 Estás disfrutando de Kiosko Pro gratis con acceso total.</p>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">{t.subscriptionTab?.activeTrial || 'Trial activo'}</p>
+              <p className="font-semibold text-cream">🎉 {t.subscriptionTab?.proTrial || 'Kiosko Pro (Trial)'}</p>
               <p className="text-sm text-creamsoft mt-2">
-                Tienes acceso completo a todas las funciones durante tu período de prueba de 180 días. Te quedan {formatDaysLeft(summary.remainingDays)}. No se aplican cargos automáticos.
+                {t.subscriptionTab?.trialEndsNotice ? t.subscriptionTab.trialEndsNotice.replace('{days}', summary.remainingDays) : `Tienes acceso total. Te quedan ${formatDaysLeft(summary.remainingDays)}.`}
               </p>
             </>
           ) : summary.isTrialExpired ? (
             <>
-              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Renovación de suscripción</p>
-              <p className="font-semibold text-wine">🔴 Tu período gratuito de 6 meses ha finalizado.</p>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">{t.subscriptionTab?.trialExpired || 'Periodo finalizado'}</p>
+              <p className="font-semibold text-wine">🔴 {t.subscriptionTab?.trialExpired || 'Tu período de prueba ha finalizado.'}</p>
               <p className="text-sm text-creamsoft mt-2">
-                Para continuar utilizando todas las herramientas avanzadas, puedes suscribirte a Kiosko Pro por $4.99 USD/mes.
+                {t.subscriptionTab?.subscribeToContinue || 'Suscríbete al plan Kiosko Pro para continuar administrando tu negocio.'}
               </p>
               <div className="mt-4">
-                <Btn variant="primary" className="justify-center">Suscribirme a Kiosko Pro</Btn>
+                <Btn variant="primary" className="justify-center">{t.subscriptionTab?.subscribeNow || 'Suscribirme a Kiosko Pro'}</Btn>
               </div>
             </>
           ) : (
             <>
-              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">Suscripción activa</p>
-              <p className="font-semibold text-cream">✅ Tu negocio tiene acceso completo a Kiosko Pro.</p>
-              <p className="text-sm text-creamsoft mt-2">Próxima renovación: {summary.renewedAt ? fmtDate(summary.renewedAt) : 'Sin fecha registrada aún'}.</p>
+              <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">{t.subscriptionTab?.activeSub || 'Suscripción activa'}</p>
+              <p className="font-semibold text-cream">✅ {t.subscriptionTab?.proPlan || 'Kiosko Pro'}</p>
+              <p className="text-sm text-creamsoft mt-2">{t.subscriptionTab?.fullAccess || 'Acceso completo.'}</p>
             </>
           )}
         </div>
@@ -172,6 +187,7 @@ export function TabMiSuscripcion({ negocio }) {
 
 /* ---------------- Dashboard ---------------- */
 export function TabDashboard({ negocio, data, onOpenShareMenu }) {
+  const { t, language } = useLanguage()
   const esModoInventario = negocio?.modo_operacion === 'inventario'
   const ventas = Array.isArray(data?.ventas) ? data.ventas : []
   const ingresos = Array.isArray(data?.ingresos) ? data.ingresos : []
@@ -190,55 +206,61 @@ export function TabDashboard({ negocio, data, onOpenShareMenu }) {
   const resultado = entradasMes - (comprasMes + pagosMes + otrosMes)
   const pendientes = pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length
   const lowStock = ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0))
+  const locale = language === 'en' ? 'en-US' : language === 'pt' ? 'pt-BR' : 'es-CO'
 
   return (
     <div>
-      <SectionTitle title={esModoInventario ? 'Resumen de inventario' : 'Resumen del mes'} sub={new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })} />
+      <SectionTitle
+        title={esModoInventario ? (t.inventory?.warehouseInventory || 'Resumen de inventario') : (t.dashboardTab?.monthSummary || 'Resumen del mes')}
+        sub={new Date().toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
+      />
 
       {!esModoInventario && onOpenShareMenu && (
         <div className="mb-6 p-4 rounded bg-paper2 border border-gold/30 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <span className="text-2xl">📱</span>
             <div>
-              <h4 className="font-serif text-sm font-semibold text-cream">Menú Digital & QR para tus clientes</h4>
+              <h4 className="font-serif text-sm font-semibold text-cream">
+                {t.digitalMenu?.button || 'Menú Digital / QR'}
+              </h4>
               <p className="text-xs text-creamsoft">
-                Tus clientes pueden ver tu catálogo en vivo y hacer pedidos desde su celular.
+                {t.digitalMenu?.sub || 'Menú digital QR para tus clientes'}
               </p>
             </div>
           </div>
           <Btn size="sm" variant="avocado" onClick={onOpenShareMenu}>
-            🔗 Ver enlace y Código QR
+            🔗 {t.myBusinessTab?.openMenu || 'Ver enlace y Código QR'}
           </Btn>
         </div>
       )}
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label={esModoInventario ? 'Ingresos registrados' : 'Ventas'} value={fmt$(entradasMes)} tone="gold" />
-        <StatCard label="Compras" value={fmt$(comprasMes)} tone="champagne" />
-        <StatCard label="Pagos a trabajadores" value={fmt$(pagosMes)} />
-        <StatCard label="Otros gastos" value={fmt$(otrosMes)} />
-        <StatCard label="Resultado aprox." value={fmt$(resultado)} tone="sage" />
+        <StatCard label={esModoInventario ? (t.dashboardTab?.totalIncome || 'Ingresos') : (t.dashboardTab?.sales || 'Ventas')} value={fmt$(entradasMes)} tone="gold" />
+        <StatCard label={t.dashboardTab?.purchases || 'Compras'} value={fmt$(comprasMes)} tone="champagne" />
+        <StatCard label={t.dashboardTab?.staffPayments || 'Pagos a personal'} value={fmt$(pagosMes)} />
+        <StatCard label={t.dashboardTab?.otherExpenses || 'Otros gastos'} value={fmt$(otrosMes)} />
+        <StatCard label={t.dashboardTab?.approxResult || 'Resultado aprox.'} value={fmt$(resultado)} tone="sage" />
       </div>
       <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
         {esModoInventario ? (
           <Card className="p-5">
-            <h3 className="font-serif text-lg font-semibold mb-3">Operación de inventario</h3>
-            <p className="text-creamsoft text-[13.5px] mb-3">Registra cada venta o entrada de dinero en “Ingresos / Egresos” para que la utilidad mensual sea precisa.</p>
+            <h3 className="font-serif text-lg font-semibold mb-3">{t.inventory?.warehouseInventory || 'Operación de inventario'}</h3>
+            <p className="text-creamsoft text-[13.5px] mb-3">{t.inventory?.warehouseInventoryDescription || 'Control de existencias y costos.'}</p>
             <div className="grid grid-cols-2 gap-3 text-[13px]">
-              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">Existencias</span><b className="font-mono text-gold">{ingredientes.length}</b></div>
-              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">Compras este mes</span><b className="font-mono text-gold">{fmt$(comprasMes)}</b></div>
+              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">{t.inventory?.supplies || 'Existencias'}</span><b className="font-mono text-gold">{ingredientes.length}</b></div>
+              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">{t.finance?.purchases || 'Compras'}</span><b className="font-mono text-gold">{fmt$(comprasMes)}</b></div>
             </div>
           </Card>
         ) : (
           <Card className="p-5">
             <h3 className="font-serif text-lg font-semibold mb-3">
-              Pedidos recientes {pendientes > 0 && <Pill tone="preparacion">{pendientes} en curso</Pill>}
+              {t.dashboardTab?.recentOrders || 'Pedidos recientes'} {pendientes > 0 && <Pill tone="preparacion">{pendientes} {t.ordersTab?.toServe || 'en curso'}</Pill>}
             </h3>
             {pedidos.length === 0 ? (
-              <Empty icon="🧾">Aún no hay pedidos. Cuando un cliente confirme uno, aparecerá aquí.</Empty>
+              <Empty icon="🧾">{t.dashboardTab?.noRecentOrders || 'Aún no hay pedidos.'}</Empty>
             ) : (
               <Table
-                head={['Pedido', 'Cliente', 'Total', 'Estado']}
+                head={[t.ordersTab?.colOrder || 'Pedido', t.ordersTab?.colCustomer || 'Cliente', t.ordersTab?.colTotal || 'Total', t.inventory?.status || 'Estado']}
                 rows={pedidos.slice(0, 6).map((p) => [
                   <span className="font-mono">#{p.numero}</span>,
                   p.cliente || 'Cliente',
@@ -250,13 +272,13 @@ export function TabDashboard({ negocio, data, onOpenShareMenu }) {
           </Card>
         )}
         <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Inventario bajo</h3>
+          <h3 className="font-serif text-lg font-semibold mb-3">{t.dashboardTab?.lowInventory || 'Inventario bajo'}</h3>
           {lowStock.length === 0 ? (
-            <p className="text-creamsoft text-[13.5px]">Todo el inventario está en buen nivel. 👍</p>
+            <p className="text-creamsoft text-[13.5px]">{t.dashboardTab?.healthyInventory || 'Todo el inventario está en buen nivel. 👍'}</p>
           ) : (
             lowStock.map((i) => (
               <div key={i.id} className="border-l-2 border-wine bg-wine/10 px-3 py-2 rounded-sm text-[12.5px] mb-2">
-                <b>{i.nombre}</b> — quedan {i.stock} {i.unidad} (mínimo {i.minimo})
+                <b>{i.nombre}</b> — {i.stock} {i.unidad} ({t.inventory?.minimum || 'mínimo'} {i.minimo})
               </div>
             ))
           )}
@@ -1032,6 +1054,7 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
    se saltan pasos al avanzar. En ambos modos, mientras el pedido no esté
    Entregado ni Cancelado, se puede Editar o Cancelar. */
 export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
+  const { t } = useLanguage()
   const [editando, setEditando] = useState(null) // pedido que se está editando
   const [cancelando, setCancelando] = useState(null) // pedido que se va a cancelar
   const productos = data.productos || []
@@ -1045,21 +1068,21 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
   }
   async function aceptar(p) {
     await avanzarEstadoPedido(p.id, 'En preparación')
-    notify(`Pedido #${p.numero} aceptado`)
+    notify(t.ordersTab?.orderAccepted ? t.ordersTab.orderAccepted.replace('{number}', p.numero) : `Pedido #${p.numero} aceptado`)
     if (onAvanzar) onAvanzar(p.id)
     reload()
   }
   async function entregar(p) {
     await avanzarEstadoPedido(p.id, 'Entregado')
-    notify(`Pedido #${p.numero} entregado`)
+    notify(t.ordersTab?.orderDelivered ? t.ordersTab.orderDelivered.replace('{number}', p.numero) : `Pedido #${p.numero} entregado`)
     if (onAvanzar) onAvanzar(p.id)
     reload()
   }
 
   const acciones = (p) => (
     <div className="flex gap-1.5 mt-1.5">
-      <button onClick={() => setEditando(p)} className="text-[11px] text-creamsoft hover:text-gold">✏️ Editar</button>
-      <button onClick={() => setCancelando(p)} className="text-[11px] text-creamsoft hover:text-wine">❌ Cancelar</button>
+      <button onClick={() => setEditando(p)} className="text-[11px] text-creamsoft hover:text-gold">{t.ordersTab?.edit || '✏️ Editar'}</button>
+      <button onClick={() => setCancelando(p)} className="text-[11px] text-creamsoft hover:text-wine">{t.ordersTab?.cancel || '❌ Cancelar'}</button>
     </div>
   )
 
@@ -1068,7 +1091,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
       {editando && (
         <EditarPedidoModal pedido={editando} productos={productos} onClose={() => setEditando(null)}
           guardar={(p, prods, items) => actualizarPedido(p, prods, items)}
-          onSaved={() => { const id = editando.id; setEditando(null); notify(`Pedido #${editando.numero} actualizado`); if (onAvanzar) onAvanzar(id); reload() }} />
+          onSaved={() => { const id = editando.id; setEditando(null); notify(t.ordersTab?.orderUpdated ? t.ordersTab.orderUpdated.replace('{number}', editando.numero) : `Pedido #${editando.numero} actualizado`); if (onAvanzar) onAvanzar(id); reload() }} />
       )}
       {cancelando && (
         <ConfirmCancelModal pedido={cancelando} onClose={() => setCancelando(null)}
@@ -1076,7 +1099,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
             const id = cancelando.id
             await cancelarPedido(cancelando, productos, simple ? 'Empleado' : 'Administrador')
             setCancelando(null)
-            notify(`Pedido #${cancelando.numero} cancelado`)
+            notify(t.ordersTab?.orderCancelled ? t.ordersTab.orderCancelled.replace('{number}', cancelando.numero) : `Pedido #${cancelando.numero} cancelado`)
             if (onAvanzar) onAvanzar(id)
             reload()
           }} />
@@ -1087,10 +1110,10 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
   if (simple) {
     const porAtender = data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado')
     const entregados = data.pedidos.filter((p) => p.estado === 'Entregado')
-    const columnas = [['Por atender', porAtender], ['Entregados', entregados]]
+    const columnas = [[t.ordersTab?.toServe || 'Por atender', porAtender], [t.ordersTab?.delivered || 'Entregados', entregados]]
     return (
       <div>
-        <SectionTitle title="Pedidos" sub="Toca una vez para aceptar el pedido y otra vez cuando lo entregues. Puedes editar o cancelar mientras no esté entregado." />
+        <SectionTitle title={t.ordersTab?.title || 'Pedidos'} sub={t.ordersTab?.subSimple || 'Toca una vez para aceptar el pedido y otra vez cuando lo entregues.'} />
         <div className="grid grid-cols-2 gap-3.5 max-[820px]:grid-cols-1">
           {columnas.map(([titulo, items]) => (
             <div key={titulo} className="bg-paper2 border border-line rounded p-3 min-h-[120px]">
@@ -1098,7 +1121,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                 {titulo} <span className="font-mono">{items.length}</span>
               </h4>
               {items.length === 0 ? (
-                <p className="text-[12px] text-creamsoft px-1.5">Sin pedidos</p>
+                <p className="text-[12px] text-creamsoft px-1.5">{t.ordersTab?.noOrders || 'Sin pedidos'}</p>
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
                   <div className="flex items-center justify-between gap-1 mb-1">
@@ -1110,7 +1133,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                         ? 'bg-gold/15 text-gold border-gold/30'
                         : 'bg-paper2 text-creamsoft border-line'
                     }`}>
-                      {p.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ Local'}
+                      {p.tipo_entrega === 'domicilio' ? (t.ordersTab?.delivery || '🛵 Domicilio') : (t.ordersTab?.local || '🍽️ Local')}
                     </span>
                   </div>
 
@@ -1131,9 +1154,9 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                   <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
                   <div className="flex justify-between items-center mt-2">
                     <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
-                    {p.estado === 'Pendiente' && <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>✅ Pedido aceptado</Btn>}
-                    {(p.estado === 'En preparación' || p.estado === 'Listo') && <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>📦 Entregado</Btn>}
-                    {p.estado === 'Entregado' && <span className="text-[11px]">✅</span>}
+                    {p.estado === 'Pendiente' && <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>{t.ordersTab?.acceptOrder || '✅ Pedido aceptado'}</Btn>}
+                    {(p.estado === 'En preparación' || p.estado === 'Listo') && <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>{t.ordersTab?.deliverOrder || '📦 Entregado'}</Btn>}
+                    {p.estado === 'Entregado' && <span className="text-[11px]">{t.ordersTab?.deliveredIcon || '✅'}</span>}
                   </div>
                   {p.estado !== 'Entregado' && acciones(p)}
                 </div>
@@ -1150,7 +1173,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
 
   return (
     <div>
-      <SectionTitle title="Pedidos" sub="Gestión en tiempo real — pensada para tablet o computador en cocina." />
+      <SectionTitle title={t.ordersTab?.title || 'Pedidos'} sub={t.ordersTab?.sub || 'Gestión en tiempo real — pensada para tablet o computador en cocina.'} />
       <div className="grid grid-cols-4 gap-3.5 max-[820px]:grid-cols-2">
         {ESTADOS.map((est) => {
           const items = data.pedidos.filter((p) => p.estado === est)
@@ -1160,7 +1183,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                 {est} <span className="font-mono">{items.length}</span>
               </h4>
               {items.length === 0 ? (
-                <p className="text-[12px] text-creamsoft px-1.5">Sin pedidos</p>
+                <p className="text-[12px] text-creamsoft px-1.5">{t.ordersTab?.noOrders || 'Sin pedidos'}</p>
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
                   <div className="flex items-center justify-between gap-1 mb-1">
@@ -1172,7 +1195,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                         ? 'bg-gold/15 text-gold border-gold/30'
                         : 'bg-paper2 text-creamsoft border-line'
                     }`}>
-                      {p.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ Local'}
+                      {p.tipo_entrega === 'domicilio' ? (t.ordersTab?.delivery || '🛵 Domicilio') : (t.ordersTab?.local || '🍽️ Local')}
                     </span>
                   </div>
 
@@ -1194,8 +1217,8 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                   <div className="flex justify-between items-center mt-2">
                     <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
                     {est !== 'Entregado'
-                      ? <Btn size="sm" variant="avocado" onClick={() => advance(p)}>Pasar a {ESTADOS[ESTADOS.indexOf(est) + 1]}</Btn>
-                      : <span className="text-[11px]">✅</span>}
+                      ? <Btn size="sm" variant="avocado" onClick={() => advance(p)}>{t.ordersTab?.advanceTo ? t.ordersTab.advanceTo.replace('{status}', ESTADOS[ESTADOS.indexOf(est) + 1]) : `Pasar a ${ESTADOS[ESTADOS.indexOf(est) + 1]}`}</Btn>
+                      : <span className="text-[11px]">{t.ordersTab?.deliveredIcon || '✅'}</span>}
                   </div>
                   {est !== 'Entregado' && acciones(p)}
                 </div>
@@ -1207,21 +1230,21 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
 
       <div className="mt-6">
         <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex items-center gap-2">
-          Cancelados <span className="font-mono">{cancelados.length}</span>
+          {t.ordersTab?.cancelledTitle || 'Cancelados'} <span className="font-mono">{cancelados.length}</span>
         </h4>
         {cancelados.length === 0 ? (
-          <p className="text-[12px] text-creamsoft">Ningún pedido cancelado.</p>
+          <p className="text-[12px] text-creamsoft">{t.ordersTab?.noCancelled || 'Ningún pedido cancelado.'}</p>
         ) : (
           <Table
-            head={['Pedido', 'Cliente', 'Tipo / Dirección', 'Total', 'Cancelado el', 'Por']}
+            head={[t.ordersTab?.colOrder || 'Pedido', t.ordersTab?.colCustomer || 'Cliente', t.ordersTab?.colDateTime || 'Hora / Fecha', t.ordersTab?.colTypeAddress || 'Tipo / Dirección', t.ordersTab?.colTotal || 'Total', t.ordersTab?.colBy || 'Por']}
             rows={cancelados.map((p) => [
-              <span className="font-mono">#{p.numero}</span>,
+              <span className="font-mono text-gold font-bold">#{p.numero}</span>,
               p.cliente,
+              <span className="text-[11px] font-mono text-creamsoft">{p.creado_en ? fmtDateTime(p.creado_en) : '—'}</span>,
               <span className="text-[11.5px] text-creamsoft">
-                {p.tipo_entrega === 'domicilio' ? `🛵 Domicilio (${p.direccion || 'Sin dir'})` : '🍽️ En local'}
+                {p.tipo_entrega === 'domicilio' ? `🛵 ${t.ordersTab?.delivery || 'Domicilio'} (${p.direccion || 'Sin dir'})` : `🍽️ ${t.ordersTab?.local || 'En local'}`}
               </span>,
-              <span className="font-mono">{fmt$(p.total)}</span>,
-              p.cancelado_en ? fmtDate(p.cancelado_en) : '—',
+              <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>,
               p.cancelado_por || '—',
             ])}
           />
@@ -1234,6 +1257,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
 
 /* ---------------- Ventas ---------------- */
 export function TabVentas({ data }) {
+  const { t } = useLanguage()
   const [detalle, setDetalle] = useState(null) // venta abierta para ver su detalle
   const [filtroPeriodo, setFiltroPeriodo] = useState('mes') // 'hoy' | '2dias' | 'semana' | 'mes' | 'mes_anterior' | 'personalizado' | 'todo'
   const [fechaInicio, setFechaInicio] = useState(todayStr())
@@ -1292,41 +1316,43 @@ export function TabVentas({ data }) {
   const totalUnidades = resumenProductos.reduce((a, p) => a + (Number(p?.cantidad) || 0), 0)
 
   const periodoLabel =
-    filtroPeriodo === 'hoy' ? 'Hoy' :
-    filtroPeriodo === '2dias' ? 'Últimos 2 días' :
-    filtroPeriodo === 'semana' ? 'Última semana' :
-    filtroPeriodo === 'mes' ? 'Este mes' :
-    filtroPeriodo === 'mes_anterior' ? 'Mes anterior' :
-    filtroPeriodo === 'personalizado' ? `${fechaInicio} al ${fechaFin}` : 'Todo el histórico'
+    filtroPeriodo === 'hoy' ? (t.salesTab?.labelToday || 'Hoy') :
+    filtroPeriodo === '2dias' ? (t.salesTab?.label2Days || 'Últimos 2 días') :
+    filtroPeriodo === 'semana' ? (t.salesTab?.labelWeek || 'Última semana') :
+    filtroPeriodo === 'mes' ? (t.salesTab?.labelMonth || 'Este mes') :
+    filtroPeriodo === 'mes_anterior' ? (t.salesTab?.labelLastMonth || 'Mes anterior') :
+    filtroPeriodo === 'personalizado' ? `${fechaInicio} - ${fechaFin}` : (t.salesTab?.labelAll || 'Todo el histórico')
 
   return (
     <div>
       <SectionTitle
-        title="Ventas y Reportes"
-        sub="Consulta y suma automáticamente los pedidos e ingresos por día, semana, mes o rango personalizado."
+        title={t.salesTab?.title || 'Ventas y Reportes'}
+        sub={t.salesTab?.description || 'Consulta y suma automáticamente los pedidos e ingresos por día, semana, mes o rango personalizado.'}
       />
 
       {/* Selector de periodo interactivo */}
       <div className="mb-6 bg-paper2 border border-line rounded-lg p-4 space-y-3 shadow-sm">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <span className="text-xs font-semibold text-cream uppercase tracking-wider flex items-center gap-1.5">
-            📅 Filtrar ventas por período: <span className="text-gold font-bold">{periodoLabel}</span>
+            📅 {t.salesTab?.filterByPeriod || 'Filtrar ventas por período:'} <span className="text-gold font-bold">{periodoLabel}</span>
           </span>
           <span className="text-[11.5px] text-creamsoft font-mono">
-            {pedidosCount} pedido{pedidosCount === 1 ? '' : 's'} sumados
+            {(t.salesTab?.ordersSummed || '{count} pedidos sumados')
+              .replace('{count}', pedidosCount)
+              .replace('{s}', pedidosCount === 1 ? '' : 's')}
           </span>
         </div>
 
         {/* Botones de filtros rápidos */}
         <div className="flex items-center gap-1.5 flex-wrap">
           {[
-            ['hoy', '☀️ Hoy'],
-            ['2dias', '⏳ 2 días'],
-            ['semana', '📅 Semana (7d)'],
-            ['mes', '🗓️ Este mes'],
-            ['mes_anterior', '⏮️ Mes anterior'],
-            ['personalizado', '🔍 Personalizado'],
-            ['todo', '🌐 Todo el histórico'],
+            ['hoy', t.salesTab?.periodToday || '☀️ Hoy'],
+            ['2dias', t.salesTab?.period2Days || '⏳ 2 días'],
+            ['semana', t.salesTab?.periodWeek || '📅 Semana (7d)'],
+            ['mes', t.salesTab?.periodMonth || '🗓️ Este mes'],
+            ['mes_anterior', t.salesTab?.periodLastMonth || '⏮️ Mes anterior'],
+            ['personalizado', t.salesTab?.periodCustom || '🔍 Personalizado'],
+            ['todo', t.salesTab?.periodAll || '🌐 Todo el histórico'],
           ].map(([k, label]) => (
             <button
               key={k}
@@ -1346,7 +1372,7 @@ export function TabVentas({ data }) {
         {filtroPeriodo === 'personalizado' && (
           <div className="pt-2 border-t border-line/60 flex items-center gap-3 flex-wrap animate-fadeIn">
             <div className="flex items-center gap-2">
-              <label className="text-xs text-creamsoft font-semibold">Desde:</label>
+              <label className="text-xs text-creamsoft font-semibold">{t.salesTab?.from || 'Desde:'}</label>
               <input
                 type="date"
                 value={fechaInicio}
@@ -1355,7 +1381,7 @@ export function TabVentas({ data }) {
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-xs text-creamsoft font-semibold">Hasta:</label>
+              <label className="text-xs text-creamsoft font-semibold">{t.salesTab?.to || 'Hasta:'}</label>
               <input
                 type="date"
                 value={fechaFin}
@@ -1369,28 +1395,39 @@ export function TabVentas({ data }) {
 
       {/* Tarjetas de estadísticas sumadas del período seleccionado */}
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label={`Ventas (${periodoLabel})`} value={fmt$(totalPeriodo)} tone="gold" />
-        <StatCard label={`Pedidos (${periodoLabel})`} value={pedidosCount} tone="champagne" />
-        <StatCard label="Ticket promedio" value={fmt$(ticketPromedio)} />
-        <StatCard label="Platos / Productos vendidos" value={totalUnidades} tone="sage" />
+        <StatCard label={(t.salesTab?.statSales || 'Ventas ({period})').replace('{period}', periodoLabel)} value={fmt$(totalPeriodo)} tone="gold" />
+        <StatCard label={(t.salesTab?.statOrders || 'Pedidos ({period})').replace('{period}', periodoLabel)} value={pedidosCount} tone="champagne" />
+        <StatCard label={t.salesTab?.statAverageTicket || 'Ticket promedio'} value={fmt$(ticketPromedio)} />
+        <StatCard label={t.salesTab?.statSoldProducts || 'Platos / Productos vendidos'} value={totalUnidades} tone="sage" />
       </div>
 
       {/* Tabla de ventas del período */}
       <Card className="p-5 mb-6">
         <div className="flex items-center justify-between mb-3 pb-2 border-b border-line/60">
           <h3 className="font-serif text-base font-semibold text-cream">
-            Historial de Ventas — {periodoLabel} ({pedidosCount})
+            {(t.salesTab?.historyTitle || 'Historial de Ventas — {period} ({count})')
+              .replace('{period}', periodoLabel)
+              .replace('{count}', pedidosCount)}
           </h3>
           <span className="font-mono text-gold font-bold text-sm">
-            Total: {fmt$(totalPeriodo)}
+            {t.salesTab?.total || 'Total:'} {fmt$(totalPeriodo)}
           </span>
         </div>
 
         {ventasFiltradas.length === 0 ? (
-          <Empty icon="💵">No hay ventas registradas en el período seleccionado ({periodoLabel}).</Empty>
+          <Empty icon="💵">
+            {(t.salesTab?.noSales || 'No hay ventas registradas en el período seleccionado ({period}).').replace('{period}', periodoLabel)}
+          </Empty>
         ) : (
           <Table
-            head={['Fecha / Hora', 'Pedido', 'Cliente', 'Productos', 'Total', '']}
+            head={[
+              t.salesTab?.colDateTime || 'Fecha / Hora',
+              t.salesTab?.colOrder || 'Pedido',
+              t.salesTab?.colCustomer || 'Cliente',
+              t.salesTab?.colProducts || 'Productos',
+              t.salesTab?.colTotal || 'Total',
+              ''
+            ]}
             rows={ventasFiltradas.map((v) => {
               const items = v.pedidos?.pedido_items || []
               const resumen = Array.isArray(items) && items.length > 0
@@ -1408,7 +1445,7 @@ export function TabVentas({ data }) {
                   onClick={() => setDetalle(v)}
                   className="text-[12px] font-semibold text-gold hover:text-golddark whitespace-nowrap bg-paper2 px-2.5 py-1 rounded border border-line hover:border-gold transition-colors"
                 >
-                  Ver detalle →
+                  {t.salesTab?.viewDetail || 'Ver detalle →'}
                 </button>,
               ]
             })}
@@ -1419,19 +1456,28 @@ export function TabVentas({ data }) {
       {/* Resumen de productos vendidos en el período seleccionado */}
       <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
         <div>
-          <h3 className="font-serif text-lg font-semibold">Productos más vendidos ({periodoLabel})</h3>
+          <h3 className="font-serif text-lg font-semibold">
+            {(t.salesTab?.bestSellersTitle || 'Productos más vendidos ({period})').replace('{period}', periodoLabel)}
+          </h3>
           <p className="text-creamsoft text-[12.5px]">
-            Suma exacta de cada plato o artículo vendido en este período para controlar la demanda y compras.
+            {t.salesTab?.bestSellersDesc || 'Suma exacta de cada plato o artículo vendido en este período para controlar la demanda y compras.'}
           </p>
         </div>
       </div>
 
       <Card className="p-5">
         {resumenProductos.length === 0 ? (
-          <Empty icon="📦">No hay productos vendidos en este período ({periodoLabel}).</Empty>
+          <Empty icon="📦">
+            {(t.salesTab?.noBestSellers || 'No hay productos vendidos en este período ({period}).').replace('{period}', periodoLabel)}
+          </Empty>
         ) : (
           <Table
-            head={['Producto', 'Cantidad vendida', 'Precio promedio', 'Total generado']}
+            head={[
+              t.salesTab?.colProduct || 'Producto',
+              t.salesTab?.colQuantity || 'Cantidad vendida',
+              t.salesTab?.colAveragePrice || 'Precio promedio',
+              t.salesTab?.colTotalGenerated || 'Total generado'
+            ]}
             rows={resumenProductos.map((p) => [
               <span className="font-semibold text-cream">{p.nombre}</span>,
               <span className="font-mono font-bold text-gold">{p.cantidad}</span>,
@@ -1448,23 +1494,24 @@ export function TabVentas({ data }) {
 }
 
 function VentaDetalleModal({ venta, onClose }) {
+  const { t } = useLanguage()
   const pedido = venta.pedidos
   const items = pedido?.pedido_items || []
   const tieneItems = items.length > 0
 
   return (
-    <Modal title={`🧾 Detalle de Venta ${pedido?.numero ? `#${pedido.numero}` : ''}`} onClose={onClose}>
+    <Modal title={`🧾 ${t.salesTab?.modalTitle || 'Detalle de Venta'} ${pedido?.numero ? `#${pedido.numero}` : ''}`} onClose={onClose}>
       <div className="space-y-4">
         {/* Cabecera con fecha y total */}
         <div className="bg-paper2 border border-line rounded-lg p-3.5 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <span className="text-[10.5px] uppercase tracking-wider text-creamsoft block">Fecha y Hora</span>
+            <span className="text-[10.5px] uppercase tracking-wider text-creamsoft block">{t.salesTab?.modalDateTime || 'Fecha y Hora'}</span>
             <span className="text-xs font-mono text-cream font-medium">
               ⏰ {venta.creado_en ? fmtDateTime(venta.creado_en) : '—'}
             </span>
           </div>
           <div className="text-right">
-            <span className="text-[10.5px] uppercase tracking-wider text-creamsoft block">Total Venta</span>
+            <span className="text-[10.5px] uppercase tracking-wider text-creamsoft block">{t.salesTab?.modalTotal || 'Total Venta'}</span>
             <span className="font-mono text-gold font-bold text-lg">{fmt$(venta.total)}</span>
           </div>
         </div>
@@ -1481,7 +1528,7 @@ function VentaDetalleModal({ venta, onClose }) {
                   ? 'bg-gold/15 text-gold border-gold/30'
                   : 'bg-paper text-creamsoft border-line'
               }`}>
-                {pedido.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ En local'}
+                {pedido.tipo_entrega === 'domicilio' ? `🛵 ${t.ordersTab?.delivery || 'Domicilio'}` : `🍽️ ${t.ordersTab?.local || 'En local'}`}
               </span>
             </div>
 
@@ -1530,7 +1577,7 @@ function VentaDetalleModal({ venta, onClose }) {
         {/* Tabla o lista de productos comprados */}
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-creamsoft mb-2">
-            Productos en esta venta ({items.length})
+            {t.salesTab?.modalProducts || 'Productos en esta venta'} ({items.length})
           </h4>
           {tieneItems ? (
             <div className="divide-y divide-line/70 border border-line rounded-lg overflow-hidden bg-paper">
@@ -1567,7 +1614,7 @@ function VentaDetalleModal({ venta, onClose }) {
 
         <div className="flex justify-end pt-2">
           <Btn variant="primary" onClick={onClose} className="justify-center">
-            Cerrar
+            {t.orderShared?.back || 'Cerrar'}
           </Btn>
         </div>
       </div>
@@ -1779,16 +1826,16 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
 
       <p className="text-creamsoft text-[11.5px] mb-5">{t.finance.thisMonth} ↓</p>
       <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label={esModoInventario ? 'Ingresos totales' : 'Ingresos (ventas + otros)'} value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
-        <StatCard label="Egresos (compras)" value={fmt$(egresosCompras)} tone="gold" />
-        <StatCard label="Egresos (personal)" value={fmt$(egresosPagos)} tone="champagne" />
-        <StatCard label="Otros egresos" value={fmt$(egresosOtros)} />
+        <StatCard label={esModoInventario ? (t.dashboardTab?.totalIncome || 'Ingresos totales') : (t.finance?.salesAndOther || 'Ingresos (ventas + otros)')} value={fmt$(ingresosVentas + ingresosExtra)} tone="sage" />
+        <StatCard label={t.finance?.purchaseExpenses || 'Egresos (compras)'} value={fmt$(egresosCompras)} tone="gold" />
+        <StatCard label={t.finance?.staffExpenses || 'Egresos (personal)'} value={fmt$(egresosPagos)} tone="champagne" />
+        <StatCard label={t.finance?.otherExpenses || 'Otros egresos'} value={fmt$(egresosOtros)} />
       </div>
 
       <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1 mb-6">
         <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Ingresos registrados</h3>
-          {ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos registrados aún.</p> :
+          <h3 className="font-serif text-lg font-semibold mb-3">{t.finance?.extraIncome || 'Ingresos registrados'}</h3>
+          {ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">{t.finance?.noManualIncome || 'Sin ingresos registrados aún.'}</p> :
             ingresos.map((i) => (
               <div key={i.id} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] last:border-none">
                 <div>
@@ -1803,8 +1850,8 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
             ))}
         </Card>
         <Card className="p-5">
-          <h3 className="font-serif text-lg font-semibold mb-3">Otros gastos</h3>
-          {egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
+          <h3 className="font-serif text-lg font-semibold mb-3">{t.finance?.otherCosts || 'Otros gastos'}</h3>
+          {egresos.length === 0 ? <p className="text-creamsoft text-[13px]">{t.finance?.noOtherCosts || 'Sin otros gastos aún.'}</p> :
             egresos.map((e) => (
               <div key={e.id} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] last:border-none">
                 <div>
@@ -1826,13 +1873,13 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
         <CapitalModal negocio={negocio} onClose={() => setModal(null)}
           onSaved={async (nuevoValor) => {
             setModal(null)
-            notify('Base inicial guardada')
+            notify(t.finance?.initialSaved || 'Base inicial guardada')
             if (onNegocioUpdated) await onNegocioUpdated({ capital_inicial: nuevoValor })
           }} />
       )}
       {(modal === 'ingreso' || modal === 'egreso') && (
         <MovimientoModal negocio={negocio} tipo={modal} onClose={() => setModal(null)}
-          onSaved={() => { setModal(null); notify('Movimiento registrado'); reload() }} />
+          onSaved={() => { setModal(null); notify(t.finance?.movementSaved || 'Movimiento registrado'); reload() }} />
       )}
     </div>
   )
@@ -1857,8 +1904,7 @@ function CapitalModal({ negocio, onClose, onSaved }) {
     <Modal onClose={onClose}>
       <h2 className="font-serif text-xl font-semibold mb-2">{t.finance.initialTitle}</h2>
       <p className="text-creamsoft text-[13px] mb-4">
-        Es el dinero con el que arrancó el negocio, antes de empezar a registrar ventas, compras y gastos en Kiosko.
-        Se suma a todos los movimientos para calcular el saldo actual real.
+        {t.finance?.initialDescription || 'Es el dinero con el que arrancó el negocio, antes de empezar a registrar ventas, compras y gastos en Kiosko. Se suma a todos los movimientos para calcular el saldo actual real.'}
       </p>
       <form onSubmit={submit}>
         <Field label={`${t.finance.initialCapital} (COP)`}>
@@ -1923,11 +1969,11 @@ function ReportePeriodo({ negocio, data }) {
   const resultado = (totalVentas + totalIngresos) - (totalCompras + totalPagos + totalEgresos)
 
   const movimientos = [
-    ...ventas.map((v) => ({ fecha: v.creado_en, tipo: 'Venta', concepto: 'Pedido de clientes', valor: Number(v.total) || 0, signo: 1 })),
-    ...ingresos.map((i) => ({ fecha: i.creado_en, tipo: 'Ingreso', concepto: i.concepto || 'Ingreso', valor: Number(i.valor) || 0, signo: 1 })),
-    ...compras.map((c) => ({ fecha: c.creado_en, tipo: 'Compra', concepto: c.ingredientes?.nombre || 'Insumo', valor: Number(c.valor) || 0, signo: -1 })),
-    ...pagos.map((p) => ({ fecha: p.creado_en, tipo: 'Pago personal', concepto: p.trabajador || 'Empleado', valor: Number(p.valor) || 0, signo: -1 })),
-    ...egresos.map((e) => ({ fecha: e.creado_en, tipo: 'Egreso', concepto: e.concepto || 'Gasto', valor: Number(e.valor) || 0, signo: -1 })),
+    ...ventas.map((v) => ({ fecha: v.creado_en, tipo: t.dashboardTab?.sales || 'Venta', concepto: 'Pedido de clientes', valor: Number(v.total) || 0, signo: 1 })),
+    ...ingresos.map((i) => ({ fecha: i.creado_en, tipo: t.finance?.income || 'Ingreso', concepto: i.concepto || 'Ingreso', valor: Number(i.valor) || 0, signo: 1 })),
+    ...compras.map((c) => ({ fecha: c.creado_en, tipo: t.dashboardTab?.purchases || 'Compra', concepto: c.ingredientes?.nombre || 'Insumo', valor: Number(c.valor) || 0, signo: -1 })),
+    ...pagos.map((p) => ({ fecha: p.creado_en, tipo: t.report?.staffPayments || 'Pago personal', concepto: p.trabajador || 'Empleado', valor: Number(p.valor) || 0, signo: -1 })),
+    ...egresos.map((e) => ({ fecha: e.creado_en, tipo: t.finance?.expense || 'Egreso', concepto: e.concepto || 'Gasto', valor: Number(e.valor) || 0, signo: -1 })),
   ].sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
 
   const etiquetaPeriodo = tipoRango === 'dia' ? fmtDateLong(fecha + 'T12:00:00') : fmtMonthLabel(mes)
@@ -1963,11 +2009,11 @@ function ReportePeriodo({ negocio, data }) {
         <p className="text-creamsoft text-[12px] mb-3 print:hidden">{t.report.period}: <b className="text-cream">{etiquetaPeriodo}</b></p>
 
         <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3 mb-5">
-          <StatCard label="Ventas" value={fmt$(totalVentas)} tone="sage" />
+          <StatCard label={t.dashboardTab?.sales || 'Ventas'} value={fmt$(totalVentas)} tone="sage" />
           <StatCard label={t.report.otherIncome} value={fmt$(totalIngresos)} tone="sage" />
-          <StatCard label="Compras" value={fmt$(totalCompras)} tone="gold" />
+          <StatCard label={t.dashboardTab?.purchases || 'Compras'} value={fmt$(totalCompras)} tone="gold" />
           <StatCard label={t.report.staffPayments} value={fmt$(totalPagos)} tone="champagne" />
-          <StatCard label="Otros egresos" value={fmt$(totalEgresos)} />
+          <StatCard label={t.dashboardTab?.otherExpenses || 'Otros egresos'} value={fmt$(totalEgresos)} />
           <StatCard label={t.report.result} value={fmt$(resultado)} tone={resultado >= 0 ? 'sage' : 'wine'} />
         </div>
 
@@ -1975,7 +2021,7 @@ function ReportePeriodo({ negocio, data }) {
           <Empty>{t.report.noMovements}</Empty>
         ) : (
           <Table
-            head={['Fecha', 'Tipo', 'Concepto', 'Valor']}
+            head={[t.finance?.date || 'Fecha', t.stats?.overview || 'Tipo', t.finance?.concept || 'Concepto', t.finance?.value || 'Valor']}
             rows={movimientos.map((m) => [
               <span className="font-mono">{m.fecha ? fmtDate(m.fecha) : '—'}</span>,
               m.tipo,
@@ -2017,7 +2063,7 @@ export function TabEstadisticas({ negocio, data }) {
         <SectionTitle title={t.stats.title} sub={t.stats.description.replace('{business}', negocio?.nombre || 'Negocio')} />
         <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
           <Card className="p-5">
-            <h3 className="font-serif text-lg font-semibold mb-3">Artículos de mayor valor en stock</h3>
+            <h3 className="font-serif text-lg font-semibold mb-3">{t.stats?.topStockValue || 'Artículos de mayor valor en stock'}</h3>
             {rankingStock.length === 0 ? (
               <Empty icon="📦">Aún no hay artículos registrados en el inventario.</Empty>
             ) : (
@@ -2038,13 +2084,13 @@ export function TabEstadisticas({ negocio, data }) {
           <Card className="p-5">
             <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.overview}</h3>
             {[
-              ['Artículos registrados', ingredientes.length],
-              ['Artículos con bajo stock', bajoStock],
-              ['Valor total en inventario', fmt$(valorTotal)],
-              ['Compras registradas', compras.length],
-              ['Trabajadores activos', trabajadores.filter((w) => w.estado === 'Activo').length],
-              ['Total ingresos registrados', fmt$(totalIngresos)],
-              ['Total egresos + compras', fmt$(totalEgresos + totalCompras)],
+              [t.inventory?.totalItems || 'Artículos registrados', ingredientes.length],
+              [t.inventory?.lowStockItems || 'Artículos con bajo stock', bajoStock],
+              [t.inventory?.totalInventoryValue || 'Valor total en inventario', fmt$(valorTotal)],
+              [t.finance?.purchases || 'Compras registradas', compras.length],
+              [t.stats?.activeStaff || 'Trabajadores activos', trabajadores.filter((w) => w.estado === 'Activo').length],
+              [t.dashboardTab?.totalIncome || 'Total ingresos registrados', fmt$(totalIngresos)],
+              [t.dashboardTab?.totalExpenses || 'Total egresos + compras', fmt$(totalEgresos + totalCompras)],
             ].map(([label, val], i) => (
               <div key={i} className="flex justify-between border-b border-line py-2.5 text-[13px] last:border-none">
                 <span>{label}</span><b className="font-mono">{val}</b>
@@ -2089,12 +2135,12 @@ export function TabEstadisticas({ negocio, data }) {
         <Card className="p-5">
           <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.overview}</h3>
           {[
-            ['Productos activos', Math.max(0, productos.length - agotados)],
-            ['Productos agotados', agotados],
-            ['Ingredientes con bajo stock', ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0)).length],
-            ['Trabajadores activos', trabajadores.filter((w) => w.estado === 'Activo').length],
-            ['Pedidos activos / entregados', pedidosValidos.length],
-            ['Total histórico vendido', fmt$(totalHistorico)],
+            [t.stats?.activeProducts || 'Productos activos', Math.max(0, productos.length - agotados)],
+            [t.stats?.soldOutProducts || 'Productos agotados', agotados],
+            [t.stats?.lowStockIngredients || 'Ingredientes con bajo stock', ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0)).length],
+            [t.stats?.activeStaff || 'Trabajadores activos', trabajadores.filter((w) => w.estado === 'Activo').length],
+            [t.stats?.totalOrders || 'Pedidos activos / entregados', pedidosValidos.length],
+            [t.stats?.totalSales || 'Total histórico vendido', fmt$(totalHistorico)],
           ].map(([label, val], i) => (
             <div key={i} className="flex justify-between border-b border-line py-2.5 text-[13px] last:border-none">
               <span>{label}</span><b className="font-mono">{val}</b>

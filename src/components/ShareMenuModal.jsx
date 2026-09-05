@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Modal, Btn } from './ui'
+import { useLanguage } from '../lib/i18n.jsx'
 
 export function ShareMenuModal({ negocio, onClose, notify }) {
+  const { t } = useLanguage()
   const [copiado, setCopiado] = useState(false)
   const urlMenu = `https://administraciondenegocios.netlify.app/?negocio=${negocio.id}`
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=15&format=png&data=${encodeURIComponent(urlMenu)}`
@@ -10,7 +12,7 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
     try {
       await navigator.clipboard.writeText(urlMenu)
       setCopiado(true)
-      if (notify) notify('¡Enlace de menú copiado al portapapeles!')
+      if (notify) notify(t.digitalMenu?.linkCopied || '¡Enlace de menú copiado al portapapeles!')
       setTimeout(() => setCopiado(false), 2500)
     } catch {
       // Fallback
@@ -33,7 +35,7 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Código QR — ${negocio.nombre}</title>
+        <title>${(t.digitalMenu?.qrPrintTitle || 'Código QR — {business}').replace('{business}', negocio.nombre)}</title>
         <style>
           body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -87,7 +89,7 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
           <h1>${negocio.emoji ? negocio.emoji + ' ' : ''}${negocio.nombre}</h1>
           ${negocio.slogan ? `<p class="slogan">${negocio.slogan}</p>` : ''}
           <img class="qr" src="${qrCodeUrl}" alt="QR Menu" />
-          <div class="cta">📱 Escanea con tu celular para ver el menú y ordenar</div>
+          <div class="cta">${t.digitalMenu?.scanToOrder || '📱 Escanea con tu celular para ver el menú y ordenar'}</div>
           <div class="subtext">${urlMenu}</div>
         </div>
         <script>
@@ -111,10 +113,10 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
             <span className="text-xl">{negocio.emoji || '🍴'}</span>
             <div>
               <h3 className="font-serif text-xl font-semibold text-cream">
-                Menú Digital & Código QR
+                {t.digitalMenu?.shareTitle || 'Menú Digital & Código QR'}
               </h3>
               <p className="text-xs text-creamsoft">
-                {negocio.nombre} · Tu enlace web público para clientes
+                {(t.digitalMenu?.shareSubtitle || '{business} · Tu enlace web público para clientes').replace('{business}', negocio.nombre)}
               </p>
             </div>
           </div>
@@ -123,7 +125,7 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
         {/* Enlace directo */}
         <div>
           <label className="block text-xs font-semibold uppercase tracking-wider text-creamsoft mb-1.5">
-            Enlace web de tu menú:
+            {t.digitalMenu?.webLinkLabel || 'Enlace web de tu menú:'}
           </label>
           <div className="flex gap-2">
             <input
@@ -133,7 +135,7 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
               className="flex-1 bg-paper border border-line rounded px-3 py-2 text-xs font-mono text-gold select-all focus:outline-none"
             />
             <Btn size="sm" variant={copiado ? 'avocado' : 'primary'} onClick={copiarLink}>
-              {copiado ? '✓ ¡Copiado!' : '📋 Copiar'}
+              {copiado ? (t.digitalMenu?.copied || '✓ ¡Copiado!') : (t.digitalMenu?.copy || '📋 Copiar')}
             </Btn>
           </div>
         </div>
@@ -149,10 +151,10 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
             />
           </div>
           <p className="text-xs text-cream font-medium">
-            📱 Tus clientes escanean este código y tu menú abre directamente en su navegador.
+            {t.digitalMenu?.scanHint || '📱 Tus clientes escanean este código y tu menú abre directamente en su navegador.'}
           </p>
           <p className="text-[11px] text-creamsoft mt-0.5">
-            Ideal para imprimir y poner en mesas, mostrador, volantes o cartas.
+            {t.digitalMenu?.printHint || 'Ideal para imprimir y poner en mesas, mostrador, volantes o cartas.'}
           </p>
         </div>
 
@@ -170,7 +172,7 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
             className="justify-center text-xs py-2.5"
             onClick={imprimirQR}
           >
-            🖨️ Imprimir QR
+            {t.digitalMenu?.printQR || '🖨️ Imprimir QR'}
           </Btn>
           <a
             href={urlMenu}
@@ -178,13 +180,13 @@ export function ShareMenuModal({ negocio, onClose, notify }) {
             rel="noreferrer"
             className="inline-flex items-center justify-center px-3 py-2.5 rounded text-xs font-semibold border border-line bg-paper2 hover:bg-paper text-cream text-center"
           >
-            👁️ Ver Menú Web
+            {t.digitalMenu?.viewWebMenu || '👁️ Ver Menú Web'}
           </a>
         </div>
 
         <div className="flex justify-end pt-3 border-t border-line">
           <Btn variant="ghost" onClick={onClose}>
-            Cerrar
+            {t.orderShared?.back || 'Cerrar'}
           </Btn>
         </div>
       </div>

@@ -98,7 +98,7 @@ export function FeedbackModal({ negocio, onClose, notify }) {
 
         <div className="pt-2 flex justify-end gap-2">
           <Btn variant="ghost" type="button" onClick={onClose} disabled={enviando}>
-            Cancelar
+            {t.orderShared?.back || 'Cancelar'}
           </Btn>
           <Btn variant="primary" type="submit" disabled={enviando}>
             {enviando ? t.feedback.sending : t.feedback.send}
