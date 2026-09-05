@@ -89,7 +89,7 @@ function createWindow() {
     console.error([Kiosko] Fallo al cargar:  )
   })
   win.webContents.on('render-process-gone', (_event, details) => {
-    console.error([Kiosko] El proceso visual terminó: )
+    console.error([Kiosko] El proceso visual terminï¿½: )
   })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
