@@ -1,17 +1,7 @@
-import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-import fs from 'node:fs'
-import http from 'node:http'
-
-const require = createRequire(import.meta.url)
 const { app, BrowserWindow, Menu, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const http = require('node:http')
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 const writableAppData = path.join(process.env.LOCALAPPDATA || app.getPath('appData'), 'Kiosko')
 
