@@ -165,3 +165,39 @@ export function Pill({ children, tone = 'default' }) {
   }
   return <span className={`text-[10.5px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wide ${tones[tone]}`}>{children}</span>
 }
+
+import { Component } from 'react'
+
+export class TabErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('[Kiosko ErrorBoundary]', error, errorInfo)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="bg-paper2 border border-line rounded-lg p-6 text-center my-4 space-y-3">
+          <div className="text-3xl">⚠️</div>
+          <h3 className="font-serif text-base font-semibold text-cream">No se pudo cargar esta sección momentáneamente</h3>
+          <p className="text-creamsoft text-xs">Tus datos están a salvo.</p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, error: null })
+              if (this.props.onReset) this.props.onReset()
+            }}
+            className="bg-gold text-paper px-4 py-2 rounded text-xs font-semibold hover:bg-golddark transition-colors"
+          >
+            🔄 Recargar sección
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}

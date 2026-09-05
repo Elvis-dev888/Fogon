@@ -10,6 +10,7 @@ import {
 } from './AdminTabs'
 import { FeedbackModal } from './FeedbackModal'
 import { ShareMenuModal } from './ShareMenuModal'
+import { TabErrorBoundary } from './ui'
 import { supabase } from '../lib/supabaseClient'
 import { playPedidoNuevo, fmt$ } from '../lib/helpers'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
@@ -151,20 +152,22 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
           ⏻ {t.signOut}
         </button>
       </nav>
-      <div className="animate-fadein">
-        {tab === 'dashboard' && <TabDashboard {...props} />}
-        {tab === 'suscripcion' && <TabMiSuscripcion {...props} />}
-        {tab === 'minegocio' && <TabMiNegocio {...props} />}
-        {tab === 'productos' && <TabProductos {...props} />}
-        {tab === 'categorias' && <TabCategorias {...props} />}
-        {tab === 'inventario' && <TabInventario {...props} />}
-        {tab === 'compras' && <TabCompras {...props} />}
-        {tab === 'pedidos' && <TabPedidos {...props} simple />}
-        {tab === 'ventas' && <TabVentas {...props} />}
-        {tab === 'trabajadores' && <TabTrabajadores {...props} />}
-        {tab === 'finanzas' && <TabFinanzas {...props} />}
-        {tab === 'estadisticas' && <TabEstadisticas {...props} />}
-      </div>
+      <TabErrorBoundary onReset={reload}>
+        <div className="animate-fadein">
+          {tab === 'dashboard' && <TabDashboard {...props} />}
+          {tab === 'suscripcion' && <TabMiSuscripcion {...props} />}
+          {tab === 'minegocio' && <TabMiNegocio {...props} />}
+          {tab === 'productos' && <TabProductos {...props} />}
+          {tab === 'categorias' && <TabCategorias {...props} />}
+          {tab === 'inventario' && <TabInventario {...props} />}
+          {tab === 'compras' && <TabCompras {...props} />}
+          {tab === 'pedidos' && <TabPedidos {...props} simple />}
+          {tab === 'ventas' && <TabVentas {...props} />}
+          {tab === 'trabajadores' && <TabTrabajadores {...props} />}
+          {tab === 'finanzas' && <TabFinanzas {...props} />}
+          {tab === 'estadisticas' && <TabEstadisticas {...props} />}
+        </div>
+      </TabErrorBoundary>
       {mostrarFeedback && (
         <FeedbackModal negocio={negocio} onClose={() => setMostrarFeedback(false)} notify={notify} />
       )}

@@ -1,27 +1,39 @@
 export const fmt$ = (n) => '$' + Math.round(n || 0).toLocaleString('es-CO')
 
-export const fmtDate = (d) =>
-  new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+export const fmtDate = (d) => {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
+}
 
 export const fmtTime = (d) => {
   if (!d) return ''
   const date = new Date(d)
+  if (isNaN(date.getTime())) return ''
   return date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
 }
 
 export const fmtDateTime = (d) => {
-  if (!d) return ''
+  if (!d) return '—'
   const date = new Date(d)
+  if (isNaN(date.getTime())) return '—'
   const time = date.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
   const day = date.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })
   return `${day} · ${time}`
 }
 
-export const fmtDateLong = (d) =>
-  new Date(d).toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+export const fmtDateLong = (d) => {
+  if (!d) return '—'
+  const date = new Date(d)
+  if (isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' })
+}
 
 export const sameMonth = (d) => {
+  if (!d) return false
   const x = new Date(d)
+  if (isNaN(x.getTime())) return false
   const now = new Date()
   return x.getMonth() === now.getMonth() && x.getFullYear() === now.getFullYear()
 }
@@ -29,7 +41,9 @@ export const sameMonth = (d) => {
 // 'YYYY-MM-DD' en horario local — para agrupar movimientos por día y para que
 // coincida con lo que devuelve un <input type="date">.
 export const dateStr = (d) => {
+  if (!d) return ''
   const x = new Date(d)
+  if (isNaN(x.getTime())) return ''
   const y = x.getFullYear()
   const m = String(x.getMonth() + 1).padStart(2, '0')
   const day = String(x.getDate()).padStart(2, '0')
@@ -38,7 +52,10 @@ export const dateStr = (d) => {
 
 // 'YYYY-MM' en horario local — para agrupar por mes y para que coincida con
 // lo que devuelve un <input type="month">.
-export const monthStr = (d) => dateStr(d).slice(0, 7)
+export const monthStr = (d) => {
+  const s = dateStr(d)
+  return s ? s.slice(0, 7) : ''
+}
 
 export const todayStr = () => dateStr(new Date())
 
