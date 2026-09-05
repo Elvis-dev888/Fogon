@@ -1,6 +1,6 @@
-import { useState } from 'react'
+ import { useState } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
-import { fmt$, fmtDate, fmtDateLong, fmtDateTime, fmtTime, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
+import { fmt$, fmtDate, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
 import { getSubscriptionSummary, formatDaysLeft } from '../lib/subscription'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
@@ -1026,10 +1026,7 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
 export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
   const [editando, setEditando] = useState(null) // pedido que se está editando
   const [cancelando, setCancelando] = useState(null) // pedido que se va a cancelar
-  const [busqueda, setBusqueda] = useState('')
-  const [filtroTipo, setFiltroTipo] = useState('todos') // 'todos' | 'domicilio' | 'local'
   const productos = data.productos || []
-  const todosPedidos = data.pedidos || []
 
   async function advance(p) {
     const i = ESTADOS.indexOf(p.estado)
@@ -1051,32 +1048,10 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
     reload()
   }
 
-  // Filtrado de pedidos en tiempo real por búsqueda y tipo de entrega
-  const pedidosFiltrados = todosPedidos.filter((p) => {
-    // Filtro por tipo de entrega
-    if (filtroTipo === 'domicilio' && p.tipo_entrega !== 'domicilio') return false
-    if (filtroTipo === 'local' && p.tipo_entrega === 'domicilio') return false
-
-    // Filtro por término de búsqueda
-    if (!busqueda.trim()) return true
-    const q = busqueda.toLowerCase().trim()
-    const matchNumero = String(p.numero || '').includes(q) || `#${p.numero}`.includes(q)
-    const matchCliente = (p.cliente || '').toLowerCase().includes(q)
-    const matchTelefono = (p.telefono || '').toLowerCase().includes(q)
-    const matchDireccion = (p.direccion || '').toLowerCase().includes(q)
-    const matchItems = (p.pedido_items || []).some((it) => (it.nombre || '').toLowerCase().includes(q))
-
-    return matchNumero || matchCliente || matchTelefono || matchDireccion || matchItems
-  })
-
   const acciones = (p) => (
-    <div className="flex items-center gap-3 mt-2 pt-2 border-t border-line/60">
-      <button onClick={() => setEditando(p)} className="text-[11px] text-creamsoft hover:text-gold transition-colors flex items-center gap-1 font-medium">
-        ✏️ Editar pedido
-      </button>
-      <button onClick={() => setCancelando(p)} className="text-[11px] text-creamsoft hover:text-wine transition-colors flex items-center gap-1 font-medium ml-auto">
-        ❌ Cancelar
-      </button>
+    <div className="flex gap-1.5 mt-1.5">
+      <button onClick={() => setEditando(p)} className="text-[11px] text-creamsoft hover:text-gold">✏️ Editar</button>
+      <button onClick={() => setCancelando(p)} className="text-[11px] text-creamsoft hover:text-wine">❌ Cancelar</button>
     </div>
   )
 
@@ -1101,188 +1076,60 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
     </>
   )
 
-  const renderPedidoCard = (p) => (
-    <div key={p.id} className="bg-paper rounded-md p-3.5 mb-3 border border-line/90 shadow-sm hover:border-gold/40 transition-all text-[12px] relative overflow-hidden">
-      {/* Indicador lateral sutil de estado */}
-      <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-        p.estado === 'Pendiente' ? 'bg-wine animate-pulse' :
-        p.estado === 'En preparación' ? 'bg-gold' :
-        p.estado === 'Listo' ? 'bg-sage' : 'bg-line'
-      }`} />
-
-      {/* Cabecera del pedido */}
-      <div className="flex items-start justify-between gap-2 mb-1.5 pl-1.5">
-        <div className="min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-mono text-gold font-bold text-sm">#{p.numero}</span>
-            <span className="font-semibold text-cream text-[13px] truncate">{p.cliente}</span>
-          </div>
-          {/* Fecha y hora exacta */}
-          <div className="text-[10.5px] text-creamsoft font-mono flex items-center gap-1 mt-0.5">
-            <span>⏰</span>
-            <span>{p.creado_en ? fmtDateTime(p.creado_en) : 'Reciente'}</span>
-          </div>
-        </div>
-
-        {/* Badge de Domicilio o Local */}
-        <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full border shrink-0 flex items-center gap-1 ${
-          p.tipo_entrega === 'domicilio'
-            ? 'bg-gold/15 text-gold border-gold/30'
-            : 'bg-paper2 text-creamsoft border-line'
-        }`}>
-          {p.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ En local'}
-        </span>
-      </div>
-
-      {/* Datos del domicilio si aplica */}
-      {p.tipo_entrega === 'domicilio' && (
-        <div className="my-2 p-2 bg-paper2/90 rounded border border-line/70 text-[11px] text-creamsoft space-y-1 ml-1.5">
-          {p.direccion && (
-            <div className="text-cream font-medium flex items-center gap-1">
-              <span>📍</span> <span>{p.direccion}</span>
-            </div>
-          )}
-          {p.telefono && (
-            <div className="flex items-center gap-1.5">
-              <span>📞</span>
-              <a
-                href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-gold hover:underline font-mono font-medium"
-              >
-                {p.telefono} (WhatsApp)
-              </a>
-            </div>
-          )}
-          {p.notas_entrega && (
-            <div className="p-2 bg-gold/10 rounded border border-gold/25 text-[11.5px] text-champagne space-y-1">
-              <div className="font-semibold text-gold flex items-center gap-1.5">
-                <span>💰</span> <span>{p.notas_entrega.split(' · ')[0] || p.notas_entrega}</span>
-              </div>
-              {p.notas_entrega.split(' · ').length > 1 && (
-                <div className="text-[10.5px] text-creamsoft italic border-t border-gold/15 pt-1 mt-1">
-                  "{p.notas_entrega.split(' · ').slice(1).join(' · ')}"
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Lista de productos solicitados */}
-      <div className="my-2 pl-1.5 space-y-1">
-        {(p.pedido_items || []).map((it, idx) => (
-          <div key={idx} className="flex items-baseline justify-between gap-2 text-creamsoft">
-            <span className="text-cream font-medium">
-              <b className="text-gold font-mono">{it.cantidad}×</b> {it.nombre}
-            </span>
-            {it.precio && <span className="text-[11px] font-mono text-creamsoft">{fmt$(it.precio * it.cantidad)}</span>}
-          </div>
-        ))}
-      </div>
-
-      {/* Pie con total y botón de acción */}
-      <div className="flex justify-between items-center mt-3 pt-2 border-t border-line/60 pl-1.5">
-        <div>
-          <span className="text-[10px] uppercase tracking-wider text-creamsoft block -mb-0.5">Total</span>
-          <span className="font-mono text-gold font-bold text-base">{fmt$(p.total)}</span>
-        </div>
-
-        <div>
-          {p.estado === 'Pendiente' && (
-            <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>
-              ✅ Aceptar pedido
-            </Btn>
-          )}
-          {(p.estado === 'En preparación' || p.estado === 'Listo') && (
-            <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>
-              📦 Marcar Entregado
-            </Btn>
-          )}
-          {p.estado === 'Entregado' && (
-            <span className="text-xs text-sage font-semibold flex items-center gap-1">
-              ✅ Entregado
-            </span>
-          )}
-        </div>
-      </div>
-
-      {p.estado !== 'Entregado' && p.estado !== 'Cancelado' && acciones(p)}
-    </div>
-  )
-
-  // Barra de búsqueda y filtros reutilizable
-  const searchBar = (
-    <div className="mb-4 bg-paper2 border border-line rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap shadow-sm">
-      <div className="relative flex-1 min-w-[240px]">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="🔍 Buscar por cliente, # pedido, teléfono, dirección o producto..."
-          className="w-full bg-paper border border-line rounded-md px-3 py-2 text-xs text-cream placeholder-creamsoft/50 focus:outline-none focus:border-gold"
-        />
-        {busqueda && (
-          <button
-            onClick={() => setBusqueda('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-creamsoft hover:text-cream"
-          >
-            ✕
-          </button>
-        )}
-      </div>
-
-      {/* Filtros rápidos */}
-      <div className="flex items-center gap-1.5">
-        <button
-          onClick={() => setFiltroTipo('todos')}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-            filtroTipo === 'todos' ? 'bg-gold text-paper' : 'bg-paper border border-line text-creamsoft hover:text-cream'
-          }`}
-        >
-          Todos ({todosPedidos.filter((p) => p.estado !== 'Cancelado').length})
-        </button>
-        <button
-          onClick={() => setFiltroTipo('domicilio')}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-            filtroTipo === 'domicilio' ? 'bg-gold text-paper' : 'bg-paper border border-line text-creamsoft hover:text-cream'
-          }`}
-        >
-          🛵 Domicilios ({todosPedidos.filter((p) => p.tipo_entrega === 'domicilio' && p.estado !== 'Cancelado').length})
-        </button>
-        <button
-          onClick={() => setFiltroTipo('local')}
-          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-            filtroTipo === 'local' ? 'bg-gold text-paper' : 'bg-paper border border-line text-creamsoft hover:text-cream'
-          }`}
-        >
-          🍽️ En local ({todosPedidos.filter((p) => p.tipo_entrega !== 'domicilio' && p.estado !== 'Cancelado').length})
-        </button>
-      </div>
-    </div>
-  )
-
   if (simple) {
-    const porAtender = pedidosFiltrados.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado')
-    const entregados = pedidosFiltrados.filter((p) => p.estado === 'Entregado')
+    const porAtender = data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado')
+    const entregados = data.pedidos.filter((p) => p.estado === 'Entregado')
     const columnas = [['Por atender', porAtender], ['Entregados', entregados]]
     return (
       <div>
-        <SectionTitle title="Pedidos" sub="Toca una vez para aceptar el pedido y otra vez cuando lo entregues. Tienes buscador y hora exacta de cada orden." />
-        {searchBar}
+        <SectionTitle title="Pedidos" sub="Toca una vez para aceptar el pedido y otra vez cuando lo entregues. Puedes editar o cancelar mientras no esté entregado." />
         <div className="grid grid-cols-2 gap-3.5 max-[820px]:grid-cols-1">
           {columnas.map(([titulo, items]) => (
-            <div key={titulo} className="bg-paper2 border border-line rounded-lg p-3 min-h-[140px]">
-              <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex justify-between items-center pb-2 border-b border-line/60">
-                <span>{titulo}</span>
-                <span className="font-mono bg-paper px-2 py-0.5 rounded border border-line text-gold font-bold">{items.length}</span>
+            <div key={titulo} className="bg-paper2 border border-line rounded p-3 min-h-[120px]">
+              <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex justify-between">
+                {titulo} <span className="font-mono">{items.length}</span>
               </h4>
               {items.length === 0 ? (
-                <p className="text-[12px] text-creamsoft px-2 py-4 text-center">
-                  {busqueda ? 'No se encontraron pedidos con ese criterio' : 'Sin pedidos en esta sección'}
-                </p>
-              ) : items.map((p) => renderPedidoCard(p))}
+                <p className="text-[12px] text-creamsoft px-1.5">Sin pedidos</p>
+              ) : items.map((p) => (
+                <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="font-semibold text-cream truncate">
+                      <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
+                      p.tipo_entrega === 'domicilio'
+                        ? 'bg-gold/15 text-gold border-gold/30'
+                        : 'bg-paper2 text-creamsoft border-line'
+                    }`}>
+                      {p.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ Local'}
+                    </span>
+                  </div>
+
+                  {p.tipo_entrega === 'domicilio' && (
+                    <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
+                      {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
+                      {p.telefono && (
+                        <div>
+                          📞 <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-gold hover:underline font-mono">
+                            {p.telefono}
+                          </a>
+                        </div>
+                      )}
+                      {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+                    </div>
+                  )}
+
+                  <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
+                    {p.estado === 'Pendiente' && <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>✅ Pedido aceptado</Btn>}
+                    {(p.estado === 'En preparación' || p.estado === 'Listo') && <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>📦 Entregado</Btn>}
+                    {p.estado === 'Entregado' && <span className="text-[11px]">✅</span>}
+                  </div>
+                  {p.estado !== 'Entregado' && acciones(p)}
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -1291,48 +1138,82 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
     )
   }
 
-  const cancelados = pedidosFiltrados.filter((p) => p.estado === 'Cancelado')
+  const cancelados = data.pedidos.filter((p) => p.estado === 'Cancelado')
 
   return (
     <div>
-      <SectionTitle title="Pedidos" sub="Gestión en tiempo real con buscador integrado, hora de orden y filtros." />
-      {searchBar}
+      <SectionTitle title="Pedidos" sub="Gestión en tiempo real — pensada para tablet o computador en cocina." />
       <div className="grid grid-cols-4 gap-3.5 max-[820px]:grid-cols-2">
         {ESTADOS.map((est) => {
-          const items = pedidosFiltrados.filter((p) => p.estado === est)
+          const items = data.pedidos.filter((p) => p.estado === est)
           return (
-            <div key={est} className="bg-paper2 border border-line rounded-lg p-3 min-h-[140px]">
-              <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex justify-between items-center pb-2 border-b border-line/60">
-                <span>{est}</span>
-                <span className="font-mono bg-paper px-2 py-0.5 rounded border border-line text-gold font-bold">{items.length}</span>
+            <div key={est} className="bg-paper2 border border-line rounded p-3 min-h-[120px]">
+              <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex justify-between">
+                {est} <span className="font-mono">{items.length}</span>
               </h4>
               {items.length === 0 ? (
-                <p className="text-[12px] text-creamsoft px-2 py-4 text-center">
-                  {busqueda ? 'Sin coincidencias' : 'Sin pedidos'}
-                </p>
-              ) : items.map((p) => renderPedidoCard(p))}
+                <p className="text-[12px] text-creamsoft px-1.5">Sin pedidos</p>
+              ) : items.map((p) => (
+                <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="font-semibold text-cream truncate">
+                      <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
+                      p.tipo_entrega === 'domicilio'
+                        ? 'bg-gold/15 text-gold border-gold/30'
+                        : 'bg-paper2 text-creamsoft border-line'
+                    }`}>
+                      {p.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ Local'}
+                    </span>
+                  </div>
+
+                  {p.tipo_entrega === 'domicilio' && (
+                    <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
+                      {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
+                      {p.telefono && (
+                        <div>
+                          📞 <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-gold hover:underline font-mono">
+                            {p.telefono}
+                          </a>
+                        </div>
+                      )}
+                      {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+                    </div>
+                  )}
+
+                  <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
+                    {est !== 'Entregado'
+                      ? <Btn size="sm" variant="avocado" onClick={() => advance(p)}>Pasar a {ESTADOS[ESTADOS.indexOf(est) + 1]}</Btn>
+                      : <span className="text-[11px]">✅</span>}
+                  </div>
+                  {est !== 'Entregado' && acciones(p)}
+                </div>
+              ))}
             </div>
           )
         })}
       </div>
 
-      <div className="mt-8 bg-paper2 border border-line rounded-lg p-4">
+      <div className="mt-6">
         <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex items-center gap-2">
-          ❌ Pedidos Cancelados <span className="font-mono bg-paper px-2 py-0.5 rounded text-wine font-bold border border-line">{cancelados.length}</span>
+          Cancelados <span className="font-mono">{cancelados.length}</span>
         </h4>
         {cancelados.length === 0 ? (
           <p className="text-[12px] text-creamsoft">Ningún pedido cancelado.</p>
         ) : (
           <Table
-            head={['Pedido', 'Cliente', 'Hora / Fecha', 'Tipo / Dirección', 'Total', 'Por']}
+            head={['Pedido', 'Cliente', 'Tipo / Dirección', 'Total', 'Cancelado el', 'Por']}
             rows={cancelados.map((p) => [
-              <span className="font-mono text-gold font-bold">#{p.numero}</span>,
+              <span className="font-mono">#{p.numero}</span>,
               p.cliente,
-              <span className="text-[11px] font-mono text-creamsoft">{p.creado_en ? fmtDateTime(p.creado_en) : '—'}</span>,
               <span className="text-[11.5px] text-creamsoft">
                 {p.tipo_entrega === 'domicilio' ? `🛵 Domicilio (${p.direccion || 'Sin dir'})` : '🍽️ En local'}
               </span>,
-              <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>,
+              <span className="font-mono">{fmt$(p.total)}</span>,
+              p.cancelado_en ? fmtDate(p.cancelado_en) : '—',
               p.cancelado_por || '—',
             ])}
           />
@@ -1346,66 +1227,198 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
 /* ---------------- Ventas ---------------- */
 export function TabVentas({ data }) {
   const [detalle, setDetalle] = useState(null) // venta abierta para ver su detalle
-  const [rango, setRango] = useState('mes') // 'mes' | 'historico' — para el resumen por producto
-  const total = data.ventas.reduce((a, v) => a + v.total, 0)
-  const ventasMes = data.ventas.filter((v) => sameMonth(v.creado_en))
-  const mes = ventasMes.reduce((a, v) => a + v.total, 0)
-  const prom = data.ventas.length ? total / data.ventas.length : 0
+  const [filtroPeriodo, setFiltroPeriodo] = useState('mes') // 'hoy' | '2dias' | 'semana' | 'mes' | 'mes_anterior' | 'personalizado' | 'todo'
+  const [fechaInicio, setFechaInicio] = useState(todayStr())
+  const [fechaFin, setFechaFin] = useState(todayStr())
 
-  const resumenProductos = resumirProductosVendidos(rango === 'mes' ? ventasMes : data.ventas)
+  const todasVentas = data.ventas || []
+  const now = new Date()
+  const hoyStr = todayStr()
+  const hace2Dias = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+  const hace7Dias = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+  // Filtrado flexible por rango de fechas
+  const ventasFiltradas = todasVentas.filter((v) => {
+    if (!v.creado_en) return true
+    const fVenta = new Date(v.creado_en)
+    const fVentaStr = dateStr(v.creado_en)
+
+    if (filtroPeriodo === 'hoy') {
+      return fVentaStr === hoyStr
+    }
+    if (filtroPeriodo === '2dias') {
+      return fVenta >= hace2Dias
+    }
+    if (filtroPeriodo === 'semana') {
+      return fVenta >= hace7Dias
+    }
+    if (filtroPeriodo === 'mes') {
+      return sameMonth(v.creado_en)
+    }
+    if (filtroPeriodo === 'mes_anterior') {
+      const mesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      return fVenta.getFullYear() === mesAnterior.getFullYear() && fVenta.getMonth() === mesAnterior.getMonth()
+    }
+    if (filtroPeriodo === 'personalizado') {
+      if (fechaInicio && fVentaStr < fechaInicio) return false
+      if (fechaFin && fVentaStr > fechaFin) return false
+      return true
+    }
+    return true // 'todo'
+  })
+
+  const totalPeriodo = ventasFiltradas.reduce((a, v) => a + (v.total || 0), 0)
+  const pedidosCount = ventasFiltradas.length
+  const ticketPromedio = pedidosCount > 0 ? totalPeriodo / pedidosCount : 0
+  const resumenProductos = resumirProductosVendidos(ventasFiltradas)
+  const totalUnidades = resumenProductos.reduce((a, p) => a + (p.cantidad || 0), 0)
+
+  const periodoLabel =
+    filtroPeriodo === 'hoy' ? 'Hoy' :
+    filtroPeriodo === '2dias' ? 'Últimos 2 días' :
+    filtroPeriodo === 'semana' ? 'Última semana' :
+    filtroPeriodo === 'mes' ? 'Este mes' :
+    filtroPeriodo === 'mes_anterior' ? 'Mes anterior' :
+    filtroPeriodo === 'personalizado' ? `${fechaInicio} al ${fechaFin}` : 'Todo el histórico'
 
   return (
     <div>
-      <SectionTitle title="Ventas" sub="Cada pedido confirmado genera su registro de venta." />
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
-        <StatCard label="Ventas del mes" value={fmt$(mes)} tone="gold" />
-        <StatCard label="Histórico total" value={fmt$(total)} />
-        <StatCard label="Pedidos" value={data.ventas.length} tone="champagne" />
-        <StatCard label="Ticket promedio" value={fmt$(prom)} />
-      </div>
-      <Card className="p-5 mb-6">
-        {data.ventas.length === 0 ? <Empty icon="💵">Aún no hay ventas registradas.</Empty> : (
-          <Table head={['Fecha', 'Pedido', 'Productos', 'Total', '']} rows={data.ventas.map((v) => {
-            const items = v.pedidos?.pedido_items || []
-            const resumen = items.length
-              ? items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')
-              : '—'
-            return [
-              <span className="font-mono">{fmtDate(v.creado_en)}</span>,
-              v.pedidos?.numero ? `#${v.pedidos.numero}` : '—',
-              <span className="text-[12.5px] text-creamsoft">{resumen}</span>,
-              <span className="font-mono">{fmt$(v.total)}</span>,
-              <button onClick={() => setDetalle(v)} className="text-[12px] font-semibold text-gold hover:text-golddark whitespace-nowrap">
-                Ver detalle →
-              </button>,
-            ]
-          })} />
-        )}
-      </Card>
+      <SectionTitle
+        title="Ventas y Reportes"
+        sub="Consulta y suma automáticamente los pedidos e ingresos por día, semana, mes o rango personalizado."
+      />
 
-      <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
-        <h3 className="font-serif text-lg font-semibold">Productos vendidos</h3>
-        <div className="flex gap-1 bg-paper2 border border-line rounded-full p-1">
-          {[['mes', 'Este mes'], ['historico', 'Todo el histórico']].map(([k, label]) => (
-            <button key={k} onClick={() => setRango(k)}
-              className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold ${rango === k ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}>
+      {/* Selector de periodo interactivo */}
+      <div className="mb-6 bg-paper2 border border-line rounded-lg p-4 space-y-3 shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <span className="text-xs font-semibold text-cream uppercase tracking-wider flex items-center gap-1.5">
+            📅 Filtrar ventas por período: <span className="text-gold font-bold">{periodoLabel}</span>
+          </span>
+          <span className="text-[11.5px] text-creamsoft font-mono">
+            {pedidosCount} pedido{pedidosCount === 1 ? '' : 's'} sumados
+          </span>
+        </div>
+
+        {/* Botones de filtros rápidos */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {[
+            ['hoy', '☀️ Hoy'],
+            ['2dias', '⏳ 2 días'],
+            ['semana', '📅 Semana (7d)'],
+            ['mes', '🗓️ Este mes'],
+            ['mes_anterior', '⏮️ Mes anterior'],
+            ['personalizado', '🔍 Personalizado'],
+            ['todo', '🌐 Todo el histórico'],
+          ].map(([k, label]) => (
+            <button
+              key={k}
+              onClick={() => setFiltroPeriodo(k)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                filtroPeriodo === k
+                  ? 'bg-gold text-paper shadow-sm'
+                  : 'bg-paper border border-line text-creamsoft hover:text-cream'
+              }`}
+            >
               {label}
             </button>
           ))}
         </div>
+
+        {/* Selector de fechas personalizadas */}
+        {filtroPeriodo === 'personalizado' && (
+          <div className="pt-2 border-t border-line/60 flex items-center gap-3 flex-wrap animate-fadeIn">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-creamsoft font-semibold">Desde:</label>
+              <input
+                type="date"
+                value={fechaInicio}
+                onChange={(e) => setFechaInicio(e.target.value)}
+                className="bg-paper border border-line rounded px-2.5 py-1 text-xs text-cream font-mono focus:border-gold focus:outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-creamsoft font-semibold">Hasta:</label>
+              <input
+                type="date"
+                value={fechaFin}
+                onChange={(e) => setFechaFin(e.target.value)}
+                className="bg-paper border border-line rounded px-2.5 py-1 text-xs text-cream font-mono focus:border-gold focus:outline-none"
+              />
+            </div>
+          </div>
+        )}
       </div>
-      <p className="text-creamsoft text-[12.5px] mb-3">
-        Cuánto se vendió de cada producto — sirve para saber qué reponer en Inventario/Compras.
-      </p>
-      <Card className="p-5">
-        {resumenProductos.length === 0 ? <Empty icon="📦">No hay productos vendidos en este rango.</Empty> : (
+
+      {/* Tarjetas de estadísticas sumadas del período seleccionado */}
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3.5 mb-6">
+        <StatCard label={`Ventas (${periodoLabel})`} value={fmt$(totalPeriodo)} tone="gold" />
+        <StatCard label={`Pedidos (${periodoLabel})`} value={pedidosCount} tone="champagne" />
+        <StatCard label="Ticket promedio" value={fmt$(ticketPromedio)} />
+        <StatCard label="Platos / Productos vendidos" value={totalUnidades} tone="sage" />
+      </div>
+
+      {/* Tabla de ventas del período */}
+      <Card className="p-5 mb-6">
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-line/60">
+          <h3 className="font-serif text-base font-semibold text-cream">
+            Historial de Ventas — {periodoLabel} ({pedidosCount})
+          </h3>
+          <span className="font-mono text-gold font-bold text-sm">
+            Total: {fmt$(totalPeriodo)}
+          </span>
+        </div>
+
+        {ventasFiltradas.length === 0 ? (
+          <Empty icon="💵">No hay ventas registradas en el período seleccionado ({periodoLabel}).</Empty>
+        ) : (
           <Table
-            head={['Producto', 'Cantidad vendida', 'Valor unitario prom.', 'Total vendido']}
+            head={['Fecha / Hora', 'Pedido', 'Cliente', 'Productos', 'Total', '']}
+            rows={ventasFiltradas.map((v) => {
+              const items = v.pedidos?.pedido_items || []
+              const resumen = items.length
+                ? items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')
+                : '—'
+              return [
+                <span className="font-mono text-xs">{v.creado_en ? fmtDateTime(v.creado_en) : '—'}</span>,
+                <span className="font-mono text-gold font-bold">{v.pedidos?.numero ? `#${v.pedidos.numero}` : '—'}</span>,
+                <span className="text-cream text-xs">{v.pedidos?.cliente || 'Cliente'}</span>,
+                <span className="text-[12px] text-creamsoft truncate max-w-[200px] block" title={resumen}>
+                  {resumen}
+                </span>,
+                <span className="font-mono font-bold text-gold">{fmt$(v.total)}</span>,
+                <button
+                  onClick={() => setDetalle(v)}
+                  className="text-[12px] font-semibold text-gold hover:text-golddark whitespace-nowrap bg-paper2 px-2.5 py-1 rounded border border-line hover:border-gold transition-colors"
+                >
+                  Ver detalle →
+                </button>,
+              ]
+            })}
+          />
+        )}
+      </Card>
+
+      {/* Resumen de productos vendidos en el período seleccionado */}
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+        <div>
+          <h3 className="font-serif text-lg font-semibold">Productos más vendidos ({periodoLabel})</h3>
+          <p className="text-creamsoft text-[12.5px]">
+            Suma exacta de cada plato o artículo vendido en este período para controlar la demanda y compras.
+          </p>
+        </div>
+      </div>
+
+      <Card className="p-5">
+        {resumenProductos.length === 0 ? (
+          <Empty icon="📦">No hay productos vendidos en este período ({periodoLabel}).</Empty>
+        ) : (
+          <Table
+            head={['Producto', 'Cantidad vendida', 'Precio promedio', 'Total generado']}
             rows={resumenProductos.map((p) => [
-              p.nombre,
-              <span className="font-mono">{p.cantidad}</span>,
-              <span className="font-mono">{fmt$(p.total / p.cantidad)}</span>,
-              <span className="font-mono">{fmt$(p.total)}</span>,
+              <span className="font-semibold text-cream">{p.nombre}</span>,
+              <span className="font-mono font-bold text-gold">{p.cantidad}</span>,
+              <span className="font-mono text-creamsoft">{fmt$(p.total / p.cantidad)}</span>,
+              <span className="font-mono font-bold text-gold">{fmt$(p.total)}</span>,
             ])}
           />
         )}
