@@ -1,9 +1,12 @@
-import electron from 'electron'
-const { app, BrowserWindow, Menu, shell } = electron
+import { app, BrowserWindow, Menu, shell } from 'electron'
+import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
 import http from 'node:http'
+
+const require = createRequire(import.meta.url)
+const { app, BrowserWindow, Menu, shell } = require('electron')
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
