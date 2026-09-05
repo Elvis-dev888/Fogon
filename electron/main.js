@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Menu, shell } from 'electron'
+import electron from 'electron'
+const { app, BrowserWindow, Menu, shell } = electron
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs'
