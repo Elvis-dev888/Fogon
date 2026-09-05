@@ -6,4 +6,9 @@ export default defineConfig({
   build: {
     outDir: 'web-dist',
   },
+  server: {
+    watch: {
+      ignored: ['**/release/**', '**/android/**', '**/web-dist/**', '**/.git/**']
+    }
+  }
 })

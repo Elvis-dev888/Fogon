@@ -172,16 +172,24 @@ export function TabMiSuscripcion({ negocio }) {
 
 /* ---------------- Dashboard ---------------- */
 export function TabDashboard({ negocio, data, onOpenShareMenu }) {
-  const esModoInventario = negocio.modo_operacion === 'inventario'
-  const ventasMes = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + v.total, 0)
-  const ingresosMes = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + i.valor, 0)
-  const comprasMes = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + c.valor, 0)
-  const pagosMes = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + p.valor, 0)
-  const otrosMes = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + e.valor, 0)
+  const esModoInventario = negocio?.modo_operacion === 'inventario'
+  const ventas = Array.isArray(data?.ventas) ? data.ventas : []
+  const ingresos = Array.isArray(data?.ingresos) ? data.ingresos : []
+  const compras = Array.isArray(data?.compras) ? data.compras : []
+  const trabajadores = Array.isArray(data?.trabajadores) ? data.trabajadores : []
+  const egresos = Array.isArray(data?.egresos) ? data.egresos : []
+  const pedidos = Array.isArray(data?.pedidos) ? data.pedidos : []
+  const ingredientes = Array.isArray(data?.ingredientes) ? data.ingredientes : []
+
+  const ventasMes = ventas.filter((v) => v.creado_en && sameMonth(v.creado_en)).reduce((a, v) => a + (Number(v.total) || 0), 0)
+  const ingresosMes = ingresos.filter((i) => i.creado_en && sameMonth(i.creado_en)).reduce((a, i) => a + (Number(i.valor) || 0), 0)
+  const comprasMes = compras.filter((c) => c.creado_en && sameMonth(c.creado_en)).reduce((a, c) => a + (Number(c.valor) || 0), 0)
+  const pagosMes = trabajadores.flatMap((w) => w.pagos || []).filter((p) => p.creado_en && sameMonth(p.creado_en)).reduce((a, p) => a + (Number(p.valor) || 0), 0)
+  const otrosMes = egresos.filter((e) => e.creado_en && sameMonth(e.creado_en)).reduce((a, e) => a + (Number(e.valor) || 0), 0)
   const entradasMes = esModoInventario ? ingresosMes : ventasMes
   const resultado = entradasMes - (comprasMes + pagosMes + otrosMes)
-  const pendientes = data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length
-  const lowStock = data.ingredientes.filter((i) => i.stock <= i.minimo)
+  const pendientes = pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length
+  const lowStock = ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0))
 
   return (
     <div>
@@ -217,7 +225,7 @@ export function TabDashboard({ negocio, data, onOpenShareMenu }) {
             <h3 className="font-serif text-lg font-semibold mb-3">Operación de inventario</h3>
             <p className="text-creamsoft text-[13.5px] mb-3">Registra cada venta o entrada de dinero en “Ingresos / Egresos” para que la utilidad mensual sea precisa.</p>
             <div className="grid grid-cols-2 gap-3 text-[13px]">
-              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">Existencias</span><b className="font-mono text-gold">{data.ingredientes.length}</b></div>
+              <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">Existencias</span><b className="font-mono text-gold">{ingredientes.length}</b></div>
               <div className="rounded border border-line bg-paper p-3"><span className="block text-creamsoft text-[11px]">Compras este mes</span><b className="font-mono text-gold">{fmt$(comprasMes)}</b></div>
             </div>
           </Card>
@@ -226,14 +234,14 @@ export function TabDashboard({ negocio, data, onOpenShareMenu }) {
             <h3 className="font-serif text-lg font-semibold mb-3">
               Pedidos recientes {pendientes > 0 && <Pill tone="preparacion">{pendientes} en curso</Pill>}
             </h3>
-            {data.pedidos.length === 0 ? (
+            {pedidos.length === 0 ? (
               <Empty icon="🧾">Aún no hay pedidos. Cuando un cliente confirme uno, aparecerá aquí.</Empty>
             ) : (
               <Table
                 head={['Pedido', 'Cliente', 'Total', 'Estado']}
-                rows={data.pedidos.slice(0, 6).map((p) => [
+                rows={pedidos.slice(0, 6).map((p) => [
                   <span className="font-mono">#{p.numero}</span>,
-                  p.cliente,
+                  p.cliente || 'Cliente',
                   <span className="font-mono">{fmt$(p.total)}</span>,
                   <Pill tone={estadoTone(p.estado)}>{p.estado}</Pill>,
                 ])}
@@ -1231,7 +1239,7 @@ export function TabVentas({ data }) {
   const [fechaInicio, setFechaInicio] = useState(todayStr())
   const [fechaFin, setFechaFin] = useState(todayStr())
 
-  const todasVentas = data.ventas || []
+  const todasVentas = Array.isArray(data?.ventas) ? data.ventas : []
   const hoyStr = todayStr()
 
   const dAyer = new Date()
@@ -1242,15 +1250,17 @@ export function TabVentas({ data }) {
   d7.setDate(d7.getDate() - 6)
   const hace7DiasStr = dateStr(d7)
 
-  const dMesAnt = new Date()
-  dMesAnt.setDate(1)
-  dMesAnt.setMonth(dMesAnt.getMonth() - 1)
+  const now = new Date()
+  const dMesAnt = new Date(now.getFullYear(), now.getMonth() - 1, 1)
   const mesAnteriorStr = dateStr(dMesAnt).slice(0, 7)
 
-  // Filtrado robusto por fechas calendario local
+  // Filtrado 100% robusto por fechas calendario local y fechas nulas
   const ventasFiltradas = todasVentas.filter((v) => {
-    if (!v.creado_en) return true
+    if (!v) return false
+    if (filtroPeriodo === 'todo') return true
+    if (!v.creado_en) return false
     const fVentaStr = dateStr(v.creado_en)
+    if (!fVentaStr || fVentaStr.includes('NaN')) return false
 
     if (filtroPeriodo === 'hoy') {
       return fVentaStr === hoyStr
@@ -1272,14 +1282,14 @@ export function TabVentas({ data }) {
       if (fechaFin && fVentaStr > fechaFin) return false
       return true
     }
-    return true // 'todo'
+    return true
   })
 
-  const totalPeriodo = ventasFiltradas.reduce((a, v) => a + (v.total || 0), 0)
+  const totalPeriodo = ventasFiltradas.reduce((a, v) => a + (Number(v?.total) || 0), 0)
   const pedidosCount = ventasFiltradas.length
   const ticketPromedio = pedidosCount > 0 ? totalPeriodo / pedidosCount : 0
   const resumenProductos = resumirProductosVendidos(ventasFiltradas)
-  const totalUnidades = resumenProductos.reduce((a, p) => a + (p.cantidad || 0), 0)
+  const totalUnidades = resumenProductos.reduce((a, p) => a + (Number(p?.cantidad) || 0), 0)
 
   const periodoLabel =
     filtroPeriodo === 'hoy' ? 'Hoy' :
@@ -1383,8 +1393,8 @@ export function TabVentas({ data }) {
             head={['Fecha / Hora', 'Pedido', 'Cliente', 'Productos', 'Total', '']}
             rows={ventasFiltradas.map((v) => {
               const items = v.pedidos?.pedido_items || []
-              const resumen = items.length
-                ? items.map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')
+              const resumen = Array.isArray(items) && items.length > 0
+                ? items.filter(Boolean).map((it) => `${Number(it.cantidad) || 1}× ${it.nombre || 'Producto'}`).join(', ')
                 : '—'
               return [
                 <span className="font-mono text-xs">{v.creado_en ? fmtDateTime(v.creado_en) : '—'}</span>,
@@ -1425,7 +1435,7 @@ export function TabVentas({ data }) {
             rows={resumenProductos.map((p) => [
               <span className="font-semibold text-cream">{p.nombre}</span>,
               <span className="font-mono font-bold text-gold">{p.cantidad}</span>,
-              <span className="font-mono text-creamsoft">{fmt$(p.total / p.cantidad)}</span>,
+              <span className="font-mono text-creamsoft">{fmt$(p.cantidad > 0 ? p.total / p.cantidad : 0)}</span>,
               <span className="font-mono font-bold text-gold">{fmt$(p.total)}</span>,
             ])}
           />
@@ -1567,15 +1577,22 @@ function VentaDetalleModal({ venta, onClose }) {
 
 // Suma cantidad y valor total por nombre de producto, a partir de las líneas
 // (pedido_items) de un conjunto de ventas — para la tabla "Productos vendidos".
-function resumirProductosVendidos(ventas) {
+function resumirProductosVendidos(ventas = []) {
   const map = {}
-  ventas.forEach((v) => {
+  ;(ventas || []).forEach((v) => {
+    if (!v) return
     const items = v.pedidos?.pedido_items || []
-    items.forEach((it) => {
-      if (!map[it.nombre]) map[it.nombre] = { nombre: it.nombre, cantidad: 0, total: 0 }
-      map[it.nombre].cantidad += it.cantidad
-      map[it.nombre].total += it.subtotal
-    })
+    if (Array.isArray(items)) {
+      items.forEach((it) => {
+        if (!it) return
+        const nombre = String(it.nombre || 'Producto').trim()
+        const cant = Math.max(0, Number(it.cantidad) || 1)
+        const sub = Math.max(0, Number(it.subtotal) || 0)
+        if (!map[nombre]) map[nombre] = { nombre, cantidad: 0, total: 0 }
+        map[nombre].cantidad += cant
+        map[nombre].total += sub
+      })
+    }
   })
   return Object.values(map).sort((a, b) => b.total - a.total)
 }
@@ -1710,20 +1727,26 @@ function PagoModal({ negocio, trabajador, onClose, onSaved }) {
 export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated }) {
   const { t } = useLanguage()
   const [modal, setModal] = useState(null) // 'capital' | 'ingreso' | 'egreso'
-  const capitalInicial = Number(negocio.capital_inicial) || 0
-  const esModoInventario = negocio.modo_operacion === 'inventario'
+  const capitalInicial = Number(negocio?.capital_inicial) || 0
+  const esModoInventario = negocio?.modo_operacion === 'inventario'
 
-  const ingresosVentas = data.ventas.filter((v) => sameMonth(v.creado_en)).reduce((a, v) => a + (Number(v.total) || 0), 0)
-  const ingresosExtra = data.ingresos.filter((i) => sameMonth(i.creado_en)).reduce((a, i) => a + (Number(i.valor) || 0), 0)
-  const egresosCompras = data.compras.filter((c) => sameMonth(c.creado_en)).reduce((a, c) => a + (Number(c.valor) || 0), 0)
-  const egresosPagos = data.trabajadores.flatMap((w) => w.pagos).filter((p) => sameMonth(p.creado_en)).reduce((a, p) => a + (Number(p.valor) || 0), 0)
-  const egresosOtros = data.egresos.filter((e) => sameMonth(e.creado_en)).reduce((a, e) => a + (Number(e.valor) || 0), 0)
+  const ventas = Array.isArray(data?.ventas) ? data.ventas : []
+  const ingresos = Array.isArray(data?.ingresos) ? data.ingresos : []
+  const compras = Array.isArray(data?.compras) ? data.compras : []
+  const trabajadores = Array.isArray(data?.trabajadores) ? data.trabajadores : []
+  const egresos = Array.isArray(data?.egresos) ? data.egresos : []
 
-  const ventasTotal = data.ventas.reduce((a, v) => a + (Number(v.total) || 0), 0)
-  const ingresosTotal = data.ingresos.reduce((a, i) => a + (Number(i.valor) || 0), 0)
-  const comprasTotal = data.compras.reduce((a, c) => a + (Number(c.valor) || 0), 0)
-  const pagosTotal = data.trabajadores.flatMap((w) => w.pagos).reduce((a, p) => a + (Number(p.valor) || 0), 0)
-  const egresosOtrosTotal = data.egresos.reduce((a, e) => a + (Number(e.valor) || 0), 0)
+  const ingresosVentas = ventas.filter((v) => v.creado_en && sameMonth(v.creado_en)).reduce((a, v) => a + (Number(v.total) || 0), 0)
+  const ingresosExtra = ingresos.filter((i) => i.creado_en && sameMonth(i.creado_en)).reduce((a, i) => a + (Number(i.valor) || 0), 0)
+  const egresosCompras = compras.filter((c) => c.creado_en && sameMonth(c.creado_en)).reduce((a, c) => a + (Number(c.valor) || 0), 0)
+  const egresosPagos = trabajadores.flatMap((w) => w.pagos || []).filter((p) => p.creado_en && sameMonth(p.creado_en)).reduce((a, p) => a + (Number(p.valor) || 0), 0)
+  const egresosOtros = egresos.filter((e) => e.creado_en && sameMonth(e.creado_en)).reduce((a, e) => a + (Number(e.valor) || 0), 0)
+
+  const ventasTotal = ventas.reduce((a, v) => a + (Number(v.total) || 0), 0)
+  const ingresosTotal = ingresos.reduce((a, i) => a + (Number(i.valor) || 0), 0)
+  const comprasTotal = compras.reduce((a, c) => a + (Number(c.valor) || 0), 0)
+  const pagosTotal = trabajadores.flatMap((w) => w.pagos || []).reduce((a, p) => a + (Number(p.valor) || 0), 0)
+  const egresosOtrosTotal = egresos.reduce((a, e) => a + (Number(e.valor) || 0), 0)
   const saldoActual = capitalInicial + ventasTotal + ingresosTotal - comprasTotal - pagosTotal - egresosOtrosTotal
 
   async function borrarIngreso(id) {
@@ -1765,12 +1788,12 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
       <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1 mb-6">
         <Card className="p-5">
           <h3 className="font-serif text-lg font-semibold mb-3">Ingresos registrados</h3>
-          {data.ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos registrados aún.</p> :
-            data.ingresos.map((i) => (
+          {ingresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin ingresos registrados aún.</p> :
+            ingresos.map((i) => (
               <div key={i.id} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] last:border-none">
                 <div>
                   <span className="font-medium text-cream">{i.concepto}</span>
-                  <div className="text-creamsoft text-[11.5px]">{fmtDate(i.creado_en)}</div>
+                  <div className="text-creamsoft text-[11.5px]">{i.creado_en ? fmtDate(i.creado_en) : '—'}</div>
                 </div>
                 <div className="flex items-center gap-3">
                   <b className="font-mono text-sage">+{fmt$(i.valor)}</b>
@@ -1781,12 +1804,12 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
         </Card>
         <Card className="p-5">
           <h3 className="font-serif text-lg font-semibold mb-3">Otros gastos</h3>
-          {data.egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
-            data.egresos.map((e) => (
+          {egresos.length === 0 ? <p className="text-creamsoft text-[13px]">Sin otros gastos aún.</p> :
+            egresos.map((e) => (
               <div key={e.id} className="flex items-center justify-between border-b border-line py-2.5 text-[13px] last:border-none">
                 <div>
                   <span className="font-medium text-cream">{e.concepto}</span>
-                  <div className="text-creamsoft text-[11.5px]">{fmtDate(e.creado_en)}</div>
+                  <div className="text-creamsoft text-[11.5px]">{e.creado_en ? fmtDate(e.creado_en) : '—'}</div>
                 </div>
                 <div className="flex items-center gap-3">
                   <b className="font-mono text-wine">−{fmt$(e.valor)}</b>
@@ -1817,7 +1840,7 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
 
 function CapitalModal({ negocio, onClose, onSaved }) {
   const { t } = useLanguage()
-  const [valor, setValor] = useState(negocio.capital_inicial || 0)
+  const [valor, setValor] = useState(negocio?.capital_inicial || 0)
   const [guardando, setGuardando] = useState(false)
   async function submit(e) {
     e.preventDefault()
@@ -1872,37 +1895,39 @@ function MovimientoModal({ negocio, tipo, onClose, onSaved }) {
   )
 }
 
-/* ---------------- Reporte por día / mes (para imprimir o guardar como PDF) ----------------
-   El usuario escoge un día o un mes, ve el resumen de ese periodo y le da "Imprimir".
-   El diálogo de impresión del navegador siempre trae la opción "Guardar como PDF",
-   así que con este mismo botón se cubre imprimir en papel o generar el PDF para el banco. */
+/* ---------------- Reporte por día / mes (para imprimir o guardar como PDF) ---------------- */
 function ReportePeriodo({ negocio, data }) {
   const { t } = useLanguage()
   const [tipoRango, setTipoRango] = useState('mes') // 'dia' | 'mes'
   const [fecha, setFecha] = useState(todayStr())
   const [mes, setMes] = useState(monthStr(new Date()))
 
-  const enRango = (d) => (tipoRango === 'dia' ? dateStr(d) === fecha : monthStr(d) === mes)
+  const enRango = (d) => {
+    if (!d) return false
+    const dStr = dateStr(d)
+    if (!dStr || dStr.includes('NaN')) return false
+    return tipoRango === 'dia' ? dStr === fecha : dStr.slice(0, 7) === mes
+  }
 
-  const ventas = data.ventas.filter((v) => enRango(v.creado_en))
-  const ingresos = data.ingresos.filter((i) => enRango(i.creado_en))
-  const compras = data.compras.filter((c) => enRango(c.creado_en))
-  const pagos = data.trabajadores.flatMap((w) => w.pagos.map((p) => ({ ...p, trabajador: w.nombre }))).filter((p) => enRango(p.creado_en))
-  const egresos = data.egresos.filter((e) => enRango(e.creado_en))
+  const ventas = (Array.isArray(data?.ventas) ? data.ventas : []).filter((v) => enRango(v.creado_en))
+  const ingresos = (Array.isArray(data?.ingresos) ? data.ingresos : []).filter((i) => enRango(i.creado_en))
+  const compras = (Array.isArray(data?.compras) ? data.compras : []).filter((c) => enRango(c.creado_en))
+  const pagos = (Array.isArray(data?.trabajadores) ? data.trabajadores : []).flatMap((w) => (w.pagos || []).map((p) => ({ ...p, trabajador: w.nombre }))).filter((p) => enRango(p.creado_en))
+  const egresos = (Array.isArray(data?.egresos) ? data.egresos : []).filter((e) => enRango(e.creado_en))
 
-  const totalVentas = ventas.reduce((a, v) => a + v.total, 0)
-  const totalIngresos = ingresos.reduce((a, i) => a + i.valor, 0)
-  const totalCompras = compras.reduce((a, c) => a + c.valor, 0)
-  const totalPagos = pagos.reduce((a, p) => a + p.valor, 0)
-  const totalEgresos = egresos.reduce((a, e) => a + e.valor, 0)
+  const totalVentas = ventas.reduce((a, v) => a + (Number(v.total) || 0), 0)
+  const totalIngresos = ingresos.reduce((a, i) => a + (Number(i.valor) || 0), 0)
+  const totalCompras = compras.reduce((a, c) => a + (Number(c.valor) || 0), 0)
+  const totalPagos = pagos.reduce((a, p) => a + (Number(p.valor) || 0), 0)
+  const totalEgresos = egresos.reduce((a, e) => a + (Number(e.valor) || 0), 0)
   const resultado = (totalVentas + totalIngresos) - (totalCompras + totalPagos + totalEgresos)
 
   const movimientos = [
-    ...ventas.map((v) => ({ fecha: v.creado_en, tipo: 'Venta', concepto: 'Pedido de clientes', valor: v.total, signo: 1 })),
-    ...ingresos.map((i) => ({ fecha: i.creado_en, tipo: 'Ingreso', concepto: i.concepto, valor: i.valor, signo: 1 })),
-    ...compras.map((c) => ({ fecha: c.creado_en, tipo: 'Compra', concepto: c.ingredientes?.nombre || 'Insumo', valor: c.valor, signo: -1 })),
-    ...pagos.map((p) => ({ fecha: p.creado_en, tipo: 'Pago personal', concepto: p.trabajador, valor: p.valor, signo: -1 })),
-    ...egresos.map((e) => ({ fecha: e.creado_en, tipo: 'Egreso', concepto: e.concepto, valor: e.valor, signo: -1 })),
+    ...ventas.map((v) => ({ fecha: v.creado_en, tipo: 'Venta', concepto: 'Pedido de clientes', valor: Number(v.total) || 0, signo: 1 })),
+    ...ingresos.map((i) => ({ fecha: i.creado_en, tipo: 'Ingreso', concepto: i.concepto || 'Ingreso', valor: Number(i.valor) || 0, signo: 1 })),
+    ...compras.map((c) => ({ fecha: c.creado_en, tipo: 'Compra', concepto: c.ingredientes?.nombre || 'Insumo', valor: Number(c.valor) || 0, signo: -1 })),
+    ...pagos.map((p) => ({ fecha: p.creado_en, tipo: 'Pago personal', concepto: p.trabajador || 'Empleado', valor: Number(p.valor) || 0, signo: -1 })),
+    ...egresos.map((e) => ({ fecha: e.creado_en, tipo: 'Egreso', concepto: e.concepto || 'Gasto', valor: Number(e.valor) || 0, signo: -1 })),
   ].sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
 
   const etiquetaPeriodo = tipoRango === 'dia' ? fmtDateLong(fecha + 'T12:00:00') : fmtMonthLabel(mes)
@@ -1930,7 +1955,7 @@ function ReportePeriodo({ negocio, data }) {
 
       <div id="finanzas-print-area">
         <div className="mb-4 hidden print:block">
-          <h2 className="font-serif text-xl font-semibold">{negocio.nombre}</h2>
+          <h2 className="font-serif text-xl font-semibold">{negocio?.nombre || 'Negocio'}</h2>
           <p className="text-[13px]">Reporte de ingresos y egresos — {etiquetaPeriodo}</p>
           <p className="text-[11px]">Generado el {fmtDateLong(new Date())}</p>
         </div>
@@ -1952,7 +1977,7 @@ function ReportePeriodo({ negocio, data }) {
           <Table
             head={['Fecha', 'Tipo', 'Concepto', 'Valor']}
             rows={movimientos.map((m) => [
-              <span className="font-mono">{fmtDate(m.fecha)}</span>,
+              <span className="font-mono">{m.fecha ? fmtDate(m.fecha) : '—'}</span>,
               m.tipo,
               m.concepto,
               <span className="font-mono">{m.signo > 0 ? '+' : '−'} {fmt$(m.valor)}</span>,
@@ -1967,20 +1992,29 @@ function ReportePeriodo({ negocio, data }) {
 /* ---------------- Estadísticas ---------------- */
 export function TabEstadisticas({ negocio, data }) {
   const { t } = useLanguage()
-  const esModoInventario = negocio.modo_operacion === 'inventario'
+  const esModoInventario = negocio?.modo_operacion === 'inventario'
+
+  const ingredientes = Array.isArray(data?.ingredientes) ? data.ingredientes : []
+  const compras = Array.isArray(data?.compras) ? data.compras : []
+  const ingresos = Array.isArray(data?.ingresos) ? data.ingresos : []
+  const egresos = Array.isArray(data?.egresos) ? data.egresos : []
+  const trabajadores = Array.isArray(data?.trabajadores) ? data.trabajadores : []
+  const productos = Array.isArray(data?.productos) ? data.productos : []
+  const pedidos = Array.isArray(data?.pedidos) ? data.pedidos : []
+  const ventas = Array.isArray(data?.ventas) ? data.ventas : []
 
   if (esModoInventario) {
-    const valorTotal = data.ingredientes.reduce((a, i) => a + ((Number(i.stock) || 0) * (Number(i.costo_unitario) || 0)), 0)
-    const rankingStock = [...data.ingredientes].sort((a, b) => ((b.stock || 0) * (b.costo_unitario || 0)) - ((a.stock || 0) * (a.costo_unitario || 0)))
-    const maxVal = rankingStock.length ? Math.max(1, (rankingStock[0].stock || 0) * (rankingStock[0].costo_unitario || 0)) : 1
-    const bajoStock = data.ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0)).length
-    const totalCompras = data.compras.reduce((a, c) => a + (Number(c.valor) || 0), 0)
-    const totalIngresos = data.ingresos.reduce((a, i) => a + (Number(i.valor) || 0), 0)
-    const totalEgresos = data.egresos.reduce((a, e) => a + (Number(e.valor) || 0), 0)
+    const valorTotal = ingredientes.reduce((a, i) => a + ((Number(i.stock) || 0) * (Number(i.costo_unitario) || 0)), 0)
+    const rankingStock = [...ingredientes].sort((a, b) => ((Number(b.stock) || 0) * (Number(b.costo_unitario) || 0)) - ((Number(a.stock) || 0) * (Number(a.costo_unitario) || 0)))
+    const maxVal = rankingStock.length ? Math.max(1, (Number(rankingStock[0].stock) || 0) * (Number(rankingStock[0].costo_unitario) || 0)) : 1
+    const bajoStock = ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0)).length
+    const totalCompras = compras.reduce((a, c) => a + (Number(c.valor) || 0), 0)
+    const totalIngresos = ingresos.reduce((a, i) => a + (Number(i.valor) || 0), 0)
+    const totalEgresos = egresos.reduce((a, e) => a + (Number(e.valor) || 0), 0)
 
     return (
       <div>
-        <SectionTitle title={t.stats.title} sub={t.stats.description.replace('{business}', negocio.nombre)} />
+        <SectionTitle title={t.stats.title} sub={t.stats.description.replace('{business}', negocio?.nombre || 'Negocio')} />
         <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
           <Card className="p-5">
             <h3 className="font-serif text-lg font-semibold mb-3">Artículos de mayor valor en stock</h3>
@@ -1993,7 +2027,7 @@ export function TabEstadisticas({ negocio, data }) {
                   <div key={art.id} className="flex items-center gap-2.5 mb-2.5 text-[12.5px]">
                     <span className="w-[150px] font-semibold text-creamsoft truncate">{art.nombre}</span>
                     <div className="flex-1 bg-paper border border-line rounded-full h-2 overflow-hidden">
-                      <div className="h-full bg-gold rounded-full" style={{ width: `${(val / maxVal) * 100}%` }} />
+                      <div className="h-full bg-gold rounded-full" style={{ width: `${Math.min(100, Math.max(0, (val / maxVal) * 100))}%` }} />
                     </div>
                     <span className="w-[110px] text-right font-mono text-gold">{fmt$(val)}</span>
                   </div>
@@ -2004,11 +2038,11 @@ export function TabEstadisticas({ negocio, data }) {
           <Card className="p-5">
             <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.overview}</h3>
             {[
-              ['Artículos registrados', data.ingredientes.length],
+              ['Artículos registrados', ingredientes.length],
               ['Artículos con bajo stock', bajoStock],
               ['Valor total en inventario', fmt$(valorTotal)],
-              ['Compras registradas', data.compras.length],
-              ['Trabajadores activos', data.trabajadores.filter((w) => w.estado === 'Activo').length],
+              ['Compras registradas', compras.length],
+              ['Trabajadores activos', trabajadores.filter((w) => w.estado === 'Activo').length],
               ['Total ingresos registrados', fmt$(totalIngresos)],
               ['Total egresos + compras', fmt$(totalEgresos + totalCompras)],
             ].map(([label, val], i) => (
@@ -2022,23 +2056,30 @@ export function TabEstadisticas({ negocio, data }) {
     )
   }
 
+  const pedidosValidos = pedidos.filter((p) => p && p.estado !== 'Cancelado')
   const conteo = {}
-  pedidosValidos.forEach((p) => (p.pedido_items || []).forEach((it) => { conteo[it.nombre] = (conteo[it.nombre] || 0) + it.cantidad }))
-  const max = ranking.length ? ranking[0][1] : 1
-  const agotados = data.productos.filter((p) => !p.disponible).length
+  pedidosValidos.forEach((p) => (p.pedido_items || []).forEach((it) => {
+    if (it && it.nombre) {
+      conteo[it.nombre] = (conteo[it.nombre] || 0) + (Number(it.cantidad) || 1)
+    }
+  }))
+  const ranking = Object.entries(conteo).sort((a, b) => b[1] - a[1])
+  const max = ranking.length ? Math.max(1, ranking[0][1]) : 1
+  const agotados = productos.filter((p) => !p.disponible).length
+  const totalHistorico = ventas.reduce((a, v) => a + (Number(v.total) || 0), 0)
 
   return (
     <div>
-      <SectionTitle title={t.stats.title} sub={t.stats.description.replace('{business}', negocio.nombre)} />
+      <SectionTitle title={t.stats.title} sub={t.stats.description.replace('{business}', negocio?.nombre || 'Negocio')} />
       <div className="grid grid-cols-[1.3fr_.9fr] gap-4 max-[820px]:grid-cols-1">
         <Card className="p-5">
           <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.bestSellers}</h3>
           {ranking.length === 0 ? <Empty icon="📉">{t.stats.noSales}</Empty> : (
             ranking.slice(0, 8).map(([nom, c]) => (
               <div key={nom} className="flex items-center gap-2.5 mb-2.5 text-[12.5px]">
-                <span className="w-[150px] font-semibold text-creamsoft">{nom}</span>
+                <span className="w-[150px] font-semibold text-creamsoft truncate">{nom}</span>
                 <div className="flex-1 bg-paper border border-line rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-gold rounded-full" style={{ width: `${(c / max) * 100}%` }} />
+                  <div className="h-full bg-gold rounded-full" style={{ width: `${Math.min(100, Math.max(0, (c / max) * 100))}%` }} />
                 </div>
                 <span className="w-[60px] text-right font-mono text-creamsoft">{c} und</span>
               </div>
@@ -2048,12 +2089,12 @@ export function TabEstadisticas({ negocio, data }) {
         <Card className="p-5">
           <h3 className="font-serif text-lg font-semibold mb-3">{t.stats.overview}</h3>
           {[
-            ['Productos activos', data.productos.length - agotados],
+            ['Productos activos', Math.max(0, productos.length - agotados)],
             ['Productos agotados', agotados],
-            ['Ingredientes con bajo stock', data.ingredientes.filter((i) => i.stock <= i.minimo).length],
-            ['Trabajadores activos', data.trabajadores.filter((w) => w.estado === 'Activo').length],
+            ['Ingredientes con bajo stock', ingredientes.filter((i) => (Number(i.stock) || 0) <= (Number(i.minimo) || 0)).length],
+            ['Trabajadores activos', trabajadores.filter((w) => w.estado === 'Activo').length],
             ['Pedidos activos / entregados', pedidosValidos.length],
-            ['Total histórico vendido', fmt$(data.ventas.reduce((a, v) => a + v.total, 0))],
+            ['Total histórico vendido', fmt$(totalHistorico)],
           ].map(([label, val], i) => (
             <div key={i} className="flex justify-between border-b border-line py-2.5 text-[13px] last:border-none">
               <span>{label}</span><b className="font-mono">{val}</b>
