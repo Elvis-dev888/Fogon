@@ -380,7 +380,7 @@ export function suscribirsePedido(pedidoId, onChange) {
 export async function fetchVentas(negocioId) {
   const { data, error } = await supabase
     .from('ventas')
-    .select('*, pedidos(id, estado, numero, cliente, pedido_items(*))')
+    .select('*, pedidos(*, pedido_items(*))')
     .eq('negocio_id', negocioId)
     .order('creado_en', { ascending: false })
   if (error) throw error

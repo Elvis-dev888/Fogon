@@ -1375,11 +1375,9 @@ export function TabVentas({ data }) {
               v.pedidos?.numero ? `#${v.pedidos.numero}` : '—',
               <span className="text-[12.5px] text-creamsoft">{resumen}</span>,
               <span className="font-mono">{fmt$(v.total)}</span>,
-              items.length > 0 && (
-                <button onClick={() => setDetalle(v)} className="text-[12px] font-semibold text-gold hover:text-golddark whitespace-nowrap">
-                  Ver detalle →
-                </button>
-              ),
+              <button onClick={() => setDetalle(v)} className="text-[12px] font-semibold text-gold hover:text-golddark whitespace-nowrap">
+                Ver detalle →
+              </button>,
             ]
           })} />
         )}
@@ -1415,6 +1413,134 @@ export function TabVentas({ data }) {
 
       {detalle && <VentaDetalleModal venta={detalle} onClose={() => setDetalle(null)} />}
     </div>
+  )
+}
+
+function VentaDetalleModal({ venta, onClose }) {
+  const pedido = venta.pedidos
+  const items = pedido?.pedido_items || []
+  const tieneItems = items.length > 0
+
+  return (
+    <Modal title={`🧾 Detalle de Venta ${pedido?.numero ? `#${pedido.numero}` : ''}`} onClose={onClose}>
+      <div className="space-y-4">
+        {/* Cabecera con fecha y total */}
+        <div className="bg-paper2 border border-line rounded-lg p-3.5 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <span className="text-[10.5px] uppercase tracking-wider text-creamsoft block">Fecha y Hora</span>
+            <span className="text-xs font-mono text-cream font-medium">
+              ⏰ {venta.creado_en ? fmtDateTime(venta.creado_en) : '—'}
+            </span>
+          </div>
+          <div className="text-right">
+            <span className="text-[10.5px] uppercase tracking-wider text-creamsoft block">Total Venta</span>
+            <span className="font-mono text-gold font-bold text-lg">{fmt$(venta.total)}</span>
+          </div>
+        </div>
+
+        {/* Información del cliente y entrega si proviene de un pedido */}
+        {pedido ? (
+          <div className="bg-paper2 border border-line rounded-lg p-3.5 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap pb-2 border-b border-line/60">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-cream">👤 {pedido.cliente || 'Cliente'}</span>
+              </div>
+              <span className={`text-[10.5px] font-semibold px-2 py-0.5 rounded-full border ${
+                pedido.tipo_entrega === 'domicilio'
+                  ? 'bg-gold/15 text-gold border-gold/30'
+                  : 'bg-paper text-creamsoft border-line'
+              }`}>
+                {pedido.tipo_entrega === 'domicilio' ? '🛵 Domicilio' : '🍽️ En local'}
+              </span>
+            </div>
+
+            {pedido.tipo_entrega === 'domicilio' && (
+              <div className="text-xs text-creamsoft space-y-1 pt-1">
+                {pedido.direccion && (
+                  <div className="text-cream font-medium flex items-center gap-1.5">
+                    <span>📍</span> <span>{pedido.direccion}</span>
+                  </div>
+                )}
+                {pedido.telefono && (
+                  <div className="flex items-center gap-1.5">
+                    <span>📞</span>
+                    <a
+                      href={`https://wa.me/${pedido.telefono.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-gold hover:underline font-mono font-medium"
+                    >
+                      {pedido.telefono} (WhatsApp)
+                    </a>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {pedido.notas_entrega && (
+              <div className="mt-2 p-2 bg-gold/10 rounded border border-gold/25 text-[11.5px] text-champagne space-y-1">
+                <div className="font-semibold text-gold flex items-center gap-1.5">
+                  <span>💰</span> <span>{pedido.notas_entrega.split(' · ')[0]}</span>
+                </div>
+                {pedido.notas_entrega.split(' · ').length > 1 && (
+                  <div className="text-[10.5px] text-creamsoft italic border-t border-gold/15 pt-1 mt-1">
+                    "{pedido.notas_entrega.split(' · ').slice(1).join(' · ')}"
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-3 bg-paper2 border border-line rounded text-xs text-creamsoft">
+            Venta directa registrada en caja / inventario.
+          </div>
+        )}
+
+        {/* Tabla o lista de productos comprados */}
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-creamsoft mb-2">
+            Productos en esta venta ({items.length})
+          </h4>
+          {tieneItems ? (
+            <div className="divide-y divide-line/70 border border-line rounded-lg overflow-hidden bg-paper">
+              {items.map((it, idx) => (
+                <div key={idx} className="p-3 flex items-start justify-between gap-3 text-xs">
+                  <div>
+                    <div className="font-semibold text-cream">
+                      <span className="text-gold font-mono font-bold mr-1.5">{it.cantidad}×</span>
+                      {it.nombre}
+                    </div>
+                    {it.adiciones && it.adiciones.length > 0 && (
+                      <div className="text-[11px] text-creamsoft mt-0.5">
+                        + {Array.isArray(it.adiciones) ? it.adiciones.join(', ') : it.adiciones}
+                      </div>
+                    )}
+                    {it.observaciones && (
+                      <div className="text-[10.5px] text-champagne/90 italic mt-0.5">
+                        "{it.observaciones}"
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-right font-mono font-semibold text-gold shrink-0">
+                    {fmt$(it.subtotal || (it.precio ? it.precio * it.cantidad : 0))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-creamsoft bg-paper2 p-3 rounded border border-line">
+              No hay productos desglosados en este registro de venta.
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Btn variant="primary" onClick={onClose} className="justify-center">
+            Cerrar
+          </Btn>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
