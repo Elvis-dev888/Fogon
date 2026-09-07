@@ -344,28 +344,39 @@ export function TabMiSuscripcion({ negocio, data }) {
             {/* Selector de método de pago */}
             <div>
               <p className="text-xs font-medium text-creamsoft mb-2">Selecciona tu método de pago directo:</p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setMetodoPago('nequi')}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                     metodoPago === 'nequi'
                       ? 'bg-fuchsia-950/40 border-fuchsia-400 text-fuchsia-300 ring-1 ring-fuchsia-400/50'
                       : 'bg-paper border-line text-creamsoft hover:border-gold/40'
                   }`}
                 >
-                  <span className="text-base">📱</span> Nequi (COP)
+                  <span className="text-base">📱</span> Nequi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMetodoPago('pse')}
+                  className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                    metodoPago === 'pse'
+                      ? 'bg-blue-950/40 border-blue-400 text-blue-300 ring-1 ring-blue-400/50'
+                      : 'bg-paper border-line text-creamsoft hover:border-gold/40'
+                  }`}
+                >
+                  <span className="text-base">🏦</span> PSE / Banco
                 </button>
                 <button
                   type="button"
                   onClick={() => setMetodoPago('binance')}
-                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center gap-1 p-2.5 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
                     metodoPago === 'binance'
                       ? 'bg-amber-950/40 border-amber-400 text-amber-300 ring-1 ring-amber-400/50'
                       : 'bg-paper border-line text-creamsoft hover:border-gold/40'
                   }`}
                 >
-                  <span className="text-base">🟡</span> Binance Pay (USDT)
+                  <span className="text-base">🟡</span> Binance USDT
                 </button>
               </div>
             </div>
@@ -382,18 +393,44 @@ export function TabMiSuscripcion({ negocio, data }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-[11px] text-creamsoft">Número Nequi / Llave:</p>
-                    <p className="text-sm font-mono font-bold text-cream">318 438 6788</p>
+                    <p className="text-sm font-mono font-bold text-cream">305 285 2956</p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => copiarAlPortapapeles('3184386788', 'nequi')}
+                    onClick={() => copiarAlPortapapeles('3052852956', 'nequi')}
                     className="text-xs px-2.5 py-1 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 hover:bg-fuchsia-500/30 cursor-pointer"
                   >
                     {copiado === 'nequi' ? '✓ ¡Copiado!' : '📋 Copiar'}
                   </button>
                 </div>
                 <div className="text-[11px] text-creamsoft bg-fuchsia-950/20 p-2.5 rounded border border-fuchsia-500/20">
-                  💡 Abre tu app Nequi, envía <b>${modalTier.priceCop.toLocaleString('es-CO')} COP</b> al número indicado y luego toca el botón inferior para enviar el comprobante por WhatsApp.
+                  💡 Abre tu app Nequi, transfiere <b>${modalTier.priceCop.toLocaleString('es-CO')} COP</b> al número <b>3052852956</b> y toca el botón inferior para enviar el comprobante por WhatsApp.
+                </div>
+              </div>
+            ) : metodoPago === 'pse' ? (
+              <div className="bg-paper border border-blue-500/30 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-line">
+                  <span className="text-xs text-creamsoft">Monto exacto a transferir:</span>
+                  <span className="text-sm font-bold font-mono text-blue-300">
+                    ${modalTier.priceCop.toLocaleString('es-CO')} COP
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] text-creamsoft">Transferencia PSE / Transfiya a Nequi:</p>
+                    <p className="text-sm font-mono font-bold text-cream">305 285 2956</p>
+                    <p className="text-[11px] text-creamsoft">Banco destino: Nequi / Bancolombia</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copiarAlPortapapeles('3052852956', 'pse')}
+                    className="text-xs px-2.5 py-1 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40 hover:bg-blue-500/30 cursor-pointer"
+                  >
+                    {copiado === 'pse' ? '✓ ¡Copiado!' : '📋 Copiar'}
+                  </button>
+                </div>
+                <div className="text-[11px] text-creamsoft bg-blue-950/20 p-2.5 rounded border border-blue-500/20">
+                  💡 Desde cualquier banco colombiano (Bancolombia, Davivienda, BBVA, Banco de Bogotá, etc.), transfiere vía PSE o Transfiya a Nequi celular <b>3052852956</b> y envía el comprobante por WhatsApp.
                 </div>
               </div>
             ) : (
@@ -404,21 +441,37 @@ export function TabMiSuscripcion({ negocio, data }) {
                     ${modalTier.priceUsd} USDT
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-[11px] text-creamsoft">Binance Pay ID:</p>
-                    <p className="text-sm font-mono font-bold text-cream">582910472</p>
+                <div>
+                  <p className="text-[11px] text-creamsoft">Red Cripto:</p>
+                  <p className="text-xs font-bold text-amber-300">Tron (TRC20)</p>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="overflow-hidden">
+                    <p className="text-[11px] text-creamsoft">Dirección de Billetera:</p>
+                    <p className="text-xs font-mono font-bold text-cream break-all">
+                      TJiNNzgpZhrMPGSQWn9DwSjc1WpjuhMiTB
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => copiarAlPortapapeles('582910472', 'binance')}
-                    className="text-xs px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 cursor-pointer"
+                    onClick={() => copiarAlPortapapeles('TJiNNzgpZhrMPGSQWn9DwSjc1WpjuhMiTB', 'binance')}
+                    className="text-xs px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 cursor-pointer shrink-0"
                   >
                     {copiado === 'binance' ? '✓ ¡Copiado!' : '📋 Copiar'}
                   </button>
                 </div>
+
+                <div className="flex items-center justify-center p-2 bg-black/40 rounded-lg border border-amber-500/20">
+                  <img
+                    src="/binance-qr.png"
+                    alt="QR Binance USDT TRC20"
+                    className="w-40 h-auto rounded shadow"
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
+                </div>
+
                 <div className="text-[11px] text-creamsoft bg-amber-950/20 p-2.5 rounded border border-amber-500/20">
-                  💡 En Binance ve a <b>Pay &gt; Enviar</b>, pega el ID <b>582910472</b>, transfiere <b>${modalTier.priceUsd} USDT</b> sin comisiones y envía el comprobante por WhatsApp.
+                  💡 Abre Binance &gt; Retirar/Enviar USDT &gt; Red <b>Tron (TRC20)</b> &gt; Pega la dirección o escanea el QR superior y envía el comprobante por WhatsApp.
                 </div>
               </div>
             )}
@@ -429,7 +482,7 @@ export function TabMiSuscripcion({ negocio, data }) {
                 href={`https://wa.me/?text=${encodeURIComponent(`Hola Kiosko, adjunto mi comprobante de pago de suscripción:
 • Negocio: ${negocio.nombre}
 • Plan: ${modalTier.name} (${modalTier.limitLabel})
-• Monto: ${metodoPago === 'nequi' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (Nequi)` : `$${modalTier.priceUsd} USDT (Binance Pay)`}
+• Método: ${metodoPago === 'nequi' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (Nequi 3052852956)` : metodoPago === 'pse' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (PSE / Transfiya)` : `$${modalTier.priceUsd} USDT (Binance TRC20)`}
 • Fecha: ${new Date().toLocaleDateString('es-CO')}`)}`}
                 target="_blank"
                 rel="noreferrer"
