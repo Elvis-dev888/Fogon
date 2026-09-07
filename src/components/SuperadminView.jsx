@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Btn, StatCard, Pill, NegocioLogo, Card, Empty, Select, Modal } from './ui'
 import { fmt$, fmtDateLong } from '../lib/helpers'
-import { toggleNegocioEstado, eliminarNegocio, fetchSugerencias, actualizarEstadoSugerencia, eliminarSugerencia } from '../lib/api'
+import { toggleNegocioEstado, toggleNegocioVip, eliminarNegocio, fetchSugerencias, actualizarEstadoSugerencia, eliminarSugerencia } from '../lib/api'
+import { getTierForProductCount } from '../lib/subscription'
 import { useLanguage } from '../lib/i18n.jsx'
 
 export default function SuperadminView({ negocios, onChanged, notify }) {
@@ -35,6 +36,17 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
     await toggleNegocioEstado(n)
     notify(`${n.nombre} ahora está ${n.estado === 'Activo' ? 'pausado' : 'activo'}`)
     onChanged()
+  }
+
+  async function handleToggleVip(n) {
+    try {
+      await toggleNegocioVip(n)
+      const isNowVip = !(n.is_vip || n.subscription_status === 'vip' || n.plan === 'VIP / Cortesía')
+      notify(`Negocio "${n.nombre}" ahora tiene ${isNowVip ? '👑 Cortesía VIP permanente' : 'plan normal'}`)
+      onChanged()
+    } catch (err) {
+      notify('Error al cambiar VIP: ' + (err.message || String(err)))
+    }
   }
 
   async function handleConfirmarEliminacion() {
@@ -128,6 +140,7 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
                   key={n.id}
                   n={n}
                   onToggle={() => handleToggle(n)}
+                  onToggleVip={() => handleToggleVip(n)}
                   onDelete={() => setNegocioAEliminar(n)}
                 />
               ))}
@@ -251,7 +264,11 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
   )
 }
 
-function NegocioCard({ n, onToggle, onDelete }) {
+function NegocioCard({ n, onToggle, onToggleVip, onDelete }) {
+  const isVip = Boolean(n.is_vip || n.subscription_status === 'vip' || n.plan === 'VIP / Cortesía')
+  const tier = getTierForProductCount(n.productosCount ?? 0)
+  const esBodega = n.modo_operacion === 'inventario'
+
   return (
     <div className="rounded border border-line bg-paper2 overflow-hidden flex flex-col justify-between">
       <div>
@@ -261,8 +278,20 @@ function NegocioCard({ n, onToggle, onDelete }) {
             : <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_30%,rgba(199,154,60,.18)_0%,transparent_60%)]" />}
         </div>
         <div className="p-5 pb-3">
-          <div className="mb-2.5">
+          <div className="mb-2.5 flex items-center gap-1.5 flex-wrap">
             <Pill tone={n.estado === 'Activo' ? 'activo' : 'pausado'}>{n.estado}</Pill>
+            {isVip ? (
+              <span className="text-[10.5px] font-bold px-2 py-0.5 rounded bg-gold/20 text-gold border border-gold/40">
+                👑 Cortesía VIP
+              </span>
+            ) : (
+              <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded bg-paper border border-line text-cream">
+                {tier.name}
+              </span>
+            )}
+            <span className="text-[10.5px] px-2 py-0.5 rounded bg-paper border border-line text-creamsoft">
+              {esBodega ? '📦 Bodega' : '🍽️ Catálogo'}
+            </span>
           </div>
           <h3 className="font-serif text-lg font-semibold mb-0.5 flex items-center gap-1.5">
             <NegocioLogo negocio={n} size={20} /> {n.nombre}
@@ -279,12 +308,15 @@ function NegocioCard({ n, onToggle, onDelete }) {
         </div>
       </div>
       <div className="p-5 pt-0">
-        <div className="flex items-center justify-between gap-2 pt-3 border-t border-line">
+        <div className="flex items-center justify-between gap-1.5 pt-3 border-t border-line flex-wrap">
+          <Btn size="sm" variant={isVip ? 'mustard' : 'ghost'} onClick={onToggleVip} title="Otorgar o revocar acceso gratuito VIP permanente">
+            {isVip ? '👑 Quitar VIP' : '👑 Dar VIP'}
+          </Btn>
           <Btn size="sm" variant="ghost" onClick={onToggle}>
             {n.estado === 'Activo' ? 'Pausar' : 'Activar'}
           </Btn>
           <Btn size="sm" variant="danger" onClick={onDelete} title="Eliminar negocio de la plataforma">
-            🗑️ Eliminar
+            🗑️
           </Btn>
         </div>
       </div>

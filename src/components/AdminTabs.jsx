@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
 import { fmt$, fmtDate, fmtTime, fmtDateTime, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
-import { getSubscriptionSummary, formatDaysLeft } from '../lib/subscription'
+import { getSubscriptionSummary, formatDaysLeft, TIERS } from '../lib/subscription'
+import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
   createIngrediente, updateIngrediente, deleteIngrediente, setIngredienteStock, registrarCompra, deleteCompra, registrarVentaInventario,
@@ -121,44 +122,70 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
   )
 }
 
-export function TabMiSuscripcion({ negocio }) {
+export function TabMiSuscripcion({ negocio, data }) {
   const { t } = useLanguage()
-  const summary = getSubscriptionSummary(negocio)
-  const estadoTone = summary.isTrialActive ? 'activo' : summary.isTrialExpired ? 'pausado' : 'activo'
+  const productCount = (data?.productos?.length || data?.ingredientes?.length || negocio?.productosCount || 0)
+  const summary = getSubscriptionSummary(negocio, productCount)
+  const estadoTone = summary.isVip ? 'sage' : summary.isTrialActive ? 'activo' : summary.isTrialExpired ? 'pausado' : 'activo'
+
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Hola Kiosko, quiero activar o renovar la suscripción de mi negocio "${negocio.nombre}" (${summary.tier.name}).`)}`
 
   return (
     <div>
       <SectionTitle
         title={t.tabs?.suscripcion || 'Mi suscripción'}
-        sub={t.subscriptionTab?.fullAccess || 'Período de prueba de 6 meses con acceso completo. Sin cobros automáticos.'}
+        sub={t.subscriptionTab?.trialSub || '1 semana de configuración + 2 meses de prueba operativa. Sin cobros automáticos.'}
       />
+
+      {summary.isVip && (
+        <Card className="p-5 mb-5 bg-gradient-to-r from-gold/20 via-paper2 to-gold/10 border-gold/50">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">👑</span>
+            <div>
+              <h4 className="font-serif text-lg font-semibold text-gold">Plan Cortesía VIP Activo</h4>
+              <p className="text-xs text-creamsoft">
+                Este negocio cuenta con acceso gratuito permanente e ilimitado otorgado por la administración.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <Card className="p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-1">{t.subscriptionTab?.proPlan || 'Plan actual'}</p>
             <h3 className="font-serif text-2xl text-gold">{summary.plan}</h3>
             <p className="text-sm text-creamsoft mt-1">
-              {summary.accessGranted
-                ? (t.subscriptionTab?.fullAccess || 'Acceso completo a todas las funciones')
-                : (t.subscriptionTab?.subscribeToContinue || 'Pendiente de suscripción')}
+              {summary.isVip
+                ? 'Acceso permanente ilimitado'
+                : summary.accessGranted
+                  ? (t.subscriptionTab?.fullAccess || 'Acceso completo a todas las funciones')
+                  : (t.subscriptionTab?.subscribeToContinue || 'Pendiente de suscripción')}
             </p>
           </div>
           <Pill tone={estadoTone}>{summary.statusLabel}</Pill>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
-          <StatCard label={t.inventory?.status || 'Estado'} value={summary.statusLabel} tone={summary.isTrialActive ? 'sage' : 'wine'} />
+          <StatCard label={t.inventory?.status || 'Estado'} value={summary.statusLabel} tone={summary.isVip ? 'sage' : summary.isTrialActive ? 'sage' : 'wine'} />
           <StatCard label={t.report?.period || 'Inicio'} value={summary.trialStartedAt ? fmtDate(summary.trialStartedAt) : '—'} tone="gold" />
-          <StatCard label={t.subscriptionTab?.daysLeft || 'Días restantes'} value={summary.isTrialActive ? formatDaysLeft(summary.remainingDays) : (summary.trialEndsAt ? fmtDate(summary.trialEndsAt) : '—')} tone="champagne" />
+          <StatCard label={t.subscriptionTab?.daysLeft || 'Días restantes'} value={summary.isVip ? 'Permanente' : summary.isTrialActive ? formatDaysLeft(summary.remainingDays) : (summary.trialEndsAt ? fmtDate(summary.trialEndsAt) : '—')} tone="champagne" />
         </div>
 
         <div className="mt-6 border border-line rounded p-4 bg-paper">
-          {summary.isTrialActive ? (
+          {summary.isVip ? (
+            <>
+              <p className="text-[11px] uppercase tracking-wider text-gold mb-1">👑 Acceso VIP Permanente</p>
+              <p className="font-semibold text-cream">Tu negocio está exento de cobros de suscripción.</p>
+              <p className="text-sm text-creamsoft mt-1">Tienes productos, inventario, pedidos y empleados ilimitados.</p>
+            </>
+          ) : summary.isTrialActive ? (
             <>
               <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">{t.subscriptionTab?.activeTrial || 'Trial activo'}</p>
-              <p className="font-semibold text-cream">🎉 {t.subscriptionTab?.proTrial || 'Kiosko Pro (Trial)'}</p>
+              <p className="font-semibold text-cream">🎉 {summary.plan}</p>
               <p className="text-sm text-creamsoft mt-2">
-                {t.subscriptionTab?.trialEndsNotice ? t.subscriptionTab.trialEndsNotice.replace('{days}', summary.remainingDays) : `Tienes acceso total. Te quedan ${formatDaysLeft(summary.remainingDays)}.`}
+                {t.subscriptionTab?.trialEndsNotice ? t.subscriptionTab.trialEndsNotice.replace('{days}', summary.remainingDays) : `Tienes acceso total. Te quedan ${formatDaysLeft(summary.remainingDays)} de prueba.`}
               </p>
             </>
           ) : summary.isTrialExpired ? (
@@ -166,19 +193,94 @@ export function TabMiSuscripcion({ negocio }) {
               <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">{t.subscriptionTab?.trialExpired || 'Periodo finalizado'}</p>
               <p className="font-semibold text-wine">🔴 {t.subscriptionTab?.trialExpired || 'Tu período de prueba ha finalizado.'}</p>
               <p className="text-sm text-creamsoft mt-2">
-                {t.subscriptionTab?.subscribeToContinue || 'Suscríbete al plan Kiosko Pro para continuar administrando tu negocio.'}
+                {t.subscriptionTab?.subscribeToContinue || 'Activa tu suscripción para continuar administrando tu negocio.'}
               </p>
-              <div className="mt-4">
-                <Btn variant="primary" className="justify-center">{t.subscriptionTab?.subscribeNow || 'Suscribirme a Kiosko Pro'}</Btn>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded bg-gold text-paper font-semibold text-xs px-4 py-2.5 hover:bg-golddark transition-colors">
+                  📲 {t.subscriptionTab?.whatsappRenew || 'Renovar / Activar por WhatsApp'}
+                </a>
               </div>
             </>
           ) : (
             <>
               <p className="text-[11px] uppercase tracking-wider text-creamsoft mb-2">{t.subscriptionTab?.activeSub || 'Suscripción activa'}</p>
-              <p className="font-semibold text-cream">✅ {t.subscriptionTab?.proPlan || 'Kiosko Pro'}</p>
+              <p className="font-semibold text-cream">✅ {summary.plan}</p>
               <p className="text-sm text-creamsoft mt-2">{t.subscriptionTab?.fullAccess || 'Acceso completo.'}</p>
             </>
           )}
+        </div>
+
+        {/* Comparativa de los 3 planes escalonados */}
+        <div className="mt-8 pt-6 border-t border-line">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <h4 className="font-serif text-lg font-semibold text-cream">Planes Disponibles</h4>
+              <p className="text-xs text-creamsoft">
+                Escala tu plan según la cantidad de productos de tu negocio. Todos los planes incluyen empleados ilimitados.
+              </p>
+            </div>
+            <span className="text-xs font-mono text-gold bg-gold/10 px-2.5 py-1 rounded border border-gold/30">
+              {productCount} {productCount === 1 ? 'producto registrado' : 'productos registrados'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {TIERS.map((tier) => {
+              const isCurrent = summary.tier?.key === tier.key
+              return (
+                <div
+                  key={tier.key}
+                  className={`rounded-lg border p-5 flex flex-col justify-between transition-all ${
+                    isCurrent
+                      ? 'bg-gold/10 border-gold shadow-lg shadow-gold/5 ring-1 ring-gold/40'
+                      : 'bg-paper border-line hover:border-gold/30'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h5 className="font-serif font-bold text-base text-cream">{tier.name}</h5>
+                      {isCurrent && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-gold text-paper px-2 py-0.5 rounded-full">
+                          {t.subscriptionTab?.currentPlan || 'Recomendado'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mb-4">
+                      <span className="font-serif text-2xl font-bold text-gold">${tier.priceUsd}</span>
+                      <span className="text-xs text-creamsoft"> USD / mes</span>
+                      <p className="text-[11px] text-creamsoft">~ ${tier.priceCop.toLocaleString('es-CO')} COP / mes</p>
+                    </div>
+                    <ul className="text-xs text-creamsoft space-y-2 mb-4">
+                      <li className="flex items-center gap-1.5 text-cream font-medium">
+                        ✓ {tier.maxProducts === Infinity ? 'Productos e inventario ILIMITADOS' : `Hasta ${tier.maxProducts} productos / platos`}
+                      </li>
+                      <li className="flex items-center gap-1.5 text-sage font-medium">
+                        ✓ 👥 Empleados ilimitados (con PIN)
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        ✓ Menú digital QR y pedidos en vivo
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        ✓ Historial de ventas y reportes
+                      </li>
+                    </ul>
+                  </div>
+                  <a
+                    href={`https://wa.me/?text=${encodeURIComponent(`Hola Kiosko, quiero consultar la suscripción al ${tier.name} ($${tier.priceUsd} USD/mes) para mi negocio "${negocio.nombre}".`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`text-center text-xs font-semibold py-2 px-3 rounded transition-colors ${
+                      isCurrent
+                        ? 'bg-gold text-paper hover:bg-golddark'
+                        : 'border border-line text-cream hover:border-gold hover:text-gold'
+                    }`}
+                  >
+                    Elegir {tier.name}
+                  </a>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </Card>
     </div>
@@ -1649,11 +1751,88 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
   const { t } = useLanguage()
   const [modal, setModal] = useState(null) // null | 'new' | trabajador (para editar)
   const [pagoFor, setPagoFor] = useState(null)
+  const [codigo, setCodigo] = useState('')
+  const [cargandoCodigo, setCargandoCodigo] = useState(true)
+  const [regenerando, setRegenerando] = useState(false)
+
+  useEffect(() => {
+    fetchCodigoNegocio(negocio.id)
+      .then(setCodigo)
+      .finally(() => setCargandoCodigo(false))
+  }, [negocio.id])
+
+  async function copiarCodigo() {
+    if (!codigo) return
+    await navigator.clipboard.writeText(codigo)
+    notify(t.copyCode || 'Código copiado — pásaselo a tu empleado')
+  }
+
+  async function compartirWhatsApp() {
+    if (!codigo) return
+    const texto = `Hola, este es el código de acceso para atender pedidos de ${negocio.nombre} en Kiosko: *${codigo}*\n\nEntra aquí para ingresar: https://administraciondenegocios.netlify.app`
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
+  }
+
+  async function regenerar() {
+    setRegenerando(true)
+    try {
+      const nuevo = await regenerarCodigoNegocio()
+      setCodigo(nuevo)
+      notify(t.newCode || 'Generado nuevo código')
+    } finally {
+      setRegenerando(false)
+    }
+  }
 
   return (
     <div>
       <SectionTitle title={t.staff.title} sub={t.staff.description.replace('{business}', negocio.nombre)}
         action={<Btn variant="primary" onClick={() => setModal('new')}>➕ {t.staff.new}</Btn>} />
+
+      {/* Tarjeta destacada de Código PIN para empleados */}
+      <Card className="p-5 mb-6 bg-paper2 border-gold/40">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gold/15 text-gold border border-gold/30">
+                👥 Empleados Ilimitados (Gratis)
+              </span>
+              <span className="text-[11.5px] text-creamsoft">Acceso para meseros, cajeros y cocina</span>
+            </div>
+            <h3 className="font-serif text-lg font-semibold text-cream">Código de acceso para tus trabajadores</h3>
+            <p className="text-xs text-creamsoft max-w-xl mt-0.5">
+              Pásale este código PIN de 6 dígitos a tus empleados para que atiendan pedidos desde sus propios celulares, sin darles tu contraseña ni acceso a tus finanzas.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:items-end gap-2.5 shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="font-mono text-lg font-bold tracking-[0.25em] text-gold bg-paper border border-line px-4 py-2 rounded text-center min-w-[130px]">
+                {cargandoCodigo ? '…' : (codigo || '••••••')}
+              </div>
+              <Btn size="sm" variant="primary" onClick={copiarCodigo}>
+                📋 Copiar
+              </Btn>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                onClick={compartirWhatsApp}
+                className="text-xs font-semibold text-sage hover:underline flex items-center gap-1 bg-sage/10 px-2.5 py-1 rounded border border-sage/30"
+              >
+                📲 Enviar por WhatsApp
+              </button>
+              <button
+                onClick={regenerar}
+                disabled={regenerando || cargandoCodigo}
+                className="text-xs text-creamsoft hover:text-gold"
+              >
+                {regenerando ? 'Generando…' : '🔄 Regenerar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Card>
+
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {data.trabajadores.map((w) => {
           const ultimoPago = w.pagos.length ? w.pagos[w.pagos.length - 1] : null

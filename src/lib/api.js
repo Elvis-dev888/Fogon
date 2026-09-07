@@ -57,6 +57,15 @@ export async function toggleNegocioEstado(negocio) {
   if (error) throw error
 }
 
+export async function toggleNegocioVip(negocio) {
+  const isCurrentlyVip = Boolean(negocio.is_vip || negocio.subscription_status === 'vip' || negocio.plan === 'VIP / Cortesía')
+  const updates = isCurrentlyVip
+    ? { is_vip: false, subscription_status: 'trial', plan: 'Plan Básico' }
+    : { is_vip: true, subscription_status: 'vip', plan: 'Plan Cortesía VIP' }
+  const { error } = await supabase.from('negocios').update(updates).eq('id', negocio.id)
+  if (error) throw error
+}
+
 export async function eliminarNegocio(id) {
   // 1. Desvincular perfiles asociados para evitar inconsistencias
   await supabase.from('perfiles').update({ negocio_id: null, rol: 'pendiente' }).eq('negocio_id', id)

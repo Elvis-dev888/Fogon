@@ -100,6 +100,28 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
 
   return (
     <div className="grid grid-cols-[220px_1fr] gap-5 items-start max-[820px]:grid-cols-1">
+      {/* Barra superior visible únicamente en celulares (<= 820px) */}
+      <div className="hidden max-[820px]:flex flex-col gap-2.5 p-3.5 bg-paper2 border border-line rounded">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 truncate">
+            {negocio.logo_url ? (
+              <img src={negocio.logo_url} alt={negocio.nombre} className="w-7 h-7 rounded-full object-cover border border-gold shrink-0" />
+            ) : (
+              <span className="text-base shrink-0">{negocio.emoji}</span>
+            )}
+            <span className="text-gold font-serif font-semibold text-sm truncate">{negocio.nombre}</span>
+          </div>
+          {!esModoInventario && (
+            <button
+              onClick={() => setMostrarShareMenu(true)}
+              className="px-2.5 py-1 rounded text-xs font-semibold text-gold bg-gold/10 hover:bg-gold/20 transition-colors flex items-center gap-1.5 border border-gold/30 shrink-0"
+            >
+              🔗 {t.digitalMenu?.button || 'Menú QR'}
+            </button>
+          )}
+        </div>
+      </div>
+
       <nav className="bg-paper2 border border-line rounded p-4 sticky top-[78px] flex flex-col gap-0.5 max-[820px]:static max-[820px]:flex-row max-[820px]:overflow-x-auto">
         <div className="flex items-center gap-2.5 pb-3.5 mb-2.5 border-b border-line max-[820px]:hidden">
           {negocio.logo_url ? (
@@ -110,15 +132,15 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
           <span className="text-gold font-serif font-semibold text-base truncate">{negocio.nombre}</span>
         </div>
         {!esModoInventario && (
-          <>
+          <div className="max-[820px]:hidden">
             <button
               onClick={() => setMostrarShareMenu(true)}
-              className="mb-2 text-left px-3 py-2 rounded-sm text-[12.5px] font-semibold text-gold bg-gold/10 hover:bg-gold/20 transition-colors flex items-center gap-2 border border-gold/30"
+              className="mb-2 text-left px-3 py-2 rounded-sm text-[12.5px] font-semibold text-gold bg-gold/10 hover:bg-gold/20 transition-colors flex items-center gap-2 border border-gold/30 w-full"
             >
               🔗 {t.digitalMenu?.button || 'Menú Digital / QR'}
             </button>
             <CodigoEmpleado negocioId={negocio.id} notify={notify} />
-          </>
+          </div>
         )}
         {tabsVisibles.map(([k, icon]) => {
           const pendientesPedidos = k === 'pedidos' ? data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado').length : 0
