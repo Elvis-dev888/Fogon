@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
 import { fmt$, fmtDate, fmtTime, fmtDateTime, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
-import { getSubscriptionSummary, formatDaysLeft, TIERS } from '../lib/subscription'
+import { getSubscriptionSummary, formatDaysLeft, getTiersForMode } from '../lib/subscription'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
 import {
   createCategoria, deleteCategoria, createProducto, updateProducto, deleteProducto, subirFotoProducto,
@@ -124,9 +124,34 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
 
 export function TabMiSuscripcion({ negocio, data }) {
   const { t } = useLanguage()
-  const productCount = (data?.productos?.length || data?.ingredientes?.length || negocio?.productosCount || 0)
-  const summary = getSubscriptionSummary(negocio, productCount)
+  const esModoInventario = negocio.modo_operacion === 'inventario'
+  const itemCount = esModoInventario ? (data?.ingredientes?.length || 0) : (data?.productos?.length || negocio?.productosCount || 0)
+  const tiers = getTiersForMode(esModoInventario ? 'inventario' : 'catalogo')
+  const summary = getSubscriptionSummary(negocio, itemCount)
   const estadoTone = summary.isVip ? 'sage' : summary.isTrialActive ? 'activo' : summary.isTrialExpired ? 'pausado' : 'activo'
+
+  const [modalTier, setModalTier] = useState(null)
+  const [metodoPago, setMetodoPago] = useState('nequi')
+  const [copiado, setCopiado] = useState(null)
+
+  const copiarAlPortapapeles = (texto, tipo) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(texto)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = texto
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopiado(tipo)
+      setTimeout(() => setCopiado(null), 2500)
+    } catch {
+      // ignore
+    }
+  }
 
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`Hola Kiosko, quiero activar o renovar la suscripción de mi negocio "${negocio.nombre}" (${summary.tier.name}).`)}`
 
@@ -196,8 +221,15 @@ export function TabMiSuscripcion({ negocio, data }) {
                 {t.subscriptionTab?.subscribeToContinue || 'Activa tu suscripción para continuar administrando tu negocio.'}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded bg-gold text-paper font-semibold text-xs px-4 py-2.5 hover:bg-golddark transition-colors">
-                  📲 {t.subscriptionTab?.whatsappRenew || 'Renovar / Activar por WhatsApp'}
+                <button
+                  type="button"
+                  onClick={() => setModalTier(summary.tier || tiers[0])}
+                  className="inline-flex items-center justify-center rounded bg-gold text-paper font-semibold text-xs px-4 py-2.5 hover:bg-golddark transition-colors cursor-pointer"
+                >
+                  💳 Activar Plan ({summary.tier?.name || 'Recomendado'})
+                </button>
+                <a href={whatsappUrl} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center rounded border border-line text-cream font-semibold text-xs px-4 py-2.5 hover:border-gold hover:text-gold transition-colors">
+                  📲 Soporte por WhatsApp
                 </a>
               </div>
             </>
@@ -214,18 +246,22 @@ export function TabMiSuscripcion({ negocio, data }) {
         <div className="mt-8 pt-6 border-t border-line">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
             <div>
-              <h4 className="font-serif text-lg font-semibold text-cream">Planes Disponibles</h4>
+              <h4 className="font-serif text-lg font-semibold text-cream">
+                Planes Disponibles {esModoInventario ? '(Modo Bodega / Tienda)' : '(Modo Catálogo / Restaurante)'}
+              </h4>
               <p className="text-xs text-creamsoft">
-                Escala tu plan según la cantidad de productos de tu negocio. Todos los planes incluyen empleados ilimitados.
+                {esModoInventario
+                  ? 'Planes basados en artículos de inventario. Todos los planes incluyen empleados ilimitados.'
+                  : 'Planes basados en productos de tu catálogo. Todos los planes incluyen empleados ilimitados.'}
               </p>
             </div>
             <span className="text-xs font-mono text-gold bg-gold/10 px-2.5 py-1 rounded border border-gold/30">
-              {productCount} {productCount === 1 ? 'producto registrado' : 'productos registrados'}
+              {itemCount} {esModoInventario ? (itemCount === 1 ? 'artículo en inventario' : 'artículos en inventario') : (itemCount === 1 ? 'producto en catálogo' : 'productos en catálogo')}
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {TIERS.map((tier) => {
+            {tiers.map((tier) => {
               const isCurrent = summary.tier?.key === tier.key
               return (
                 <div
@@ -250,39 +286,168 @@ export function TabMiSuscripcion({ negocio, data }) {
                       <span className="text-xs text-creamsoft"> USD / mes</span>
                       <p className="text-[11px] text-creamsoft">~ ${tier.priceCop.toLocaleString('es-CO')} COP / mes</p>
                     </div>
-                    <ul className="text-xs text-creamsoft space-y-2 mb-4">
+                    <ul className="text-xs text-creamsoft space-y-2 mb-5">
                       <li className="flex items-center gap-1.5 text-cream font-medium">
-                        ✓ {tier.maxProducts === Infinity ? 'Productos e inventario ILIMITADOS' : `Hasta ${tier.maxProducts} productos / platos`}
+                        ✓ {tier.limitLabel}
                       </li>
                       <li className="flex items-center gap-1.5 text-sage font-medium">
                         ✓ 👥 Empleados ilimitados (con PIN)
                       </li>
                       <li className="flex items-center gap-1.5">
-                        ✓ Menú digital QR y pedidos en vivo
+                        ✓ {esModoInventario ? 'Control de stock y bodega en tiempo real' : 'Menú digital QR y catálogo online'}
                       </li>
                       <li className="flex items-center gap-1.5">
-                        ✓ Historial de ventas y reportes
+                        ✓ Historial de ventas, finanzas y reportes
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        ✓ Soporte continuo y actualizaciones
                       </li>
                     </ul>
                   </div>
-                  <a
-                    href={`https://wa.me/?text=${encodeURIComponent(`Hola Kiosko, quiero consultar la suscripción al ${tier.name} ($${tier.priceUsd} USD/mes) para mi negocio "${negocio.nombre}".`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`text-center text-xs font-semibold py-2 px-3 rounded transition-colors ${
+                  <button
+                    type="button"
+                    onClick={() => setModalTier(tier)}
+                    className={`w-full text-center text-xs font-semibold py-2.5 px-3 rounded transition-colors cursor-pointer ${
                       isCurrent
                         ? 'bg-gold text-paper hover:bg-golddark'
                         : 'border border-line text-cream hover:border-gold hover:text-gold'
                     }`}
                   >
-                    Elegir {tier.name}
-                  </a>
+                    💳 Pagar {tier.name}
+                  </button>
                 </div>
               )
             })}
           </div>
         </div>
       </Card>
+
+      {/* Modal de Pago Directo: Nequi y Binance Pay */}
+      {modalTier && (
+        <Modal
+          title={`Activar ${modalTier.name}`}
+          onClose={() => setModalTier(null)}
+        >
+          <div className="space-y-4">
+            <div className="bg-paper2 border border-line rounded-lg p-3.5 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] text-creamsoft uppercase tracking-wider">Plan seleccionado</p>
+                <h4 className="font-serif font-bold text-base text-cream">{modalTier.name}</h4>
+                <p className="text-xs text-gold">{modalTier.limitLabel} • Empleados ilimitados</p>
+              </div>
+              <div className="text-right">
+                <span className="text-lg font-bold font-serif text-gold">${modalTier.priceUsd} USD</span>
+                <p className="text-[11px] text-creamsoft">~ ${modalTier.priceCop.toLocaleString('es-CO')} COP / mes</p>
+              </div>
+            </div>
+
+            {/* Selector de método de pago */}
+            <div>
+              <p className="text-xs font-medium text-creamsoft mb-2">Selecciona tu método de pago directo:</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMetodoPago('nequi')}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                    metodoPago === 'nequi'
+                      ? 'bg-fuchsia-950/40 border-fuchsia-400 text-fuchsia-300 ring-1 ring-fuchsia-400/50'
+                      : 'bg-paper border-line text-creamsoft hover:border-gold/40'
+                  }`}
+                >
+                  <span className="text-base">📱</span> Nequi (COP)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMetodoPago('binance')}
+                  className={`flex items-center justify-center gap-2 p-3 rounded-lg border text-xs font-semibold transition-all cursor-pointer ${
+                    metodoPago === 'binance'
+                      ? 'bg-amber-950/40 border-amber-400 text-amber-300 ring-1 ring-amber-400/50'
+                      : 'bg-paper border-line text-creamsoft hover:border-gold/40'
+                  }`}
+                >
+                  <span className="text-base">🟡</span> Binance Pay (USDT)
+                </button>
+              </div>
+            </div>
+
+            {/* Detalles del método seleccionado */}
+            {metodoPago === 'nequi' ? (
+              <div className="bg-paper border border-fuchsia-500/30 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-line">
+                  <span className="text-xs text-creamsoft">Monto exacto a transferir:</span>
+                  <span className="text-sm font-bold font-mono text-fuchsia-300">
+                    ${modalTier.priceCop.toLocaleString('es-CO')} COP
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] text-creamsoft">Número Nequi / Llave:</p>
+                    <p className="text-sm font-mono font-bold text-cream">318 438 6788</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copiarAlPortapapeles('3184386788', 'nequi')}
+                    className="text-xs px-2.5 py-1 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 hover:bg-fuchsia-500/30 cursor-pointer"
+                  >
+                    {copiado === 'nequi' ? '✓ ¡Copiado!' : '📋 Copiar'}
+                  </button>
+                </div>
+                <div className="text-[11px] text-creamsoft bg-fuchsia-950/20 p-2.5 rounded border border-fuchsia-500/20">
+                  💡 Abre tu app Nequi, envía <b>${modalTier.priceCop.toLocaleString('es-CO')} COP</b> al número indicado y luego toca el botón inferior para enviar el comprobante por WhatsApp.
+                </div>
+              </div>
+            ) : (
+              <div className="bg-paper border border-amber-500/30 rounded-lg p-4 space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-line">
+                  <span className="text-xs text-creamsoft">Monto exacto a transferir:</span>
+                  <span className="text-sm font-bold font-mono text-amber-300">
+                    ${modalTier.priceUsd} USDT
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] text-creamsoft">Binance Pay ID:</p>
+                    <p className="text-sm font-mono font-bold text-cream">582910472</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => copiarAlPortapapeles('582910472', 'binance')}
+                    className="text-xs px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 cursor-pointer"
+                  >
+                    {copiado === 'binance' ? '✓ ¡Copiado!' : '📋 Copiar'}
+                  </button>
+                </div>
+                <div className="text-[11px] text-creamsoft bg-amber-950/20 p-2.5 rounded border border-amber-500/20">
+                  💡 En Binance ve a <b>Pay &gt; Enviar</b>, pega el ID <b>582910472</b>, transfiere <b>${modalTier.priceUsd} USDT</b> sin comisiones y envía el comprobante por WhatsApp.
+                </div>
+              </div>
+            )}
+
+            {/* Acciones */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-2">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(`Hola Kiosko, adjunto mi comprobante de pago de suscripción:
+• Negocio: ${negocio.nombre}
+• Plan: ${modalTier.name} (${modalTier.limitLabel})
+• Monto: ${metodoPago === 'nequi' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (Nequi)` : `$${modalTier.priceUsd} USDT (Binance Pay)`}
+• Fecha: ${new Date().toLocaleDateString('es-CO')}`)}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs py-3 px-4 transition-colors text-center"
+              >
+                <span>📲</span> Enviar Comprobante por WhatsApp
+              </a>
+              <button
+                type="button"
+                onClick={() => setModalTier(null)}
+                className="sm:w-28 text-center text-xs text-creamsoft hover:text-cream border border-line py-3 px-3 rounded cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

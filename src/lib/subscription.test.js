@@ -24,12 +24,20 @@ test('trial activo entrega acceso completo y días restantes (67 días)', () => 
   assert.match(formatDaysLeft(summary.remainingDays), /d[ií]as|\d+ días/)
 })
 
-test('clasifica planes según cantidad de productos', () => {
-  assert.equal(getTierForProductCount(10).key, 'basico')
-  assert.equal(getTierForProductCount(33).key, 'basico')
-  assert.equal(getTierForProductCount(34).key, 'pro')
-  assert.equal(getTierForProductCount(100).key, 'pro')
-  assert.equal(getTierForProductCount(101).key, 'enterprise')
+test('clasifica planes en modo catálogo (restaurantes/servicios)', () => {
+  assert.equal(getTierForProductCount(10, 'catalogo').key, 'basico')
+  assert.equal(getTierForProductCount(33, 'catalogo').key, 'basico')
+  assert.equal(getTierForProductCount(34, 'catalogo').key, 'pro')
+  assert.equal(getTierForProductCount(80, 'catalogo').key, 'pro')
+  assert.equal(getTierForProductCount(81, 'catalogo').key, 'enterprise')
+})
+
+test('clasifica planes en modo inventario (ferreterías/bodegas/tiendas)', () => {
+  assert.equal(getTierForProductCount(50, 'inventario').key, 'basico')
+  assert.equal(getTierForProductCount(100, 'inventario').key, 'basico')
+  assert.equal(getTierForProductCount(101, 'inventario').key, 'pro')
+  assert.equal(getTierForProductCount(300, 'inventario').key, 'pro')
+  assert.equal(getTierForProductCount(301, 'inventario').key, 'enterprise')
 })
 
 test('negocio con cortesía VIP tiene acceso permanente ilimitado', () => {
