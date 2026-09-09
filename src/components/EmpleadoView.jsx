@@ -91,6 +91,7 @@ export default function EmpleadoView({ negocio, onExit, notify }) {
 
       {loading ? <p className="text-creamsoft text-sm">Cargando pedidos…</p> : (
         <TabPedidos
+          negocio={negocio}
           data={{ pedidos, productos }}
           reload={reload}
           notify={notify}

@@ -79,7 +79,7 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
                 onClick={() => setMostrarRecuperar(true)}
                 className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
               >
-                ¿Olvidaste tu contraseña?
+                {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
               </button>
             </div>
           )}
@@ -163,7 +163,7 @@ export function EmpleadoAuth({ onDone, notify }) {
                 onClick={() => setMostrarRecuperar(true)}
                 className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
               >
-                ¿Olvidaste tu contraseña?
+                {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
               </button>
             </div>
           )}
@@ -288,7 +288,7 @@ export function SuperadminAuth({ onDone, notify }) {
                 onClick={() => setMostrarRecuperar(true)}
                 className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
               >
-                ¿Olvidaste tu contraseña?
+                {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
               </button>
             </div>
           )}
@@ -563,6 +563,7 @@ export function SinPermiso({ mensaje }) {
 
 /* ---------------- Modal: Solicitar enlace de recuperación de contraseña ---------------- */
 export function RecuperarPasswordModal({ onClose, notify, initialEmail = '' }) {
+  const { t } = useLanguage()
   const [email, setEmail] = useState(initialEmail)
   const [enviado, setEnviado] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -575,7 +576,7 @@ export function RecuperarPasswordModal({ onClose, notify, initialEmail = '' }) {
     try {
       await recuperarPassword(email.trim())
       setEnviado(true)
-      if (notify) notify('Enlace de recuperación enviado')
+      if (notify) notify(t.authRecovery?.linkSentToast || 'Enlace de recuperación enviado')
     } catch (err) {
       setError(err.message || String(err))
     } finally {
@@ -584,26 +585,26 @@ export function RecuperarPasswordModal({ onClose, notify, initialEmail = '' }) {
   }
 
   return (
-    <Modal title="🔑 Recuperar contraseña" onClose={onClose}>
+    <Modal title={t.authRecovery?.modalTitle || "🔑 Recuperar contraseña"} onClose={onClose}>
       {enviado ? (
         <div className="text-center py-3 space-y-3">
           <div className="text-4xl">✉️</div>
-          <h3 className="font-serif text-lg font-semibold text-gold">¡Correo de recuperación enviado!</h3>
+          <h3 className="font-serif text-lg font-semibold text-gold">{t.authRecovery?.emailSentTitle || '¡Correo de recuperación enviado!'}</h3>
           <p className="text-creamsoft text-sm leading-relaxed max-w-sm mx-auto">
-            Hemos enviado un enlace seguro a <b className="text-cream">{email}</b>. Revisa tu bandeja de entrada (y la carpeta de spam o no deseados) para reestablecer tu contraseña.
+            {(t.authRecovery?.emailSentDescription || 'Hemos enviado un enlace seguro a {email}. Revisa tu bandeja de entrada (y la carpeta de spam o no deseados) para reestablecer tu contraseña.').replace('{email}', email)}
           </p>
           <div className="pt-2">
             <Btn variant="primary" onClick={onClose} className="justify-center mx-auto">
-              Entendido
+              {t.authRecovery?.understood || 'Entendido'}
             </Btn>
           </div>
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4">
           <p className="text-creamsoft text-sm leading-relaxed">
-            Ingresa tu correo electrónico registrado y te enviaremos un enlace oficial para que puedas crear una nueva contraseña.
+            {t.authRecovery?.modalDescription || 'Ingresa tu correo electrónico registrado y te enviaremos un enlace oficial para que puedas crear una nueva contraseña.'}
           </p>
-          <Field label="Correo electrónico">
+          <Field label={t.authRecovery?.emailLabel || "Correo electrónico"}>
             <Input
               required
               type="email"
@@ -615,10 +616,10 @@ export function RecuperarPasswordModal({ onClose, notify, initialEmail = '' }) {
           {error && <p className="text-wine text-xs">{error}</p>}
           <div className="flex justify-end gap-2 pt-2">
             <Btn variant="ghost" onClick={onClose} type="button">
-              Cancelar
+              {t.authRecovery?.cancel || 'Cancelar'}
             </Btn>
             <Btn variant="primary" disabled={loading}>
-              {loading ? 'Enviando…' : 'Enviar enlace'}
+              {loading ? (t.authRecovery?.sending || 'Enviando…') : (t.authRecovery?.sendLink || 'Enviar enlace')}
             </Btn>
           </div>
         </form>
@@ -629,6 +630,7 @@ export function RecuperarPasswordModal({ onClose, notify, initialEmail = '' }) {
 
 /* ---------------- Modal: Establecer nueva contraseña tras hacer clic en el correo ---------------- */
 export function EstablecerNuevaPasswordModal({ onDone, notify }) {
+  const { t } = useLanguage()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
@@ -638,17 +640,17 @@ export function EstablecerNuevaPasswordModal({ onDone, notify }) {
     e.preventDefault()
     setError('')
     if (password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres')
+      setError(t.authRecovery?.minCharsError || 'La contraseña debe tener al menos 6 caracteres')
       return
     }
     if (password !== confirmPassword) {
-      setError('Las contraseñas no coinciden')
+      setError(t.authRecovery?.mismatchError || 'Las contraseñas no coinciden')
       return
     }
     setLoading(true)
     try {
       await actualizarPassword(password)
-      if (notify) notify('¡Contraseña actualizada exitosamente!')
+      if (notify) notify(t.authRecovery?.successMessage || '¡Contraseña actualizada exitosamente!')
       onDone()
     } catch (err) {
       setError(err.message || String(err))
@@ -660,12 +662,12 @@ export function EstablecerNuevaPasswordModal({ onDone, notify }) {
   return (
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
       <Card className="max-w-[420px] w-full p-6">
-        <h2 className="font-serif text-2xl font-semibold mb-2 text-center text-gold">🔐 Nueva Contraseña</h2>
+        <h2 className="font-serif text-2xl font-semibold mb-2 text-center text-gold">{t.authRecovery?.resetModalTitle || '🔐 Nueva Contraseña'}</h2>
         <p className="text-creamsoft text-sm text-center mb-6">
-          Ingresa y confirma tu nueva contraseña para recuperar el acceso a tu cuenta.
+          {t.authRecovery?.resetModalDescription || 'Ingresa y confirma tu nueva contraseña para recuperar el acceso a tu cuenta.'}
         </p>
         <form onSubmit={submit} className="space-y-4">
-          <Field label="Nueva contraseña (mínimo 6 caracteres)">
+          <Field label={t.authRecovery?.newPasswordLabel || "Nueva contraseña (mínimo 6 caracteres)"}>
             <Input
               required
               type="password"
@@ -674,7 +676,7 @@ export function EstablecerNuevaPasswordModal({ onDone, notify }) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </Field>
-          <Field label="Confirmar nueva contraseña">
+          <Field label={t.authRecovery?.confirmPasswordLabel || "Confirmar nueva contraseña"}>
             <Input
               required
               type="password"
@@ -685,7 +687,7 @@ export function EstablecerNuevaPasswordModal({ onDone, notify }) {
           </Field>
           {error && <p className="text-wine text-xs">{error}</p>}
           <Btn variant="primary" className="w-full justify-center mt-2" disabled={loading}>
-            {loading ? 'Guardando…' : 'Guardar nueva contraseña'}
+            {loading ? (t.authRecovery?.saving || 'Guardando…') : (t.authRecovery?.saveButton || 'Guardar nueva contraseña')}
           </Btn>
         </form>
       </Card>

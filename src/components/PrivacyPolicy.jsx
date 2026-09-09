@@ -1,34 +1,73 @@
+import { useLanguage, LANGUAGES } from '../lib/i18n.jsx'
+
 export default function PrivacyPolicy() {
+  const { language, setLanguage, t } = useLanguage()
+  const p = t.privacyPolicy || {}
+
   return (
     <main className="min-h-screen bg-[#151515] px-5 py-10 text-[#f4e8d0] sm:px-8">
       <article className="mx-auto max-w-3xl rounded-2xl border border-white/10 bg-white/[0.03] p-6 shadow-2xl sm:p-10">
-        <a className="text-sm text-[#d7ae5a] hover:underline" href="/">← Volver a Kiosko</a>
-        <h1 className="mt-6 font-serif text-3xl font-semibold sm:text-4xl">Política de privacidad de Kiosko</h1>
-        <p className="mt-3 text-sm text-[#c6bba8]">Última actualización: 28 de agosto de 2026</p>
+        <div className="flex items-center justify-between flex-wrap gap-4 border-b border-white/10 pb-4">
+          <a className="text-sm font-semibold text-[#d7ae5a] hover:underline" href="/">
+            {p.backToKiosko || '← Volver a Kiosko'}
+          </a>
 
-        <Section title="1. Responsable">
-          Kiosko es una aplicación para administrar negocios, inventario, pedidos y ventas. Esta política explica cómo se trata la información al usar la aplicación y sus servicios asociados.
+          {/* Selector de idioma */}
+          <div className="flex items-center gap-1.5 bg-white/[0.05] p-1 rounded-lg border border-white/10">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                type="button"
+                onClick={() => setLanguage(l.code)}
+                className={`px-2.5 py-1 rounded text-xs font-medium transition-all ${
+                  language === l.code
+                    ? 'bg-[#d7ae5a] text-[#151515] font-bold shadow'
+                    : 'text-[#c6bba8] hover:text-[#f4e8d0]'
+                }`}
+              >
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <h1 className="mt-6 font-serif text-3xl font-semibold sm:text-4xl text-[#f4e8d0]">
+          {p.title || 'Política de Privacidad de Kiosko'}
+        </h1>
+        <p className="mt-2 text-xs text-[#c6bba8] font-mono">
+          {p.lastUpdated || 'Última actualización: 8 de septiembre de 2026'}
+        </p>
+
+        <Section title={p.sec1Title || '1. Responsable'}>
+          {p.sec1Text}
         </Section>
-        <Section title="2. Información que se recopila">
-          Para crear y administrar una cuenta se recopila el correo electrónico y la información de autenticación. Los administradores también pueden registrar datos del negocio, catálogo, inventario, trabajadores, compras, ventas y movimientos financieros. Al crear un pedido, el cliente puede proporcionar el nombre que desea usar para identificarlo en el negocio.
+
+        <Section title={p.sec2Title || '2. Información que se recopila'}>
+          {p.sec2Text}
         </Section>
-        <Section title="3. Uso de la información">
-          La información se usa únicamente para prestar las funciones de Kiosko: autenticar usuarios, mostrar catálogos, gestionar pedidos, inventario, personal, ventas y finanzas, y mantener separados los datos de cada negocio.
+
+        <Section title={p.sec3Title || '3. Uso de la información'}>
+          {p.sec3Text}
         </Section>
-        <Section title="4. Almacenamiento y proveedores">
-          Los datos de la aplicación se almacenan y procesan mediante Supabase, proveedor de infraestructura de base de datos, autenticación y archivos. Kiosko no vende información personal ni la usa para publicidad basada en el comportamiento.
+
+        <Section title={p.sec4Title || '4. Almacenamiento y proveedores'}>
+          {p.sec4Text}
         </Section>
-        <Section title="5. Compartición y visibilidad">
-          La información de pedidos y operación se comparte con el negocio al que corresponde y con los usuarios autorizados de ese negocio. Las imágenes de logos y productos que sus administradores publiquen pueden ser visibles en el catálogo público del negocio.
+
+        <Section title={p.sec5Title || '5. Compartición y visibilidad'}>
+          {p.sec5Text}
         </Section>
-        <Section title="6. Conservación y seguridad">
-          Los datos se conservan mientras sean necesarios para operar la cuenta o el negocio, salvo que una obligación legal requiera conservarlos por más tiempo. Se aplican controles de acceso de la plataforma para limitar el acceso a la información según el rol del usuario.
+
+        <Section title={p.sec6Title || '6. Conservación y seguridad'}>
+          {p.sec6Text}
         </Section>
-        <Section title="7. Tus derechos y contacto">
-          Puedes solicitar acceso, corrección o eliminación de los datos de tu cuenta contactando al administrador del negocio que usa Kiosko. Si eres administrador, puedes gestionar la información operativa desde la aplicación o contactar al responsable de Kiosko mediante el canal desde el que obtuviste la aplicación.
+
+        <Section title={p.sec7Title || '7. Tus derechos y contacto'}>
+          {p.sec7Text}
         </Section>
-        <Section title="8. Cambios a esta política">
-          Si se realizan cambios relevantes, esta página se actualizará con una nueva fecha de revisión.
+
+        <Section title={p.sec8Title || '8. Cambios a esta política'}>
+          {p.sec8Text}
         </Section>
       </article>
     </main>
@@ -39,7 +78,7 @@ function Section({ title, children }) {
   return (
     <section className="mt-8">
       <h2 className="text-lg font-semibold text-[#e6c77d]">{title}</h2>
-      <p className="mt-2 leading-7 text-[#e6dfd0]">{children}</p>
+      <p className="mt-2 leading-7 text-[#e6dfd0] text-sm sm:text-base">{children}</p>
     </section>
   )
 }

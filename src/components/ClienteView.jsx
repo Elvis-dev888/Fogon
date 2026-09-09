@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Btn, Modal, Field, Input, Empty } from './ui'
-import { fmt$, ESTADOS, thumbFor } from '../lib/helpers'
+import { fmt$, ESTADOS, thumbFor, formatWhatsAppNumber } from '../lib/helpers'
 import { fetchCategorias, fetchProductos, crearPedido, suscribirsePedido, actualizarPedido, cancelarPedido } from '../lib/api'
 import { ProductoDetalleModal, EditarPedidoModal, ConfirmCancelModal, QtyStepper } from './PedidoCompartido'
 import { useLanguage } from '../lib/i18n.jsx'
@@ -469,6 +469,25 @@ function Tracking({ negocio, pedido, productos, onPedidoActualizado, onNuevo }) 
         <p className="text-creamsoft text-[12px] mb-4">{t.customer.cancelledDescription}</p>
       ) : (
         <p className="text-creamsoft text-[12px] mb-4">{t.customer.trackingDescription}</p>
+      )}
+
+      {!cancelado && negocio?.telefono && (
+        <div className="mb-4">
+          <a
+            href={`https://wa.me/${formatWhatsAppNumber(negocio.telefono)}?text=${encodeURIComponent(
+              (t.customer?.askOrderWhatsAppMessage || '¡Hola {business}! 👋 Quiero saber cómo va mi pedido #{number} a nombre de {name}.')
+                .replace('{business}', negocio.nombre || '')
+                .replace('{number}', pedido.numero || '')
+                .replace('{name}', pedido.cliente || 'Cliente')
+            )}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-lg bg-[#25D366] hover:bg-[#20bd5a] text-black font-bold text-sm shadow-md transition-all hover:scale-[1.01]"
+          >
+            <span className="text-base">🛵</span>
+            <span>{t.customer?.askOrderStatusWhatsApp || '¿Cómo va mi pedido? Consultar por WhatsApp'}</span>
+          </a>
+        </div>
       )}
 
       {puedeModificar && (

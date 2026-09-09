@@ -93,9 +93,9 @@ const MOCK_PRODUCTOS = [
 ]
 
 const MOCK_TRABAJADORES = [
-  { id: 'trab-1', nombre: 'Carlos Rodríguez', rol: 'Mesero / Atención', activo: true, salario: 60000, periodo_pago: 'diario' },
-  { id: 'trab-2', nombre: 'María Fernanda Gómez', rol: 'Jefa de Cocina', activo: true, salario: 1800000, periodo_pago: 'mensual' },
-  { id: 'trab-3', nombre: 'Andrés Felipe Pérez', rol: 'Caja & Pedidos', activo: true, salario: 70000, periodo_pago: 'diario' }
+  { id: 'trab-1', nombre: 'Carlos Rodríguez', cargo: 'Cocinero Principal', rol: 'Cocinero Principal', estado: 'Activo', pago: 1750000, esquema_pago: 'fijo', frecuencia_pago: 'mensual', pagos: [{ id: 'p-1', periodo: 'Enero 2026', valor: 1750000, creado_en: '2026-01-31T12:00:00Z' }] },
+  { id: 'trab-2', nombre: 'Valentina Duque', cargo: 'Confección & Ventas Ropa', rol: 'Confección & Ventas Ropa', estado: 'Activo', pago: 0, esquema_pago: 'comision', tipo_comision: 'porcentaje', valor_comision: 10, pagos: [{ id: 'p-2', periodo: 'Comisión Quincena 1', valor: 150000, creado_en: '2026-02-15T12:00:00Z' }] },
+  { id: 'trab-3', nombre: 'Andrés Felipe Pérez', cargo: 'Asesor Comercial / Boutique', rol: 'Asesor Comercial', estado: 'Activo', pago: 800000, esquema_pago: 'mixto', tipo_comision: 'monto_fijo', valor_comision: 5000, frecuencia_pago: 'quincenal', pagos: [] },
 ]
 
 const MOCK_PEDIDOS = [
@@ -277,6 +277,34 @@ export default function DemoShowcase() {
     )
   }
 
+  if (scene === 'empleado_pin') {
+    return (
+      <div className="min-h-screen bg-bg text-cream flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-6">
+            <span className="text-4xl">📱</span>
+            <h2 className="font-serif text-2xl font-bold text-cream mt-2">Acceso de Empleados &amp; Meseros</h2>
+            <p className="text-xs text-creamsoft">Ingresa con el código PIN de 6 dígitos que te compartió el dueño del negocio</p>
+          </div>
+          <div className="bg-paper border border-line rounded-2xl p-6 shadow-2xl">
+            <label className="block text-xs font-semibold text-creamsoft mb-2 uppercase tracking-wider">
+              Código PIN de tu Negocio
+            </label>
+            <div className="font-mono text-3xl font-bold tracking-[0.3em] text-center text-gold bg-paper2 border border-gold/40 py-4 rounded-xl mb-4">
+              482195
+            </div>
+            <p className="text-xs text-creamsoft mb-5 text-center">
+              ✓ Vinculado con éxito a: <b className="text-cream">El Rincón Gourmet</b>
+            </p>
+            <button className="w-full bg-gold hover:bg-golddark text-paper font-bold py-3 rounded-xl transition-all shadow-lg text-sm">
+              🧑‍🍳 Entrar a Atender Pedidos en Vivo
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   // Wrapper for Admin Tabs
   return (
     <div className="min-h-screen bg-bg text-cream font-sans p-6 max-w-7xl mx-auto">
@@ -308,6 +336,8 @@ export default function DemoShowcase() {
           ['productos', '🍔 Productos'],
           ['pedidos', '🧑‍🍳 Pedidos en Vivo'],
           ['inventario', '📦 Inventario'],
+          ['compras', '🛍️ Compras'],
+          ['ventas', '🛒 Ventas'],
           ['trabajadores', '👥 Trabajadores & PIN'],
           ['finanzas', '📈 Finanzas'],
           ['suscripcion', '💳 Mi Suscripción']
@@ -331,6 +361,8 @@ export default function DemoShowcase() {
         {scene === 'productos' && <TabProductos negocio={MOCK_NEGOCIO} data={MOCK_DATA} notify={notify} reload={() => {}} />}
         {scene === 'pedidos' && <TabPedidos negocio={MOCK_NEGOCIO} data={MOCK_DATA} notify={notify} reload={() => {}} />}
         {scene === 'inventario' && <TabInventario negocio={MOCK_NEGOCIO} data={MOCK_DATA} notify={notify} reload={() => {}} />}
+        {scene === 'compras' && <TabCompras negocio={MOCK_NEGOCIO} data={MOCK_DATA} notify={notify} reload={() => {}} />}
+        {scene === 'ventas' && <TabVentas negocio={MOCK_NEGOCIO} data={MOCK_DATA} />}
         {scene === 'trabajadores' && <TabTrabajadores negocio={MOCK_NEGOCIO} data={MOCK_DATA} notify={notify} reload={() => {}} />}
         {scene === 'finanzas' && <TabFinanzas negocio={MOCK_NEGOCIO} data={MOCK_DATA} notify={notify} reload={() => {}} />}
         {scene === 'suscripcion' && <TabMiSuscripcion negocio={MOCK_NEGOCIO} data={MOCK_DATA} />}

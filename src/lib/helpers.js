@@ -101,3 +101,12 @@ export function playPedidoNuevo() {
     // si el navegador bloquea el audio, no pasa nada — el aviso visual sigue funcionando
   }
 }
+
+export function formatWhatsAppNumber(phone) {
+  if (!phone) return ''
+  let cleaned = String(phone).replace(/\D/g, '')
+  if (cleaned.length === 10 && cleaned.startsWith('3')) {
+    cleaned = '57' + cleaned
+  }
+  return cleaned
+}

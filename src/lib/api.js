@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+  import { supabase } from './supabaseClient'
 import { shouldCreateSale } from './orderSales'
 
 /* =========================================================
@@ -81,7 +81,16 @@ export async function eliminarNegocio(id) {
 
 export async function updateNegocio(id, cambios) {
   const { error } = await supabase.from('negocios').update(cambios).eq('id', id)
-  if (error) throw error
+  if (error) {
+    if (cambios.telefono !== undefined && (error.message?.includes('telefono') || error.code === '42703')) {
+      console.warn('[Kiosko] Columna telefono no encontrada en tabla negocios. Ejecuta schema_v19_whatsapp.sql en Supabase.')
+      const { telefono, ...resto } = cambios
+      const { error: err2 } = await supabase.from('negocios').update(resto).eq('id', id)
+      if (err2) throw err2
+      return
+    }
+    throw error
+  }
 }
 
 // Base inicial: el capital con el que arrancó el negocio antes de empezar a

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
-import { fmt$, fmtDate, fmtTime, fmtDateTime, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor } from '../lib/helpers'
+import { fmt$, fmtDate, fmtTime, fmtDateTime, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor, formatWhatsAppNumber } from '../lib/helpers'
 import { getSubscriptionSummary, formatDaysLeft, getTiersForMode } from '../lib/subscription'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
 import {
@@ -13,6 +13,7 @@ import {
 } from '../lib/api'
 import { EditarPedidoModal, ConfirmCancelModal } from './PedidoCompartido'
 import { useLanguage } from '../lib/i18n.jsx'
+import { calculateWorkerSalesAndCommission, formatCompensationLabel } from '../lib/commissions'
 
 const estadoTone = (e) => (
   e === 'Pendiente' ? 'default' : e === 'En preparación' ? 'preparacion' : e === 'Listo' ? 'listo' : e === 'Cancelado' ? 'cancelado' : 'entregado'
@@ -25,6 +26,7 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
   const [slogan, setSlogan] = useState(negocio.slogan || '')
   const [descripcion, setDescripcion] = useState(negocio.descripcion || '')
   const [modoOperacion, setModoOperacion] = useState(negocio.modo_operacion || 'catalogo')
+  const [telefono, setTelefono] = useState(negocio.telefono || '')
   const [preview, setPreview] = useState(negocio.logo_url || null)
   const [archivo, setArchivo] = useState(null)
   const [guardando, setGuardando] = useState(false)
@@ -48,7 +50,7 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
         logoUrl = await subirLogoNegocio(negocio.id, archivo)
         setSubiendo(false)
       }
-      const cambios = { nombre, slogan, descripcion, logo_url: logoUrl, modo_operacion: modoOperacion }
+      const cambios = { nombre, slogan, descripcion, logo_url: logoUrl, modo_operacion: modoOperacion, telefono: telefono.trim() }
       await updateNegocio(negocio.id, cambios)
       notify(t.myBusinessTab?.saved || 'Datos del negocio actualizados')
       if (onNegocioUpdated) await onNegocioUpdated(cambios)
@@ -98,6 +100,12 @@ export function TabMiNegocio({ negocio, notify, onNegocioUpdated, onOpenShareMen
           </Field>
           <Field label={t.myBusinessTab?.sloganLabel || 'Eslogan'}>
             <Input value={slogan} placeholder={t.myBusinessTab?.sloganPlaceholder || ''} onChange={(e) => setSlogan(e.target.value)} />
+          </Field>
+          <Field label={t.myBusinessTab?.phoneLabel || 'Teléfono / WhatsApp de atención al cliente'}>
+            <Input value={telefono} placeholder={t.myBusinessTab?.phonePlaceholder || 'Ej: +57 300 123 4567'} onChange={(e) => setTelefono(e.target.value)} />
+            <p className="mt-1 text-[11.5px] text-creamsoft">
+              {t.myBusinessTab?.phoneHelp || 'Tus clientes podrán consultar cómo va su pedido directamente a este número.'}
+            </p>
           </Field>
           <Field label={t.myBusinessTab?.descLabel || 'Descripción'}>
             <Textarea rows={3} value={descripcion} placeholder={t.myBusinessTab?.descPlaceholder || ''} onChange={(e) => setDescripcion(e.target.value)} />
@@ -342,8 +350,11 @@ export function TabMiSuscripcion({ negocio, data }) {
             </div>
 
             {/* Selector de método de pago */}
+            {/* Selector de método de pago */}
             <div>
-              <p className="text-xs font-medium text-creamsoft mb-2">Selecciona tu método de pago directo:</p>
+              <p className="text-xs font-medium text-creamsoft mb-2">
+                {t.commonDialogs?.directPaymentMethod || 'Selecciona tu método de pago directo:'}
+              </p>
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
@@ -385,14 +396,14 @@ export function TabMiSuscripcion({ negocio, data }) {
             {metodoPago === 'nequi' ? (
               <div className="bg-paper border border-fuchsia-500/30 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-line">
-                  <span className="text-xs text-creamsoft">Monto exacto a transferir:</span>
+                  <span className="text-xs text-creamsoft">{t.commonDialogs?.exactAmountToTransfer || 'Monto exacto a transferir:'}</span>
                   <span className="text-sm font-bold font-mono text-fuchsia-300">
                     ${modalTier.priceCop.toLocaleString('es-CO')} COP
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] text-creamsoft">Número Nequi / Llave:</p>
+                    <p className="text-[11px] text-creamsoft">{t.commonDialogs?.nequiNumberLabel || 'Número Nequi / Llave:'}</p>
                     <p className="text-sm font-mono font-bold text-cream">305 285 2956</p>
                   </div>
                   <button
@@ -400,54 +411,57 @@ export function TabMiSuscripcion({ negocio, data }) {
                     onClick={() => copiarAlPortapapeles('3052852956', 'nequi')}
                     className="text-xs px-2.5 py-1 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 hover:bg-fuchsia-500/30 cursor-pointer"
                   >
-                    {copiado === 'nequi' ? '✓ ¡Copiado!' : '📋 Copiar'}
+                    {copiado === 'nequi' ? (t.commonDialogs?.copied || '✓ ¡Copiado!') : (t.commonDialogs?.copy || '📋 Copiar')}
                   </button>
                 </div>
                 <div className="text-[11px] text-creamsoft bg-fuchsia-950/20 p-2.5 rounded border border-fuchsia-500/20">
-                  💡 Abre tu app Nequi, transfiere <b>${modalTier.priceCop.toLocaleString('es-CO')} COP</b> al número <b>3052852956</b> y toca el botón inferior para enviar el comprobante por WhatsApp.
+                  💡 {(t.commonDialogs?.nequiInstruction || 'Abre tu app Nequi, transfiere {amount} al número {number} y toca el botón inferior para enviar el comprobante por WhatsApp.')
+                    .replace('{amount}', `$${modalTier.priceCop.toLocaleString('es-CO')} COP`)
+                    .replace('{number}', '3052852956')}
                 </div>
               </div>
             ) : metodoPago === 'pse' ? (
               <div className="bg-paper border border-blue-500/30 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-line">
-                  <span className="text-xs text-creamsoft">Monto exacto a transferir:</span>
+                  <span className="text-xs text-creamsoft">{t.commonDialogs?.exactAmountToTransfer || 'Monto exacto a transferir:'}</span>
                   <span className="text-sm font-bold font-mono text-blue-300">
                     ${modalTier.priceCop.toLocaleString('es-CO')} COP
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-[11px] text-creamsoft">Transferencia PSE / Transfiya a Nequi:</p>
+                    <p className="text-[11px] text-creamsoft">{t.commonDialogs?.pseTransferLabel || 'Transferencia PSE / Transfiya a Nequi:'}</p>
                     <p className="text-sm font-mono font-bold text-cream">305 285 2956</p>
-                    <p className="text-[11px] text-creamsoft">Banco destino: Nequi / Bancolombia</p>
+                    <p className="text-[11px] text-creamsoft">{t.commonDialogs?.targetBank || 'Banco destino: Nequi / Bancolombia'}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => copiarAlPortapapeles('3052852956', 'pse')}
                     className="text-xs px-2.5 py-1 rounded bg-blue-500/20 text-blue-300 border border-blue-500/40 hover:bg-blue-500/30 cursor-pointer"
                   >
-                    {copiado === 'pse' ? '✓ ¡Copiado!' : '📋 Copiar'}
+                    {copiado === 'pse' ? (t.commonDialogs?.copied || '✓ ¡Copiado!') : (t.commonDialogs?.copy || '📋 Copiar')}
                   </button>
                 </div>
                 <div className="text-[11px] text-creamsoft bg-blue-950/20 p-2.5 rounded border border-blue-500/20">
-                  💡 Desde cualquier banco colombiano (Bancolombia, Davivienda, BBVA, Banco de Bogotá, etc.), transfiere vía PSE o Transfiya a Nequi celular <b>3052852956</b> y envía el comprobante por WhatsApp.
+                  💡 {(t.commonDialogs?.pseInstruction || 'Desde cualquier banco colombiano (Bancolombia, Davivienda, BBVA, Banco de Bogotá, etc.), transfiere vía PSE o Transfiya a Nequi celular {number} y envía el comprobante por WhatsApp.')
+                    .replace('{number}', '3052852956')}
                 </div>
               </div>
             ) : (
               <div className="bg-paper border border-amber-500/30 rounded-lg p-4 space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-line">
-                  <span className="text-xs text-creamsoft">Monto exacto a transferir:</span>
+                  <span className="text-xs text-creamsoft">{t.commonDialogs?.exactAmountToTransfer || 'Monto exacto a transferir:'}</span>
                   <span className="text-sm font-bold font-mono text-amber-300">
                     ${modalTier.priceUsd} USDT
                   </span>
                 </div>
                 <div>
-                  <p className="text-[11px] text-creamsoft">Red Cripto:</p>
+                  <p className="text-[11px] text-creamsoft">{t.commonDialogs?.cryptoNetwork || 'Red Cripto:'}</p>
                   <p className="text-xs font-bold text-amber-300">Tron (TRC20)</p>
                 </div>
                 <div className="flex items-center justify-between gap-2">
                   <div className="overflow-hidden">
-                    <p className="text-[11px] text-creamsoft">Dirección de Billetera:</p>
+                    <p className="text-[11px] text-creamsoft">{t.commonDialogs?.walletAddress || 'Dirección de Billetera:'}</p>
                     <p className="text-xs font-mono font-bold text-cream break-all">
                       TJiNNzgpZhrMPGSQWn9DwSjc1WpjuhMiTB
                     </p>
@@ -457,7 +471,7 @@ export function TabMiSuscripcion({ negocio, data }) {
                     onClick={() => copiarAlPortapapeles('TJiNNzgpZhrMPGSQWn9DwSjc1WpjuhMiTB', 'binance')}
                     className="text-xs px-2.5 py-1 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 cursor-pointer shrink-0"
                   >
-                    {copiado === 'binance' ? '✓ ¡Copiado!' : '📋 Copiar'}
+                    {copiado === 'binance' ? (t.commonDialogs?.copied || '✓ ¡Copiado!') : (t.commonDialogs?.copy || '📋 Copiar')}
                   </button>
                 </div>
 
@@ -471,7 +485,7 @@ export function TabMiSuscripcion({ negocio, data }) {
                 </div>
 
                 <div className="text-[11px] text-creamsoft bg-amber-950/20 p-2.5 rounded border border-amber-500/20">
-                  💡 Abre Binance &gt; Retirar/Enviar USDT &gt; Red <b>Tron (TRC20)</b> &gt; Pega la dirección o escanea el QR superior y envía el comprobante por WhatsApp.
+                  💡 {t.commonDialogs?.binanceInstruction || 'Abre Binance > Retirar/Enviar USDT > Red Tron (TRC20) > Pega la dirección o escanea el QR superior y envía el comprobante por WhatsApp.'}
                 </div>
               </div>
             )}
@@ -479,23 +493,28 @@ export function TabMiSuscripcion({ negocio, data }) {
             {/* Acciones */}
             <div className="pt-2 flex flex-col sm:flex-row gap-2">
               <a
-                href={`https://wa.me/?text=${encodeURIComponent(`Hola Kiosko, adjunto mi comprobante de pago de suscripción:
-• Negocio: ${negocio.nombre}
-• Plan: ${modalTier.name} (${modalTier.limitLabel})
-• Método: ${metodoPago === 'nequi' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (Nequi 3052852956)` : metodoPago === 'pse' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (PSE / Transfiya)` : `$${modalTier.priceUsd} USDT (Binance TRC20)`}
-• Fecha: ${new Date().toLocaleDateString('es-CO')}`)}`}
+                href={`https://wa.me/?text=${encodeURIComponent((t.commonDialogs?.whatsappReceiptTemplate || `Hola Kiosko, adjunto mi comprobante de pago de suscripción:
+• Negocio: {business}
+• Plan: {plan} ({limit})
+• Monto: {amount}
+• Fecha: {date}`)
+                  .replace('{business}', negocio.nombre)
+                  .replace('{plan}', modalTier.name)
+                  .replace('{limit}', modalTier.limitLabel)
+                  .replace('{amount}', metodoPago === 'nequi' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (Nequi 3052852956)` : metodoPago === 'pse' ? `$${modalTier.priceCop.toLocaleString('es-CO')} COP (PSE / Transfiya)` : `$${modalTier.priceUsd} USDT (Binance TRC20)`)
+                  .replace('{date}', new Date().toLocaleDateString('es-CO')))}`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs py-3 px-4 transition-colors text-center"
               >
-                <span>📲</span> Enviar Comprobante por WhatsApp
+                <span>📲</span> {t.commonDialogs?.sendReceiptWhatsApp || 'Enviar Comprobante por WhatsApp'}
               </a>
               <button
                 type="button"
                 onClick={() => setModalTier(null)}
                 className="sm:w-28 text-center text-xs text-creamsoft hover:text-cream border border-line py-3 px-3 rounded cursor-pointer"
               >
-                Cerrar
+                {t.commonDialogs?.close || 'Cerrar'}
               </button>
             </div>
           </div>
@@ -1113,7 +1132,7 @@ function EditarIngredienteModal({ ingrediente, esModoInventario, onClose, onSave
   }
 
   async function handleDelete() {
-    if (!window.confirm(`¿Seguro que deseas eliminar "${ingrediente.nombre}" del inventario?`)) return
+    if (!window.confirm(t.commonDialogs?.confirmDeleteIngredient?.replace('{name}', ingrediente.nombre) || `¿Seguro que deseas eliminar "${ingrediente.nombre}" del inventario?`)) return
     setEliminando(true)
     try {
       await deleteIngrediente(ingrediente.id)
@@ -1128,7 +1147,7 @@ function EditarIngredienteModal({ ingrediente, esModoInventario, onClose, onSave
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-serif text-xl font-semibold">{t.inventory.editItemTitle} — {ingrediente.nombre}</h2>
         <Btn size="sm" variant="danger" type="button" disabled={eliminando || guardando} onClick={handleDelete}>
-          {eliminando ? 'Eliminando…' : t.inventory.delete}
+          {eliminando ? (t.commonDialogs?.deleting || 'Eliminando…') : t.inventory.delete}
         </Btn>
       </div>
       <form onSubmit={submit}>
@@ -1373,11 +1392,24 @@ function CompraModal({ negocio, ingredientes, onClose, onSaved }) {
    usando los mismos 4 valores (para no romper nada más de la app), solo
    se saltan pasos al avanzar. En ambos modos, mientras el pedido no esté
    Entregado ni Cancelado, se puede Editar o Cancelar. */
-export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
+export function TabPedidos({ negocio, data, reload, notify, simple, onAvanzar }) {
   const { t } = useLanguage()
   const [editando, setEditando] = useState(null) // pedido que se está editando
   const [cancelando, setCancelando] = useState(null) // pedido que se va a cancelar
+  const [busqueda, setBusqueda] = useState('')
   const productos = data.productos || []
+
+  const term = busqueda.trim().toLowerCase()
+  const pedidosFiltrados = (data.pedidos || []).filter((p) => {
+    if (!p) return false
+    if (!term) return true
+    const num = String(p.numero || '')
+    const cli = String(p.cliente || '').toLowerCase()
+    const tel = String(p.telefono || '').toLowerCase()
+    const dir = String(p.direccion || '').toLowerCase()
+    const items = (p.pedido_items || []).map((it) => it.nombre || '').join(' ').toLowerCase()
+    return num.includes(term) || cli.includes(term) || tel.includes(term) || dir.includes(term) || items.includes(term)
+  })
 
   async function advance(p) {
     const i = ESTADOS.indexOf(p.estado)
@@ -1427,13 +1459,43 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
     </>
   )
 
+  const barraBusqueda = (
+    <div className="mb-4 flex items-center gap-2.5">
+      <div className="relative flex-1 max-w-md">
+        <input
+          type="text"
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder={t.ordersTab?.searchPlaceholder || '🔍 Buscar pedido por cliente (nombre, apellido, #pedido, teléfono)...'}
+          className="w-full bg-paper border border-line rounded-lg pl-3 pr-8 py-2 text-xs text-cream placeholder:text-creamsoft focus:outline-none focus:border-gold transition-colors"
+        />
+        {busqueda && (
+          <button
+            type="button"
+            onClick={() => setBusqueda('')}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-creamsoft hover:text-cream"
+            title={t.ordersTab?.clearSearch || 'Limpiar búsqueda'}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      {busqueda && (
+        <span className="text-xs text-creamsoft font-mono">
+          {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? (t.ordersTab?.singleMatch || 'coincidencia') : (t.ordersTab?.matches || 'coincidencias')}
+        </span>
+      )}
+    </div>
+  )
+
   if (simple) {
-    const porAtender = data.pedidos.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado')
-    const entregados = data.pedidos.filter((p) => p.estado === 'Entregado')
+    const porAtender = pedidosFiltrados.filter((p) => p.estado !== 'Entregado' && p.estado !== 'Cancelado')
+    const entregados = pedidosFiltrados.filter((p) => p.estado === 'Entregado')
     const columnas = [[t.ordersTab?.toServe || 'Por atender', porAtender], [t.ordersTab?.delivered || 'Entregados', entregados]]
     return (
       <div>
         <SectionTitle title={t.ordersTab?.title || 'Pedidos'} sub={t.ordersTab?.subSimple || 'Toca una vez para aceptar el pedido y otra vez cuando lo entregues.'} />
+        {barraBusqueda}
         <div className="grid grid-cols-2 gap-3.5 max-[820px]:grid-cols-1">
           {columnas.map(([titulo, items]) => (
             <div key={titulo} className="bg-paper2 border border-line rounded p-3 min-h-[120px]">
@@ -1441,7 +1503,7 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                 {titulo} <span className="font-mono">{items.length}</span>
               </h4>
               {items.length === 0 ? (
-                <p className="text-[12px] text-creamsoft px-1.5">{t.ordersTab?.noOrders || 'Sin pedidos'}</p>
+                <p className="text-[12px] text-creamsoft px-1.5">{busqueda ? (t.ordersTab?.noSearchResults || 'Sin coincidencias') : (t.ordersTab?.noOrders || 'Sin pedidos')}</p>
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
                   <div className="flex items-center justify-between gap-1 mb-1">
@@ -1461,9 +1523,21 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                     <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
                       {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
                       {p.telefono && (
-                        <div>
-                          📞 <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-gold hover:underline font-mono">
-                            {p.telefono}
+                        <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                          <span className="font-mono">📞 {p.telefono}</span>
+                          <a
+                            href={`https://wa.me/${formatWhatsAppNumber(p.telefono)}?text=${encodeURIComponent(
+                              (t.ordersTab?.contactCustomerMessage || '¡Hola {name}! 👋 Te contactamos de {business} respecto a tu pedido #{number}.')
+                                .replace('{name}', p.cliente || 'Cliente')
+                                .replace('{business}', negocio?.nombre || 'Kiosko')
+                                .replace('{number}', p.numero || '')
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[10.5px] font-medium hover:bg-emerald-600/30 transition-colors"
+                            title={t.ordersTab?.contactCustomerTooltip || 'Contactar al cliente por WhatsApp'}
+                          >
+                            <span>{t.ordersTab?.whatsappCustomerBadge || '💬 WhatsApp'}</span>
                           </a>
                         </div>
                       )}
@@ -1489,21 +1563,22 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
     )
   }
 
-  const cancelados = data.pedidos.filter((p) => p.estado === 'Cancelado')
+  const cancelados = pedidosFiltrados.filter((p) => p.estado === 'Cancelado')
 
   return (
     <div>
       <SectionTitle title={t.ordersTab?.title || 'Pedidos'} sub={t.ordersTab?.sub || 'Gestión en tiempo real — pensada para tablet o computador en cocina.'} />
+      {barraBusqueda}
       <div className="grid grid-cols-4 gap-3.5 max-[820px]:grid-cols-2">
         {ESTADOS.map((est) => {
-          const items = data.pedidos.filter((p) => p.estado === est)
+          const items = pedidosFiltrados.filter((p) => p.estado === est)
           return (
             <div key={est} className="bg-paper2 border border-line rounded p-3 min-h-[120px]">
               <h4 className="text-[11px] uppercase tracking-wide text-creamsoft font-semibold mb-3 flex justify-between">
                 {est} <span className="font-mono">{items.length}</span>
               </h4>
               {items.length === 0 ? (
-                <p className="text-[12px] text-creamsoft px-1.5">{t.ordersTab?.noOrders || 'Sin pedidos'}</p>
+                <p className="text-[12px] text-creamsoft px-1.5">{busqueda ? (t.ordersTab?.noSearchResults || 'Sin coincidencias') : (t.ordersTab?.noOrders || 'Sin pedidos')}</p>
               ) : items.map((p) => (
                 <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
                   <div className="flex items-center justify-between gap-1 mb-1">
@@ -1523,9 +1598,21 @@ export function TabPedidos({ data, reload, notify, simple, onAvanzar }) {
                     <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
                       {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
                       {p.telefono && (
-                        <div>
-                          📞 <a href={`https://wa.me/${p.telefono.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-gold hover:underline font-mono">
-                            {p.telefono}
+                        <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                          <span className="font-mono">📞 {p.telefono}</span>
+                          <a
+                            href={`https://wa.me/${formatWhatsAppNumber(p.telefono)}?text=${encodeURIComponent(
+                              (t.ordersTab?.contactCustomerMessage || '¡Hola {name}! 👋 Te contactamos de {business} respecto a tu pedido #{number}.')
+                                .replace('{name}', p.cliente || 'Cliente')
+                                .replace('{business}', negocio?.nombre || 'Kiosko')
+                                .replace('{number}', p.numero || '')
+                            )}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[10.5px] font-medium hover:bg-emerald-600/30 transition-colors"
+                            title={t.ordersTab?.contactCustomerTooltip || 'Contactar al cliente por WhatsApp'}
+                          >
+                            <span>{t.ordersTab?.whatsappCustomerBadge || '💬 WhatsApp'}</span>
                           </a>
                         </div>
                       )}
@@ -2013,13 +2100,13 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
           <div>
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gold/15 text-gold border border-gold/30">
-                👥 Empleados Ilimitados (Gratis)
+                {t.commonDialogs?.unlimitedWorkersBadge || '👥 Empleados Ilimitados (Gratis)'}
               </span>
-              <span className="text-[11.5px] text-creamsoft">Acceso para meseros, cajeros y cocina</span>
+              <span className="text-[11.5px] text-creamsoft">{t.commonDialogs?.unlimitedWorkersSub || 'Acceso para meseros, cajeros y cocina'}</span>
             </div>
-            <h3 className="font-serif text-lg font-semibold text-cream">Código de acceso para tus trabajadores</h3>
+            <h3 className="font-serif text-lg font-semibold text-cream">{t.commonDialogs?.workerPinTitle || 'Código de acceso para tus trabajadores'}</h3>
             <p className="text-xs text-creamsoft max-w-xl mt-0.5">
-              Pásale este código PIN de 6 dígitos a tus empleados para que atiendan pedidos desde sus propios celulares, sin darles tu contraseña ni acceso a tus finanzas.
+              {t.commonDialogs?.workerPinDesc || 'Pásale este código PIN de 6 dígitos a tus empleados para que atiendan pedidos desde sus propios celulares, sin darles tu contraseña ni acceso a tus finanzas.'}
             </p>
           </div>
 
@@ -2029,7 +2116,7 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
                 {cargandoCodigo ? '…' : (codigo || '••••••')}
               </div>
               <Btn size="sm" variant="primary" onClick={copiarCodigo}>
-                📋 Copiar
+                {t.commonDialogs?.copy || '📋 Copiar'}
               </Btn>
             </div>
             <div className="flex items-center gap-2.5">
@@ -2037,39 +2124,204 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
                 onClick={compartirWhatsApp}
                 className="text-xs font-semibold text-sage hover:underline flex items-center gap-1 bg-sage/10 px-2.5 py-1 rounded border border-sage/30"
               >
-                📲 Enviar por WhatsApp
+                {t.commonDialogs?.sendViaWhatsApp || '📲 Enviar por WhatsApp'}
               </button>
               <button
                 onClick={regenerar}
                 disabled={regenerando || cargandoCodigo}
                 className="text-xs text-creamsoft hover:text-gold"
               >
-                {regenerando ? 'Generando…' : '🔄 Regenerar'}
+                {regenerando ? (t.commonDialogs?.generating || 'Generando…') : (t.commonDialogs?.regeneratePin || '🔄 Regenerar')}
               </button>
             </div>
           </div>
         </div>
       </Card>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
         {data.trabajadores.map((w) => {
-          const ultimoPago = w.pagos.length ? w.pagos[w.pagos.length - 1] : null
+          const stats = calculateWorkerSalesAndCommission(w, data.ventas || [], data.pedidos || [])
+          const esquema = w.esquema_pago || 'fijo'
+          const frecuencia = w.frecuencia_pago || 'mensual'
+          const freqLabel = frecuencia === 'diario' ? (t.staff.daily || 'día')
+            : frecuencia === 'quincenal' ? (t.staff.biweekly || 'quincena')
+            : frecuencia === 'semanal' ? (t.staff.weekly || 'semana')
+            : (t.staff.monthly || 'mes')
+
+          const ultimoPago = (w.pagos && w.pagos.length) ? w.pagos[w.pagos.length - 1] : null
+
           return (
-            <Card key={w.id} className="p-5">
-              <div className="flex items-center justify-between mb-1.5">
-                <Pill tone={w.estado === 'Activo' ? 'activo' : 'pausado'}>{w.estado === 'Activo' ? t.staff.active : t.staff.paused}</Pill>
+            <Card key={w.id} className="p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Pill tone={w.estado === 'Activo' ? 'activo' : 'pausado'}>
+                    {w.estado === 'Activo' ? t.staff.active : t.staff.paused}
+                  </Pill>
+
+                  {/* Badge del Esquema */}
+                  {esquema === 'fijo' && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sage/15 text-sage border border-sage/30">
+                      🟢 {t.staff.fixedSalary}
+                    </span>
+                  )}
+                  {esquema === 'comision' && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-mustard/15 text-mustard border border-mustard/30">
+                      🟡 {t.staff.onlyCommission}
+                    </span>
+                  )}
+                  {esquema === 'mixto' && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                      🔵 {t.staff.mixedSalary}
+                    </span>
+                  )}
+                </div>
+
+                <h4 className="font-serif font-semibold text-lg text-cream mb-0.5">{w.nombre}</h4>
+                <p className="text-creamsoft text-[13px] mb-3">{w.cargo}</p>
+
+                {/* CASO 1: SUELDO FIJO (REGLA DEL USUARIO: NADA DE PEDIDOS VENDIDOS) */}
+                {esquema === 'fijo' && (
+                  <div className="mb-3 p-3 bg-paper2 rounded-lg border border-line">
+                    <span className="text-[11px] uppercase tracking-wider text-creamsoft font-semibold block mb-0.5">
+                      {t.staff.fixedSalary}
+                    </span>
+                    <p className="font-mono font-bold text-xl text-gold">
+                      {fmt$(w.pago)}{' '}
+                      <span className="text-xs text-creamsoft font-normal">/ {freqLabel}</span>
+                    </p>
+                    <p className="text-[11px] text-creamsoft mt-1 italic">
+                      {t.staff.cleanFixedNote || 'Sueldo fijo tradicional sin registro de comisiones por venta.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* CASO 2: SOLO COMISIÓN (0 SUELDO BASE, TODO POR VENTA O PRENDA) */}
+                {esquema === 'comision' && (
+                  <div className="mb-3 space-y-2.5">
+                    <div className="p-3 bg-paper2 rounded-lg border border-line">
+                      <div className="flex justify-between items-center text-[11.5px] mb-1">
+                        <span className="text-creamsoft">{t.staff.commissionType}:</span>
+                        <span className="font-semibold text-cream">
+                          {w.tipo_comision === 'monto_fijo'
+                            ? `${fmt$(w.valor_comision)} / prenda`
+                            : `${w.valor_comision || 0}% por venta`}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-line text-[11.5px]">
+                        <div>
+                          <span className="text-creamsoft block text-[10.5px]">{t.staff.garmentsSold}:</span>
+                          <span className="font-mono font-bold text-cream">{stats.totalPrendas}</span>
+                        </div>
+                        <div>
+                          <span className="text-creamsoft block text-[10.5px]">{t.staff.salesVolume}:</span>
+                          <span className="font-mono font-semibold text-cream">{fmt$(stats.totalDinero)}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 bg-mustard/10 rounded-lg border border-mustard/30 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10.5px] text-creamsoft block uppercase tracking-wider font-semibold">
+                          {t.staff.accumulatedCommission}
+                        </span>
+                        <span className="font-mono font-bold text-base text-mustard">
+                          {fmt$(stats.comisionPendiente)}
+                        </span>
+                      </div>
+                      {stats.pagosComision > 0 && (
+                        <div className="text-right">
+                          <span className="text-[10px] text-creamsoft block">{t.staff.commissionPaid}:</span>
+                          <span className="font-mono text-xs text-creamsoft">{fmt$(stats.pagosComision)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* CASO 3: ESQUEMA MIXTO (SUELDO BASE + COMISIÓN) */}
+                {esquema === 'mixto' && (
+                  <div className="mb-3 space-y-2">
+                    <div className="p-2.5 bg-paper2 rounded-lg border border-line">
+                      <div className="flex justify-between items-center text-[11.5px]">
+                        <span className="text-creamsoft">{t.staff.baseSalary}:</span>
+                        <span className="font-mono font-bold text-cream">
+                          {fmt$(w.pago)} <span className="text-[10px] font-normal text-creamsoft">/ {freqLabel}</span>
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11.5px] mt-1 pt-1 border-t border-line">
+                        <span className="text-creamsoft">{t.staff.commission}:</span>
+                        <span className="font-semibold text-sky-400">
+                          {w.tipo_comision === 'monto_fijo' ? `${fmt$(w.valor_comision)} / prenda` : `${w.valor_comision || 0}%`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-2 bg-paper2/70 rounded border border-line flex justify-between items-center text-[11px]">
+                      <span className="text-creamsoft">{stats.totalPrendas} prendas · {fmt$(stats.totalDinero)}</span>
+                      <span className="font-mono font-bold text-gold">+{fmt$(stats.comisionPendiente)} com.</span>
+                    </div>
+                  </div>
+                )}
               </div>
-              <h4 className="font-serif font-semibold text-base mb-0.5">{w.nombre}</h4>
-              <p className="text-creamsoft text-[13px] mb-2">{w.cargo}</p>
-              <p className="font-mono font-bold mb-3">{fmt$(w.pago)}/mes</p>
-              <div className="flex gap-1.5 flex-wrap">
-                <Btn size="sm" variant="ghost" onClick={() => setModal(w)}>✏️ {t.staff.editSalary}</Btn>
-                <Btn size="sm" variant="mustard" onClick={() => setPagoFor(w)}>{t.staff.registerPayment}</Btn>
-                <Btn size="sm" variant="ghost" onClick={async () => { await toggleTrabajadorEstado(w); reload() }}>
-                  {w.estado === 'Activo' ? t.staff.deactivate : t.staff.activate}
-                </Btn>
+
+              {/* Botones de acción */}
+              <div>
+                <div className="flex gap-1.5 flex-wrap pt-2 border-t border-line/60">
+                  {esquema === 'fijo' && (
+                    <Btn size="sm" variant="mustard" onClick={() => setPagoFor({
+                      trabajador: w,
+                      tipo: 'sueldo',
+                      valor: w.pago,
+                      concepto: (t.staff.salaryPaymentConcept || 'Pago de sueldo ({period})').replace('{period}', new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })),
+                    })}>
+                      💵 {t.staff.registerPayment}
+                    </Btn>
+                  )}
+
+                  {esquema === 'comision' && (
+                    <Btn size="sm" variant="mustard" onClick={() => setPagoFor({
+                      trabajador: w,
+                      tipo: 'comision',
+                      valor: stats.comisionPendiente,
+                      concepto: (t.staff.commissionPaymentConcept || 'Pago de comisiones acumuladas ({amount})').replace('{amount}', fmt$(stats.comisionPendiente)),
+                    })}>
+                      💰 {t.staff.payCommission}
+                    </Btn>
+                  )}
+
+                  {esquema === 'mixto' && (
+                    <>
+                      <Btn size="sm" variant="mustard" onClick={() => setPagoFor({
+                        trabajador: w,
+                        tipo: 'comision',
+                        valor: stats.comisionPendiente,
+                        concepto: (t.staff.commissionPaymentConcept || 'Pago de comisiones acumuladas ({amount})').replace('{amount}', fmt$(stats.comisionPendiente)),
+                      })}>
+                        💰 {t.staff.payCommission}
+                      </Btn>
+                      <Btn size="sm" variant="ghost" onClick={() => setPagoFor({
+                        trabajador: w,
+                        tipo: 'sueldo',
+                        valor: w.pago,
+                        concepto: (t.staff.salaryPaymentConcept || 'Pago de sueldo ({period})').replace('{period}', new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })),
+                      })}>
+                        💵 {t.staff.registerPayment}
+                      </Btn>
+                    </>
+                  )}
+
+                  <Btn size="sm" variant="ghost" onClick={() => setModal(w)}>✏️ {t.staff.editSalary}</Btn>
+                  <Btn size="sm" variant="ghost" onClick={async () => { await toggleTrabajadorEstado(w); reload() }}>
+                    {w.estado === 'Activo' ? t.staff.deactivate : t.staff.activate}
+                  </Btn>
+                </div>
+
+                {ultimoPago && (
+                  <p className="mt-2.5 text-[11px] text-creamsoft font-mono">
+                    {t.staff.lastPayment}: {fmtDate(ultimoPago.creado_en)} · {fmt$(ultimoPago.valor)} {ultimoPago.periodo ? `(${ultimoPago.periodo})` : ''}
+                  </p>
+                )}
               </div>
-              {ultimoPago && <p className="mt-2.5 text-[11.5px] text-creamsoft">{t.staff.lastPayment}: {fmtDate(ultimoPago.creado_en)} · {fmt$(ultimoPago.valor)}</p>}
             </Card>
           )
         })}
@@ -2080,12 +2332,24 @@ export function TabTrabajadores({ negocio, data, reload, notify }) {
           trabajador={modal === 'new' ? null : modal}
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); notify(modal === 'new' ? t.staff.added : t.staff.salaryUpdated); reload() }}
-          onDeleted={() => { setModal(null); notify('Trabajador eliminado'); reload() }}
+          onDeleted={() => { setModal(null); notify(t.commonDialogs?.workerDeleted || 'Trabajador eliminado'); reload() }}
         />
       )}
       {pagoFor && (
-        <PagoModal negocio={negocio} trabajador={pagoFor} onClose={() => setPagoFor(null)}
-          onSaved={() => { setPagoFor(null); notify(t.staff.paymentRegistered.replace('{name}', pagoFor.nombre)); reload() }} />
+        <PagoModal
+          negocio={negocio}
+          trabajador={pagoFor.trabajador}
+          initialTipo={pagoFor.tipo}
+          initialValor={pagoFor.valor}
+          initialConcepto={pagoFor.concepto}
+          onClose={() => setPagoFor(null)}
+          onSaved={() => {
+            const nombre = pagoFor.trabajador?.nombre || ''
+            setPagoFor(null)
+            notify(t.staff.paymentRegistered.replace('{name}', nombre))
+            reload()
+          }}
+        />
       )}
     </div>
   )
@@ -2094,7 +2358,11 @@ function TrabajadorModal({ negocio, trabajador, onClose, onSaved, onDeleted }) {
   const { t } = useLanguage()
   const [nombre, setNombre] = useState(trabajador?.nombre || '')
   const [cargo, setCargo] = useState(trabajador?.cargo || '')
-  const [pago, setPago] = useState(trabajador?.pago ?? '')
+  const [esquema, setEsquema] = useState(trabajador?.esquema_pago || 'fijo')
+  const [tipoComision, setTipoComision] = useState(trabajador?.tipo_comision || 'porcentaje')
+  const [valorComision, setValorComision] = useState(trabajador?.valor_comision ?? (trabajador?.tipo_comision === 'monto_fijo' ? 5000 : 10))
+  const [pago, setPago] = useState(trabajador?.pago ?? (trabajador ? '' : 1750000))
+  const [frecuencia, setFrecuencia] = useState(trabajador?.frecuencia_pago || 'mensual')
   const [guardando, setGuardando] = useState(false)
   const [eliminando, setEliminando] = useState(false)
 
@@ -2102,7 +2370,15 @@ function TrabajadorModal({ negocio, trabajador, onClose, onSaved, onDeleted }) {
     e.preventDefault()
     setGuardando(true)
     try {
-      const payload = { nombre: nombre.trim(), cargo: cargo.trim(), pago: parseFloat(pago) || 0 }
+      const payload = {
+        nombre: nombre.trim(),
+        cargo: cargo.trim(),
+        esquema_pago: esquema,
+        tipo_comision: tipoComision,
+        valor_comision: esquema === 'fijo' ? 0 : (parseFloat(valorComision) || 0),
+        pago: esquema === 'comision' ? 0 : (parseFloat(pago) || 0),
+        frecuencia_pago: frecuencia,
+      }
       if (trabajador) await updateTrabajador(trabajador.id, payload)
       else await createTrabajador(negocio.id, payload)
       onSaved()
@@ -2113,7 +2389,7 @@ function TrabajadorModal({ negocio, trabajador, onClose, onSaved, onDeleted }) {
 
   async function handleDelete() {
     if (!trabajador) return
-    if (!window.confirm(`¿Seguro que deseas eliminar a "${trabajador.nombre}"?`)) return
+    if (!window.confirm(t.commonDialogs?.confirmDeleteWorker?.replace('{name}', trabajador.nombre) || `¿Seguro que deseas eliminar a "${trabajador.nombre}"?`)) return
     setEliminando(true)
     try {
       await deleteTrabajador(trabajador.id)
@@ -2129,16 +2405,168 @@ function TrabajadorModal({ negocio, trabajador, onClose, onSaved, onDeleted }) {
         <h2 className="font-serif text-xl font-semibold">{trabajador ? t.staff.edit.replace('{name}', trabajador.nombre) : t.staff.new}</h2>
         {trabajador && (
           <Btn size="sm" variant="danger" type="button" disabled={eliminando || guardando} onClick={handleDelete}>
-            {eliminando ? 'Eliminando…' : 'Eliminar'}
+            {eliminando ? (t.commonDialogs?.deleting || 'Eliminando…') : (t.commonDialogs?.delete || 'Eliminar')}
           </Btn>
         )}
       </div>
-      <form onSubmit={submit}>
-        <Field label={t.staff.name}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} /></Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t.staff.role}><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} /></Field>
-          <Field label={t.staff.monthlyPay}><Input required type="number" value={pago} onChange={(e) => setPago(e.target.value)} /></Field>
+      <form onSubmit={submit} className="space-y-4">
+        <Field label={t.staff.name}><Input required value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Marcela Gómez" /></Field>
+        <Field label={t.staff.role}><Input required value={cargo} onChange={(e) => setCargo(e.target.value)} placeholder="Ej: Vendedora / Confección / Cajero" /></Field>
+
+        {/* Selector de Esquema de Remuneración */}
+        <div>
+          <label className="block text-xs font-semibold text-cream mb-1.5 uppercase tracking-wide">
+            {t.staff.scheme}
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setEsquema('fijo')}
+              className={`p-2.5 rounded-lg border text-left text-xs font-medium transition-colors ${
+                esquema === 'fijo'
+                  ? 'bg-sage/20 border-sage text-cream ring-1 ring-sage'
+                  : 'bg-paper2 border-line text-creamsoft hover:border-creamsoft/50'
+              }`}
+            >
+              <div className="font-bold text-sage mb-0.5">🟢 {t.staff.fixedSalary}</div>
+              <div className="text-[11px] text-creamsoft">Cocinero, cajero, aseo</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setEsquema('comision')}
+              className={`p-2.5 rounded-lg border text-left text-xs font-medium transition-colors ${
+                esquema === 'comision'
+                  ? 'bg-mustard/20 border-mustard text-cream ring-1 ring-mustard'
+                  : 'bg-paper2 border-line text-creamsoft hover:border-creamsoft/50'
+              }`}
+            >
+              <div className="font-bold text-mustard mb-0.5">🟡 {t.staff.onlyCommission}</div>
+              <div className="text-[11px] text-creamsoft">Confección, boutiques</div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setEsquema('mixto')}
+              className={`p-2.5 rounded-lg border text-left text-xs font-medium transition-colors ${
+                esquema === 'mixto'
+                  ? 'bg-sky-500/20 border-sky-500 text-cream ring-1 ring-sky-500'
+                  : 'bg-paper2 border-line text-creamsoft hover:border-creamsoft/50'
+              }`}
+            >
+              <div className="font-bold text-sky-400 mb-0.5">🔵 {t.staff.mixedSalary}</div>
+              <div className="text-[11px] text-creamsoft">Base fijo + comisión</div>
+            </button>
+          </div>
+          <p className="text-[11px] text-creamsoft mt-1.5 leading-relaxed">{t.staff.salarySchemeHelp}</p>
         </div>
+
+        {/* Campos condicionales según esquema */}
+        {esquema === 'fijo' && (
+          <div className="grid grid-cols-2 gap-3 p-3 bg-paper2/80 rounded-lg border border-line">
+            <Field label={t.staff.baseSalary}>
+              <Input
+                required
+                type="number"
+                min="0"
+                step="1000"
+                value={pago}
+                onChange={(e) => setPago(e.target.value)}
+                placeholder="1750000"
+              />
+            </Field>
+            <Field label={t.staff.paymentFrequency}>
+              <Select value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)}>
+                <option value="diario">{t.staff.frequencyDaily || 'Diario'}</option>
+                <option value="semanal">{t.staff.frequencyWeekly || 'Semanal'}</option>
+                <option value="quincenal">{t.staff.frequencyBiweekly || 'Quincenal'}</option>
+                <option value="mensual">{t.staff.frequencyMonthly || 'Mensual'}</option>
+              </Select>
+            </Field>
+          </div>
+        )}
+
+        {esquema === 'comision' && (
+          <div className="p-3 bg-paper2/80 rounded-lg border border-line space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t.staff.commissionType}>
+                <Select value={tipoComision} onChange={(e) => setTipoComision(e.target.value)}>
+                  <option value="porcentaje">{t.staff.commissionPercent || '% Sobre ventas'}</option>
+                  <option value="monto_fijo">{t.staff.commissionPerItem || '$ Por prenda/artículo'}</option>
+                </Select>
+              </Field>
+
+              <Field label={t.staff.commissionRate}>
+                <Input
+                  required
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={valorComision}
+                  onChange={(e) => setValorComision(e.target.value)}
+                  placeholder={tipoComision === 'porcentaje' ? (t.staff.percentPlaceholder || '10') : (t.staff.itemPlaceholder || '5000')}
+                />
+              </Field>
+            </div>
+            <p className="text-[11px] text-mustard/90 font-medium">
+              💡 {tipoComision === 'porcentaje'
+                ? (t.commonDialogs?.percentCommissionTooltip?.replace('{rate}', valorComision || 0) || `El empleado ganará el ${valorComision || 0}% de cada pedido o venta que realice.`)
+                : (t.commonDialogs?.itemCommissionTooltip?.replace('{rate}', Number(valorComision || 0).toLocaleString('es-CO')) || `El empleado ganará $${Number(valorComision || 0).toLocaleString('es-CO')} COP por cada prenda o artículo entregado.`)}
+            </p>
+          </div>
+        )}
+
+        {esquema === 'mixto' && (
+          <div className="p-3 bg-paper2/80 rounded-lg border border-line space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label={t.staff.baseSalary}>
+                <Input
+                  required
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={pago}
+                  onChange={(e) => setPago(e.target.value)}
+                  placeholder="800000"
+                />
+              </Field>
+              <Field label={t.staff.paymentFrequency}>
+                <Select value={frecuencia} onChange={(e) => setFrecuencia(e.target.value)}>
+                  <option value="diario">{t.staff.frequencyDaily || 'Diario'}</option>
+                  <option value="semanal">{t.staff.frequencyWeekly || 'Semanal'}</option>
+                  <option value="quincenal">{t.staff.frequencyBiweekly || 'Quincenal'}</option>
+                  <option value="mensual">{t.staff.frequencyMonthly || 'Mensual'}</option>
+                </Select>
+              </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-line">
+              <Field label={t.staff.commissionType}>
+                <Select value={tipoComision} onChange={(e) => setTipoComision(e.target.value)}>
+                  <option value="porcentaje">{t.staff.commissionPercent || '% Sobre ventas'}</option>
+                  <option value="monto_fijo">{t.staff.commissionPerItem || '$ Por prenda/artículo'}</option>
+                </Select>
+              </Field>
+              <Field label={t.staff.commissionRate}>
+                <Input
+                  required
+                  type="number"
+                  step="any"
+                  min="0"
+                  value={valorComision}
+                  onChange={(e) => setValorComision(e.target.value)}
+                  placeholder={tipoComision === 'porcentaje' ? '5' : '3000'}
+                />
+              </Field>
+            </div>
+            <p className="text-[11px] text-sky-400/90 font-medium">
+              💡 {tipoComision === 'porcentaje'
+                ? (t.commonDialogs?.percentCommissionTooltip?.replace('{rate}', valorComision || 0) || `El empleado ganará el ${valorComision || 0}% de cada pedido o venta que realice.`)
+                : (t.commonDialogs?.itemCommissionTooltip?.replace('{rate}', Number(valorComision || 0).toLocaleString('es-CO')) || `El empleado ganará $${Number(valorComision || 0).toLocaleString('es-CO')} COP por cada prenda o artículo entregado.`)}
+            </p>
+          </div>
+        )}
+
         <Btn variant="primary" className="w-full justify-center" disabled={guardando || eliminando}>
           {guardando ? t.catalogAdmin.saving : trabajador ? t.orderShared.save : t.staff.add}
         </Btn>
@@ -2146,22 +2574,55 @@ function TrabajadorModal({ negocio, trabajador, onClose, onSaved, onDeleted }) {
     </Modal>
   )
 }
-function PagoModal({ negocio, trabajador, onClose, onSaved }) {
+function PagoModal({ negocio, trabajador, initialTipo = 'sueldo', initialValor, initialConcepto, onClose, onSaved }) {
   const { t } = useLanguage()
-  const [periodo, setPeriodo] = useState(new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }))
-  const [valor, setValor] = useState(trabajador.pago)
+  const defaultPeriod = initialConcepto || (initialTipo === 'comision'
+    ? (t.staff.commissionPaymentConcept || 'Pago de comisiones acumuladas').replace(' ({amount})', '')
+    : new Date().toLocaleDateString('es-CO', { month: 'long', year: 'numeric' }))
+
+  const [periodo, setPeriodo] = useState(defaultPeriod)
+  const [valor, setValor] = useState(initialValor !== undefined ? initialValor : (trabajador?.pago || 0))
+  const [guardando, setGuardando] = useState(false)
+
   async function submit(e) {
     e.preventDefault()
-    await registrarPago(trabajador.id, negocio.id, { periodo, valor: parseFloat(valor) || 0 })
-    onSaved()
+    setGuardando(true)
+    try {
+      await registrarPago(trabajador.id, negocio.id, {
+        periodo: periodo.trim(),
+        valor: parseFloat(valor) || 0,
+      })
+      onSaved()
+    } finally {
+      setGuardando(false)
+    }
   }
+
   return (
     <Modal onClose={onClose}>
-      <h2 className="font-serif text-xl font-semibold mb-4">{t.staff.payTitle} — {trabajador.nombre}</h2>
-      <form onSubmit={submit}>
-        <Field label={t.staff.period}><Input required value={periodo} onChange={(e) => setPeriodo(e.target.value)} /></Field>
-        <Field label={t.staff.value}><Input required type="number" value={valor} onChange={(e) => setValor(e.target.value)} /></Field>
-        <Btn variant="primary" className="w-full justify-center">{t.staff.confirmPayment}</Btn>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-serif text-xl font-semibold">
+          {initialTipo === 'comision' ? `💰 ${t.staff.payCommission}` : `💵 ${t.staff.payTitle}`} — {trabajador?.nombre}
+        </h2>
+      </div>
+
+      <form onSubmit={submit} className="space-y-4">
+        <Field label={t.staff.period}>
+          <Input required value={periodo} onChange={(e) => setPeriodo(e.target.value)} placeholder="Ej: Comisión semana 1 / Sueldo Enero" />
+        </Field>
+
+        <Field label={t.staff.value}>
+          <Input required type="number" step="100" min="0" value={valor} onChange={(e) => setValor(e.target.value)} />
+        </Field>
+
+        <div className="flex items-center justify-between text-xs text-creamsoft p-2.5 bg-paper2 rounded border border-line">
+          <span>{t.staff.role}: <b className="text-cream">{trabajador?.cargo}</b></span>
+          <span>{t.staff.scheme}: <b className="text-gold">{trabajador?.esquema_pago === 'comision' ? t.staff.onlyCommission : trabajador?.esquema_pago === 'mixto' ? t.staff.mixedSalary : t.staff.fixedSalary}</b></span>
+        </div>
+
+        <Btn variant="primary" className="w-full justify-center" disabled={guardando}>
+          {guardando ? t.catalogAdmin.saving : t.staff.confirmPayment}
+        </Btn>
       </form>
     </Modal>
   )
@@ -2194,16 +2655,16 @@ export function TabFinanzas({ negocio, data, reload, notify, onNegocioUpdated })
   const saldoActual = capitalInicial + ventasTotal + ingresosTotal - comprasTotal - pagosTotal - egresosOtrosTotal
 
   async function borrarIngreso(id) {
-    if (!window.confirm('¿Deseas eliminar este registro de ingreso?')) return
+    if (!window.confirm(t.commonDialogs?.confirmDeleteIncome || '¿Deseas eliminar este registro de ingreso?')) return
     await deleteIngreso(id)
-    notify('Ingreso eliminado')
+    notify(t.commonDialogs?.incomeDeleted || 'Ingreso eliminado')
     reload()
   }
 
   async function borrarEgreso(id) {
-    if (!window.confirm('¿Deseas eliminar este registro de gasto?')) return
+    if (!window.confirm(t.commonDialogs?.confirmDeleteExpense || '¿Deseas eliminar este registro de gasto?')) return
     await deleteEgreso(id)
-    notify('Gasto eliminado')
+    notify(t.commonDialogs?.expenseDeleted || 'Gasto eliminado')
     reload()
   }
 
@@ -2366,7 +2827,7 @@ function ReportePeriodo({ negocio, data }) {
   const resultado = (totalVentas + totalIngresos) - (totalCompras + totalPagos + totalEgresos)
 
   const movimientos = [
-    ...ventas.map((v) => ({ fecha: v.creado_en, tipo: t.dashboardTab?.sales || 'Venta', concepto: 'Pedido de clientes', valor: Number(v.total) || 0, signo: 1 })),
+    ...ventas.map((v) => ({ fecha: v.creado_en, tipo: t.dashboardTab?.sales || 'Venta', concepto: t.commonDialogs?.customerOrderConcept || 'Pedido de clientes', valor: Number(v.total) || 0, signo: 1 })),
     ...ingresos.map((i) => ({ fecha: i.creado_en, tipo: t.finance?.income || 'Ingreso', concepto: i.concepto || 'Ingreso', valor: Number(i.valor) || 0, signo: 1 })),
     ...compras.map((c) => ({ fecha: c.creado_en, tipo: t.dashboardTab?.purchases || 'Compra', concepto: c.ingredientes?.nombre || 'Insumo', valor: Number(c.valor) || 0, signo: -1 })),
     ...pagos.map((p) => ({ fecha: p.creado_en, tipo: t.report?.staffPayments || 'Pago personal', concepto: p.trabajador || 'Empleado', valor: Number(p.valor) || 0, signo: -1 })),
@@ -2399,8 +2860,8 @@ function ReportePeriodo({ negocio, data }) {
       <div id="finanzas-print-area">
         <div className="mb-4 hidden print:block">
           <h2 className="font-serif text-xl font-semibold">{negocio?.nombre || 'Negocio'}</h2>
-          <p className="text-[13px]">Reporte de ingresos y egresos — {etiquetaPeriodo}</p>
-          <p className="text-[11px]">Generado el {fmtDateLong(new Date())}</p>
+          <p className="text-[13px]">{(t.commonDialogs?.reportIncomeExpensesTitle || 'Reporte de ingresos y egresos — {period}').replace('{period}', etiquetaPeriodo)}</p>
+          <p className="text-[11px]">{(t.commonDialogs?.generatedOn || 'Generado el {date}').replace('{date}', fmtDateLong(new Date()))}</p>
         </div>
 
         <p className="text-creamsoft text-[12px] mb-3 print:hidden">{t.report.period}: <b className="text-cream">{etiquetaPeriodo}</b></p>
