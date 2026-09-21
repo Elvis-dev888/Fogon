@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Btn, StatCard, Pill, NegocioLogo, Card, Empty, Select, Modal } from './ui'
+import { Btn, StatCard, Pill, NegocioLogo, Card, Empty, Select, Modal, Input } from './ui'
 import { fmt$, fmtDateLong } from '../lib/helpers'
 import { toggleNegocioEstado, toggleNegocioVip, eliminarNegocio, fetchSugerencias, actualizarEstadoSugerencia, eliminarSugerencia } from '../lib/api'
 import { getTierForProductCount } from '../lib/subscription'
@@ -9,12 +9,23 @@ import { useLanguage } from '../lib/i18n.jsx'
 export default function SuperadminView({ negocios, onChanged, notify, onExit }) {
   const { t } = useLanguage()
   const [seccion, setSeccion] = useState('negocios') // 'negocios' | 'sugerencias' | 'seguridad'
+  const [busquedaNegocio, setBusquedaNegocio] = useState('')
   const [sugerencias, setSugerencias] = useState([])
   const [cargandoSugerencias, setCargandoSugerencias] = useState(false)
   const [negocioAEliminar, setNegocioAEliminar] = useState(null)
   const [eliminando, setEliminando] = useState(false)
   const [emailClienteDesbloqueo, setEmailClienteDesbloqueo] = useState('')
   const [copiadoCod, setCopiadoCod] = useState(false)
+
+  const negociosFiltrados = negocios.filter((n) => {
+    if (!busquedaNegocio.trim()) return true
+    const q = busquedaNegocio.toLowerCase()
+    return (
+      n.nombre?.toLowerCase().includes(q) ||
+      n.slogan?.toLowerCase().includes(q) ||
+      n.dueno_email?.toLowerCase().includes(q)
+    )
+  })
 
   const totalVentasMes = negocios.reduce((s, n) => s + (n.ventasMes || 0), 0)
   const totalPedidos = negocios.reduce((s, n) => s + (n.pedidosCount || 0), 0)
@@ -148,12 +159,36 @@ export default function SuperadminView({ negocios, onChanged, notify, onExit }) 
             <StatCard label="Sugerencias recibidas" value={sugerencias.length} tone="sage" />
           </div>
 
-          <h3 className="font-serif text-xl mb-3">Negocios registrados</h3>
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div>
+              <h3 className="font-serif text-xl font-semibold">
+                Negocios registrados ({negociosFiltrados.length}{negociosFiltrados.length !== negocios.length ? ` de ${negocios.length}` : ''})
+              </h3>
+              <p className="text-xs text-creamsoft">
+                Supervisa todos los negocios en la plataforma y el correo de cada dueño.
+              </p>
+            </div>
+            {negocios.length > 0 && (
+              <div className="w-full sm:w-72">
+                <Input
+                  value={busquedaNegocio}
+                  onChange={(e) => setBusquedaNegocio(e.target.value)}
+                  placeholder="🔍 Buscar por nombre o correo…"
+                  className="text-xs py-1.5"
+                />
+              </div>
+            )}
+          </div>
+
           {negocios.length === 0 ? (
             <p className="text-creamsoft text-sm">Todavía no hay negocios — aparecerán aquí en cuanto alguien registre el suyo.</p>
+          ) : negociosFiltrados.length === 0 ? (
+            <p className="text-creamsoft text-sm py-8 text-center bg-paper2 rounded border border-line">
+              No se encontraron negocios que coincidan con «{busquedaNegocio}».
+            </p>
           ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
-              {negocios.map((n) => (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
+              {negociosFiltrados.map((n) => (
                 <NegocioCard
                   key={n.id}
                   n={n}
@@ -421,6 +456,25 @@ function NegocioCard({ n, onToggle, onToggleVip, onDelete }) {
             <div>
               <b className="block font-serif text-base text-cream font-semibold">{fmt$(n.ventasMes || 0)}</b>ventas/mes
             </div>
+          </div>
+
+          {/* Correo del dueño */}
+          <div className="mt-3 p-2.5 rounded bg-paper3/60 border border-line flex items-center justify-between gap-2 text-xs">
+            <div className="min-w-0 flex-1">
+              <span className="text-[10.5px] text-creamsoft block">👤 Correo del dueño:</span>
+              <span className="font-mono text-gold font-medium truncate block select-all text-[12px]" title={n.dueno_email || 'Sin correo vinculado'}>
+                {n.dueno_email || 'Sin correo vinculado'}
+              </span>
+            </div>
+            {n.dueno_email && n.dueno_email !== 'Sin correo vinculado' && (
+              <a
+                href={`mailto:${n.dueno_email}?subject=${encodeURIComponent(`Contacto oficial Kiosko — ${n.nombre}`)}`}
+                className="text-creamsoft hover:text-gold p-1 text-sm shrink-0 transition-colors"
+                title={`Enviar correo a ${n.dueno_email}`}
+              >
+                ✉️
+              </a>
+            )}
           </div>
         </div>
       </div>

@@ -31,7 +31,6 @@ export default function App() {
   const [negocioId, setNegocioId] = useState(null) // solo lo usa el flujo de Cliente
   const [mostrarPrivacidad, setMostrarPrivacidad] = useState(false)
   const [modoRecuperacion, setModoRecuperacion] = useState(false)
-  const [adminIntent, setAdminIntent] = useState(null) // null | 'entrar' | 'registrar' — solo lo usa el flujo de Admin
   const [negocios, setNegocios] = useState([])
   const [toast, setToast] = useState(null)
   const [loadError, setLoadError] = useState(null)
@@ -159,7 +158,6 @@ export default function App() {
   async function handleSignOut() {
     await signOut()
     setRole(isNativeApp ? 'admin' : 'cliente')
-    setAdminIntent(null)
     setMenuAbierto(false)
   }
 
@@ -182,13 +180,12 @@ export default function App() {
       CapacitorApp.addListener('backButton', () => {
         if (menuAbierto) { setMenuAbierto(false); return }
         if (role === 'cliente' && negocioCliente) { exitNegocioCliente(); return }
-        if (role === 'admin' && !session && adminIntent) { setAdminIntent(null); return }
         if (role !== 'cliente') { setRole('cliente'); return }
         CapacitorApp.exitApp()
       }).then((h) => { listenerHandle = h })
     })
     return () => { cancelled = true; listenerHandle?.remove() }
-  }, [isNativeApp, role, negocioCliente, session, adminIntent, menuAbierto])
+  }, [isNativeApp, role, negocioCliente, session, menuAbierto])
  if (!online) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-paper text-center px-6">
@@ -230,7 +227,7 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="flex gap-1 bg-paper2 border border-line rounded-full p-1">
                 {ROLES.filter(([r]) => r === 'cliente').map(([r, icon, label]) => (
-                  <button key={r} onClick={() => { setRole(r); setAdminIntent(null) }}
+                  <button key={r} onClick={() => setRole(r)}
                     className={`px-4 py-2 rounded-full text-[12.5px] font-semibold ${role === r ? 'bg-gold text-paper' : 'text-creamsoft hover:text-cream'}`}>
                     {icon} {t[label]}
                   </button>
@@ -269,11 +266,7 @@ export default function App() {
         {/* ---------------- ADMIN DE NEGOCIO Y SUPERADMIN UNIFICADO ---------------- */}
         {role === 'admin' && (
           session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
-          !session ? (
-            adminIntent === null
-              ? <PickNegocioAdmin negocios={negocios} onEntrar={() => setAdminIntent('entrar')} onRegistrar={() => setAdminIntent('registrar')} />
-              : <AdminAuth modoInicial={adminIntent === 'registrar' ? 'registro' : 'login'} onDone={loadPerfil} notify={notify} onVolver={() => setAdminIntent(null)} />
-          ) :
+          !session ? <AdminAuth modoInicial="login" onDone={loadPerfil} notify={notify} /> :
           !perfil ? <p className="text-creamsoft text-sm text-center mt-10">{t.loadingProfile}</p> :
           perfil.rol === 'superadmin' ? (
             <SuperadminView negocios={negocios} onChanged={loadNegocios} notify={notify} onExit={handleSignOut} />
@@ -342,7 +335,7 @@ export default function App() {
           {APP_ROLES.map(([r, icon, label]) => (
             <button
               key={r}
-              onClick={() => { setRole(r); setAdminIntent(null); setMenuAbierto(false) }}
+              onClick={() => { setRole(r); setMenuAbierto(false) }}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10.5px] font-semibold ${role === r ? 'text-gold' : 'text-creamsoft'}`}
             >
               <span className={`text-lg leading-none ${role === r ? 'opacity-100' : 'opacity-70'}`}>{icon}</span>
@@ -380,56 +373,6 @@ export default function App() {
   )
 }
 
-function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
-  const { t } = useLanguage()
-
-  return (
-    <div>
-      <section className="relative overflow-hidden rounded border border-line bg-paper2 px-6 py-9 md:px-10 md:py-11 mb-8">
-        <div className="absolute -right-10 -top-16 opacity-20"><BrandMark size={230} /></div>
-        <div className="relative max-w-3xl">
-          <div className="flex items-center gap-4 mb-5">
-            <BrandMark size={84} />
-            <div>
-              <p className="text-[11px] uppercase tracking-[0.22em] text-gold font-semibold">Kiosko Negocios</p>
-              <p className="text-xs text-creamsoft">{t.businessPanelDescription || 'Centro de gestión para tu negocio'}</p>
-            </div>
-          </div>
-          <h2 className="font-serif text-3xl md:text-4xl font-semibold mb-3 leading-tight">{t.heroAdminTitle}</h2>
-          <p className="text-creamsoft text-sm md:text-base leading-relaxed max-w-2xl">{t.heroAdminDescription}</p>
-        </div>
-      </section>
-
-      <ActualizacionNegociosBanner className="mb-7" />
-
-      <div className="mb-7 flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="font-serif text-3xl font-semibold mb-2">{t.businessPanel}</h2>
-          <p className="text-creamsoft text-sm max-w-lg leading-relaxed">Elige tu negocio para entrar con tu correo, o registra uno nuevo si vas a usar Kiosko por primera vez.</p>
-        </div>
-        <button onClick={onRegistrar} className="bg-gold text-paper font-semibold text-[13px] rounded-full px-5 py-3 hover:bg-golddark whitespace-nowrap">
-          ➕ {t.authAdmin.register}
-        </button>
-      </div>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(270px,1fr))] gap-4">
-        {negocios.map((n) => (
-          <div key={n.id} className="rounded border border-line bg-paper2 overflow-hidden">
-            <NegocioBanner negocio={n} />
-            <div className="p-5">
-              <h3 className="font-serif text-lg font-semibold mb-0.5 flex items-center gap-1.5"><NegocioLogo negocio={n} size={20} /> {n.nombre}</h3>
-              <p className="text-[12.5px] text-creamsoft mb-3">{n.slogan}</p>
-              <button onClick={onEntrar}
-                className="w-full bg-paper3 border border-line text-cream font-semibold text-[13px] rounded py-2.5 hover:border-gold hover:text-gold">
-                🔑 Ingresar como administrador
-              </button>
-            </div>
-          </div>
-        ))}
-        {negocios.length === 0 && <p className="text-creamsoft text-sm">Todavía no hay negocios registrados en la plataforma. Sé el primero.</p>}
-      </div>
-    </div>
-  )
-}
 
 function PickNegocio({ negocios, onEnter, showWelcome = false, showDownloads = false }) {
   const { t } = useLanguage()

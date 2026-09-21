@@ -243,7 +243,7 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
   }
 
   return (
-    <div className="max-w-[420px] mx-auto mt-10">
+    <div className="max-w-[460px] mx-auto mt-6 sm:mt-10">
       <h2 className="font-serif text-2xl font-semibold mb-1 text-center">
         {modo === 'login' ? t.authAdmin.loginTitle : t.authAdmin.registerTitle}
       </h2>

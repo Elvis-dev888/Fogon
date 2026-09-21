@@ -5,8 +5,37 @@ import { shouldCreateSale } from './orderSales'
    NEGOCIOS
    ========================================================= */
 export async function fetchNegocios() {
-  const { data: negocios, error } = await supabase.from('negocios').select('*').order('creado_en')
-  if (error) throw error
+  let negocios = null
+
+  // Intentamos obtener negocios con el correo del dueño mediante la RPC para superadmin
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('obtener_negocios_superadmin')
+    if (!rpcError && Array.isArray(rpcData) && rpcData.length > 0) {
+      negocios = rpcData
+    }
+  } catch {
+    // Si la RPC aún no está creada en la base de datos, continúa con la tabla negocios
+  }
+
+  if (!negocios) {
+    const { data, error } = await supabase.from('negocios').select('*').order('creado_en')
+    if (error) throw error
+    negocios = data || []
+
+    // Si es superadmin o la sesión lo permite, enriquece con perfiles
+    try {
+      const { data: perfiles } = await supabase.from('perfiles').select('negocio_id, email, rol').eq('rol', 'admin')
+      if (perfiles && perfiles.length > 0) {
+        const emailMap = new Map(perfiles.filter((p) => p.negocio_id && p.email).map((p) => [p.negocio_id, p.email]))
+        negocios = negocios.map((n) => ({
+          ...n,
+          dueno_email: emailMap.get(n.id) || n.dueno_email || 'Sin correo vinculado',
+        }))
+      }
+    } catch {
+      // Ignorar fallback si la política no lo permite
+    }
+  }
 
   // Traemos conteos simples para las tarjetas del Superadmin (consultas ligeras, una por negocio).
   // Si alguna de estas consultas extra falla, no debe tumbar la lista completa de negocios —
