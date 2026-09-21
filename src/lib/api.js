@@ -371,8 +371,24 @@ export async function actualizarPedido(pedido, productos, nuevosItems) {
 // historial), le devuelve el stock a los productos que tenía, y borra la
 // "venta" asociada para que no siga contando en los reportes de ingresos.
 export async function cancelarPedido(pedido, productos, canceladoPor) {
-  await restaurarStockItems(pedido.pedido_items || pedido.items, productos)
-  await supabase.from('ventas').delete().eq('pedido_id', pedido.id)
+  // 1. Intentar vía función segura en Supabase (RPC sin problemas de RLS)
+  try {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('cancelar_pedido', {
+      p_pedido_id: pedido.id,
+      p_cancelado_por: canceladoPor || 'Cliente',
+    })
+    if (!rpcError && rpcData?.success) {
+      return rpcData
+    }
+  } catch {}
+
+  // 2. Fallback directo en caso de que aún no hayan corrido el script en Supabase
+  try {
+    await restaurarStockItems(pedido.pedido_items || pedido.items, productos)
+  } catch {}
+  try {
+    await supabase.from('ventas').delete().eq('pedido_id', pedido.id)
+  } catch {}
   const { error } = await supabase
     .from('pedidos')
     .update({ estado: 'Cancelado', cancelado_en: new Date().toISOString(), cancelado_por: canceladoPor || null })
