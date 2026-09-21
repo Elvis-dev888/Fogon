@@ -72,34 +72,129 @@ export const ESTADOS = ['Pendiente', 'En preparación', 'Listo', 'Entregado']
 export const THUMBS = ['#231C16', '#221E17', '#1E211C', '#211A1A']
 export const thumbFor = (emoji) => THUMBS[(emoji || '🍽️').charCodeAt(0) % 4]
 
-// Timbre de "pedido nuevo" hecho con Web Audio (sin archivos de sonido que subir).
-// Los navegadores bloquean audio hasta que hay una interacción del usuario en la
-// página (un clic, por ejemplo) — por eso puede no sonar la primerísima vez que
-// se abre la pestaña de Pedidos, pero sí de ahí en adelante.
-export function playPedidoNuevo() {
+// Campana potente de restaurante y timbre de comanda con Web Audio
+export function playCampanaRestaurante(forzar = false) {
+  if (typeof window !== 'undefined' && !forzar) {
+    const habilitado = window.localStorage?.getItem('kiosko_sonido_habilitado')
+    if (habilitado === 'false') return
+  }
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext
     if (!Ctx) return
     const ctx = new Ctx()
-    const notas = [880, 1108]
-    notas.forEach((freq, i) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'sine'
-      osc.frequency.value = freq
-      const start = ctx.currentTime + i * 0.14
-      gain.gain.setValueAtTime(0.0001, start)
-      gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32)
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-      osc.start(start)
-      osc.stop(start + 0.34)
+
+    // Acordes de campana de servicio de restaurante: D5 (587Hz) + A5 (880Hz) seguido de D6 (1175Hz)
+    const campanas = [
+      { freqs: [880, 1760], start: 0, dur: 0.55, vol: 0.65 },
+      { freqs: [1175, 2350], start: 0.16, dur: 0.85, vol: 0.75 },
+    ]
+
+    campanas.forEach(({ freqs, start, dur, vol }) => {
+      freqs.forEach((freq, idx) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = idx === 0 ? 'triangle' : 'sine'
+        osc.frequency.value = freq
+
+        const s = ctx.currentTime + start
+        gain.gain.setValueAtTime(0.0001, s)
+        gain.gain.exponentialRampToValueAtTime(vol * (idx === 0 ? 1 : 0.6), s + 0.015)
+        gain.gain.exponentialRampToValueAtTime(0.0001, s + dur)
+
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(s)
+        osc.stop(s + dur + 0.05)
+      })
     })
-    setTimeout(() => ctx.close(), 700)
+
+    setTimeout(() => ctx.close(), 1300)
   } catch {
-    // si el navegador bloquea el audio, no pasa nada — el aviso visual sigue funcionando
+    // Si el navegador bloquea audio, continúa silenciosamente
   }
+}
+
+// Compatibilidad hacia atrás
+export function playPedidoNuevo() {
+  playCampanaRestaurante()
+}
+
+// Extrae el número o nombre de mesa de las notas o propiedades del pedido
+export function extractMesaFromPedido(pedido) {
+  if (!pedido) return null
+  if (pedido.mesa) return String(pedido.mesa).trim()
+  const texto = `${pedido.notas_entrega || ''} ${pedido.direccion || ''}`
+  const match = texto.match(/Mesa\s*#?\s*([0-9a-zA-ZáéíóúÁÉÍÓÚ]+)/i)
+  if (match) return match[1]
+  return null
+}
+
+// Anuncio hablado con voz inteligente (Text-to-Speech)
+export function speakAnuncioPedido(pedido) {
+  try {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
+    window.speechSynthesis.cancel() // cancela cualquier voz previa
+
+    const mesa = extractMesaFromPedido(pedido)
+    const cliente = (pedido?.cliente || 'Cliente').trim()
+    const esDomicilio = pedido?.tipo_entrega === 'domicilio'
+
+    let texto = ''
+    if (mesa) {
+      texto = `¡Nuevo pedido! Mesa ${mesa}, ${cliente}.`
+    } else if (esDomicilio) {
+      texto = `¡Nuevo pedido para domicilio! ${cliente}.`
+    } else {
+      texto = `¡Nuevo pedido en el local! ${cliente}.`
+    }
+
+    const utterance = new SpeechSynthesisUtterance(texto)
+    utterance.lang = 'es-CO'
+    utterance.volume = 1.0
+    utterance.rate = 1.02
+    utterance.pitch = 1.05
+
+    // Intentar asignar una voz en español disponible
+    const voices = window.speechSynthesis.getVoices() || []
+    const vozEs = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('es'))
+    if (vozEs) {
+      utterance.voice = vozEs
+    }
+
+    window.speechSynthesis.speak(utterance)
+  } catch {
+    // Si speech no está disponible, no pasa nada
+  }
+}
+
+// Función unificada: Campana de restaurante + Voz inteligente con aviso del pedido
+export function notificarPedidoNuevoConVoz(pedido, forzar = false) {
+  if (typeof window !== 'undefined' && !forzar) {
+    const habilitado = window.localStorage?.getItem('kiosko_sonido_habilitado')
+    if (habilitado === 'false') return // el usuario lo silenció con la campanita
+  }
+
+  // 1. Suena la campana
+  playCampanaRestaurante()
+
+  // 2. 600ms después anuncia con la voz
+  setTimeout(() => {
+    speakAnuncioPedido(pedido)
+  }, 600)
+
+  // 3. Notificación nativa del sistema si está minimizada la app
+  try {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      const mesa = extractMesaFromPedido(pedido)
+      const titulo = mesa ? `🛎️ ¡Nuevo pedido en Mesa ${mesa}!` : `🛎️ ¡Nuevo pedido de ${pedido?.cliente || 'Cliente'}!`
+      const cuerpo = `${pedido?.cliente || 'Cliente'} · Total: ${fmt$(pedido?.total || 0)}${pedido?.tipo_entrega === 'domicilio' ? ' (Domicilio)' : ''}`
+      new Notification(titulo, {
+        body: cuerpo,
+        icon: '/Kiosko.jpg',
+        badge: '/Kiosko.jpg',
+      })
+    }
+  } catch {}
 }
 
 export function formatWhatsAppNumber(phone) {

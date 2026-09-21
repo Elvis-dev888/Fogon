@@ -1,7 +1,119 @@
 import { useState, useEffect } from 'react'
 import { Btn, Card, Field, Input, Select, Textarea, Modal } from './ui'
 import { signUp, signIn, signOut, crearNegocioPropio, unirseComoEmpleado, reclamarSuperadmin, fetchNegociosSinAdmin, reclamarNegocioExistente, recuperarPassword, actualizarPassword } from '../lib/auth'
+import { SUPPORT_EMAIL, getSecurityStatus, recordFailedAttempt, clearFailedAttempts, unlockAccountWithCode, formatRemainingTime } from '../lib/security'
 import { useLanguage } from '../lib/i18n.jsx'
+
+/* ---------------- Tarjeta de cuenta bloqueada por seguridad (6 horas) ---------------- */
+export function SecurityLockCard({ email, status, onUnlocked, onMostrarRecuperar, notify }) {
+  const { t } = useLanguage()
+  const [remainingMs, setRemainingMs] = useState(status?.remainingMs || 0)
+  const [codigoDesbloqueo, setCodigoDesbloqueo] = useState('')
+  const [errorDesbloqueo, setErrorDesbloqueo] = useState('')
+  const [copiado, setCopiado] = useState(false)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const s = getSecurityStatus(email)
+      if (!s.isLocked) {
+        onUnlocked()
+      } else {
+        setRemainingMs(s.remainingMs)
+      }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [email, onUnlocked])
+
+  function handleCopiarCorreo() {
+    navigator.clipboard?.writeText(SUPPORT_EMAIL)
+    setCopiado(true)
+    if (notify) notify(t.security?.emailCopied || 'Correo oficial copiado al portapapeles')
+    setTimeout(() => setCopiado(false), 3000)
+  }
+
+  function handleDesbloquear(e) {
+    e.preventDefault()
+    setErrorDesbloqueo('')
+    if (!codigoDesbloqueo.trim()) {
+      setErrorDesbloqueo(t.security?.unlockError || 'Ingresa un código')
+      return
+    }
+    const ok = unlockAccountWithCode(email, codigoDesbloqueo)
+    if (ok) {
+      if (notify) notify(t.security?.unlockSuccess || '¡Acceso desbloqueado exitosamente!')
+      onUnlocked()
+    } else {
+      setErrorDesbloqueo(t.security?.unlockError || 'Código incorrecto. Verifica el código o contacta a soporte.')
+    }
+  }
+
+  const subject = encodeURIComponent(t.security?.supportEmailSubject || 'Solicitud de desbloqueo de cuenta Kiosko')
+  const body = encodeURIComponent((t.security?.supportEmailBody || 'Hola Soporte Kiosko, mi cuenta con el correo {email} ha sido bloqueada por seguridad (6 intentos fallidos). Solicito asistencia para desbloquearla.').replace('{email}', email))
+  const mailtoUrl = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`
+
+  return (
+    <Card className="p-6 border-wine bg-wine/10 space-y-4">
+      <div className="text-center">
+        <div className="text-3xl mb-1">🔒</div>
+        <h3 className="font-serif text-lg font-semibold text-wine">
+          {t.security?.accountLockedTitle || 'Acceso temporalmente bloqueado'}
+        </h3>
+        <p className="text-creamsoft text-xs mt-1 leading-relaxed">
+          {t.security?.accountLockedDesc || 'Por seguridad, este acceso ha sido bloqueado durante 6 horas tras alcanzar el límite de 6 intentos fallidos.'}
+        </p>
+        <div className="inline-block mt-3 px-3 py-1.5 bg-paper border border-wine/40 rounded text-xs font-mono text-wine font-semibold">
+          ⏳ {t.security?.timeRemaining?.replace('{time}', formatRemainingTime(remainingMs)) || `Tiempo de espera: ${formatRemainingTime(remainingMs)}`}
+        </div>
+      </div>
+
+      <div className="pt-2 border-t border-line/60 space-y-2">
+        <a
+          href={mailtoUrl}
+          className="w-full flex items-center justify-center gap-2 bg-paper2 border border-gold text-gold hover:bg-gold hover:text-paper font-semibold text-xs py-2.5 px-3 rounded transition-colors text-center"
+        >
+          {t.security?.contactSupportEmail?.replace('{email}', SUPPORT_EMAIL) || `✉️ Contactar a Soporte (${SUPPORT_EMAIL})`}
+        </a>
+
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleCopiarCorreo}
+            className="flex-1 text-[11px] text-creamsoft hover:text-gold py-1.5 text-center bg-transparent border border-line rounded transition-colors"
+          >
+            📋 {copiado ? '✓ Copiado' : (t.security?.copyEmail || 'Copiar correo')}
+          </button>
+          {onMostrarRecuperar && (
+            <button
+              type="button"
+              onClick={onMostrarRecuperar}
+              className="flex-1 text-[11px] text-creamsoft hover:text-gold py-1.5 text-center bg-transparent border border-line rounded transition-colors"
+            >
+              🔑 {t.authRecovery?.forgotPassword || 'Restablecer contraseña'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <form onSubmit={handleDesbloquear} className="pt-2 border-t border-line/60">
+        <p className="text-[11.5px] text-creamsoft mb-1.5 font-medium">
+          {t.security?.haveUnlockCode || '¿Recibiste un código de desbloqueo de soporte?'}
+        </p>
+        <div className="flex gap-2">
+          <Input
+            value={codigoDesbloqueo}
+            onChange={(e) => { setCodigoDesbloqueo(e.target.value); setErrorDesbloqueo('') }}
+            placeholder={t.security?.unlockCodePlaceholder || 'Ej. KIO-123456'}
+            className="text-xs uppercase font-mono flex-1"
+          />
+          <Btn type="submit" size="sm" variant="secondary">
+            {t.security?.unlockButton || 'Desbloquear'}
+          </Btn>
+        </div>
+        {errorDesbloqueo && <p className="text-wine text-[11px] mt-1">{errorDesbloqueo}</p>}
+      </form>
+    </Card>
+  )
+}
 
 /* ---------------- Login / registro para Admin de negocio ---------------- */
 export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
@@ -13,11 +125,28 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
   const [aviso, setAviso] = useState('')
   const [loading, setLoading] = useState(false)
   const [mostrarRecuperar, setMostrarRecuperar] = useState(false)
+  const [securityStatus, setSecurityStatus] = useState(() => getSecurityStatus(email))
+
+  function handleEmailChange(e) {
+    const val = e.target.value
+    setEmail(val)
+    setSecurityStatus(getSecurityStatus(val))
+    setError('')
+  }
 
   async function submit(e) {
     e.preventDefault()
     setError('')
     setAviso('')
+
+    if (modo === 'login') {
+      const status = getSecurityStatus(email)
+      if (status.isLocked) {
+        setSecurityStatus(status)
+        return
+      }
+    }
+
     setLoading(true)
     try {
       if (modo === 'registro') {
@@ -32,10 +161,23 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
         notify(t.authAdmin.accountCreated)
       } else {
         await signIn(email, password)
+        clearFailedAttempts(email)
+        setSecurityStatus(getSecurityStatus(email))
       }
       onDone()
     } catch (err) {
-      setError(err.message || String(err))
+      if (modo === 'login') {
+        const newStatus = recordFailedAttempt(email)
+        setSecurityStatus(newStatus)
+        if (newStatus.isLocked) {
+          setError('')
+        } else {
+          const warning = (t.security?.attemptsWarning || 'Contraseña incorrecta. Te quedan {count} intentos antes del bloqueo temporal (6 horas).').replace('{count}', newStatus.attemptsLeft)
+          setError(warning)
+        }
+      } else {
+        setError(err.message || String(err))
+      }
     } finally {
       setLoading(false)
     }
@@ -68,27 +210,41 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
 
       {aviso && <div className="mb-4 border border-gold bg-gold/10 text-champagne text-[12.5px] rounded p-3">{aviso}</div>}
 
-      <Card className="p-6">
-        <form onSubmit={submit}>
-          <Field label={t.authAdmin.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label={t.authAdmin.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
-          {modo === 'login' && (
-            <div className="text-right -mt-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setMostrarRecuperar(true)}
-                className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
-              >
-                {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
-              </button>
-            </div>
-          )}
-          {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
-          <Btn variant="primary" className="w-full justify-center" disabled={loading}>
-            {loading ? t.authAdmin.wait : modo === 'login' ? t.authAdmin.enter : t.authAdmin.createContinue}
-          </Btn>
-        </form>
-      </Card>
+      {modo === 'login' && securityStatus.isLocked ? (
+        <SecurityLockCard
+          email={email}
+          status={securityStatus}
+          notify={notify}
+          onUnlocked={() => {
+            setSecurityStatus(getSecurityStatus(email))
+            setError('')
+          }}
+          onMostrarRecuperar={() => setMostrarRecuperar(true)}
+        />
+      ) : (
+        <Card className="p-6">
+          <form onSubmit={submit}>
+            <Field label={t.authAdmin.email}><Input required type="email" value={email} onChange={handleEmailChange} /></Field>
+            <Field label={t.authAdmin.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+            {modo === 'login' && (
+              <div className="text-right -mt-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setMostrarRecuperar(true)}
+                  className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
+                >
+                  {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
+                </button>
+              </div>
+            )}
+            {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
+            <Btn variant="primary" className="w-full justify-center" disabled={loading}>
+              {loading ? t.authAdmin.wait : modo === 'login' ? t.authAdmin.enter : t.authAdmin.createContinue}
+            </Btn>
+          </form>
+        </Card>
+      )}
+
       {onVolver && (
         <button onClick={onVolver} className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-4">
           ← {t.authAdmin.back}
@@ -116,11 +272,28 @@ export function EmpleadoAuth({ onDone, notify }) {
   const [aviso, setAviso] = useState('')
   const [loading, setLoading] = useState(false)
   const [mostrarRecuperar, setMostrarRecuperar] = useState(false)
+  const [securityStatus, setSecurityStatus] = useState(() => getSecurityStatus(email))
+
+  function handleEmailChange(e) {
+    const val = e.target.value
+    setEmail(val)
+    setSecurityStatus(getSecurityStatus(val))
+    setError('')
+  }
 
   async function submit(e) {
     e.preventDefault()
     setError('')
     setAviso('')
+
+    if (modo === 'login') {
+      const status = getSecurityStatus(email)
+      if (status.isLocked) {
+        setSecurityStatus(status)
+        return
+      }
+    }
+
     setLoading(true)
     try {
       if (modo === 'registro') {
@@ -134,10 +307,23 @@ export function EmpleadoAuth({ onDone, notify }) {
         notify(t.authEmployee.accountCreated)
       } else {
         await signIn(email, password)
+        clearFailedAttempts(email)
+        setSecurityStatus(getSecurityStatus(email))
       }
       onDone()
     } catch (err) {
-      setError(err.message || String(err))
+      if (modo === 'login') {
+        const newStatus = recordFailedAttempt(email)
+        setSecurityStatus(newStatus)
+        if (newStatus.isLocked) {
+          setError('')
+        } else {
+          const warning = (t.security?.attemptsWarning || 'Contraseña incorrecta. Te quedan {count} intentos antes del bloqueo temporal (6 horas).').replace('{count}', newStatus.attemptsLeft)
+          setError(warning)
+        }
+      } else {
+        setError(err.message || String(err))
+      }
     } finally {
       setLoading(false)
     }
@@ -152,33 +338,47 @@ export function EmpleadoAuth({ onDone, notify }) {
         {modo === 'login' ? t.authEmployee.loginDescription : t.authEmployee.registerDescription}
       </p>
       {aviso && <div className="mb-4 border border-gold bg-gold/10 text-champagne text-[12.5px] rounded p-3">{aviso}</div>}
-      <Card className="p-6">
-        <form onSubmit={submit}>
-          <Field label={t.authEmployee.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label={t.authEmployee.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
-          {modo === 'login' && (
-            <div className="text-right -mt-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setMostrarRecuperar(true)}
-                className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
-              >
-                {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
-              </button>
-            </div>
-          )}
-          {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
-          <Btn variant="primary" className="w-full justify-center" disabled={loading}>
-            {loading ? t.authEmployee.wait : modo === 'login' ? t.authEmployee.login : t.authEmployee.create}
-          </Btn>
-        </form>
-        <button
-          onClick={() => { setModo(modo === 'login' ? 'registro' : 'login'); setError(''); setAviso('') }}
-          className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-4"
-        >
-          {modo === 'login' ? t.authEmployee.createQuestion : t.authEmployee.loginQuestion}
-        </button>
-      </Card>
+
+      {modo === 'login' && securityStatus.isLocked ? (
+        <SecurityLockCard
+          email={email}
+          status={securityStatus}
+          notify={notify}
+          onUnlocked={() => {
+            setSecurityStatus(getSecurityStatus(email))
+            setError('')
+          }}
+          onMostrarRecuperar={() => setMostrarRecuperar(true)}
+        />
+      ) : (
+        <Card className="p-6">
+          <form onSubmit={submit}>
+            <Field label={t.authEmployee.email}><Input required type="email" value={email} onChange={handleEmailChange} /></Field>
+            <Field label={t.authEmployee.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+            {modo === 'login' && (
+              <div className="text-right -mt-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setMostrarRecuperar(true)}
+                  className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
+                >
+                  {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
+                </button>
+              </div>
+            )}
+            {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
+            <Btn variant="primary" className="w-full justify-center" disabled={loading}>
+              {loading ? t.authEmployee.wait : modo === 'login' ? t.authEmployee.login : t.authEmployee.create}
+            </Btn>
+          </form>
+          <button
+            onClick={() => { setModo(modo === 'login' ? 'registro' : 'login'); setError(''); setAviso('') }}
+            className="w-full text-center text-[12.5px] text-creamsoft hover:text-gold mt-4"
+          >
+            {modo === 'login' ? t.authEmployee.createQuestion : t.authEmployee.loginQuestion}
+          </button>
+        </Card>
+      )}
 
       {mostrarRecuperar && (
         <RecuperarPasswordModal
@@ -243,11 +443,28 @@ export function SuperadminAuth({ onDone, notify }) {
   const [aviso, setAviso] = useState('')
   const [loading, setLoading] = useState(false)
   const [mostrarRecuperar, setMostrarRecuperar] = useState(false)
+  const [securityStatus, setSecurityStatus] = useState(() => getSecurityStatus(email))
+
+  function handleEmailChange(e) {
+    const val = e.target.value
+    setEmail(val)
+    setSecurityStatus(getSecurityStatus(val))
+    setError('')
+  }
 
   async function submit(e) {
     e.preventDefault()
     setError('')
     setAviso('')
+
+    if (modo === 'login') {
+      const status = getSecurityStatus(email)
+      if (status.isLocked) {
+        setSecurityStatus(status)
+        return
+      }
+    }
+
     setLoading(true)
     try {
       if (modo === 'registro') {
@@ -261,10 +478,23 @@ export function SuperadminAuth({ onDone, notify }) {
         await reclamarSuperadmin()
       } else {
         await signIn(email, password)
+        clearFailedAttempts(email)
+        setSecurityStatus(getSecurityStatus(email))
       }
       onDone()
     } catch (err) {
-      setError(err.message || String(err))
+      if (modo === 'login') {
+        const newStatus = recordFailedAttempt(email)
+        setSecurityStatus(newStatus)
+        if (newStatus.isLocked) {
+          setError('')
+        } else {
+          const warning = (t.security?.attemptsWarning || 'Contraseña incorrecta. Te quedan {count} intentos antes del bloqueo temporal (6 horas).').replace('{count}', newStatus.attemptsLeft)
+          setError(warning)
+        }
+      } else {
+        setError(err.message || String(err))
+      }
     } finally {
       setLoading(false)
     }
@@ -277,33 +507,47 @@ export function SuperadminAuth({ onDone, notify }) {
         {modo === 'login' ? t.authSuper.exclusive : t.authSuper.firstSetup}
       </p>
       {aviso && <div className="mb-4 border border-gold bg-gold/10 text-champagne text-[12.5px] rounded p-3">{aviso}</div>}
-      <Card className="p-6">
-        <form onSubmit={submit}>
-          <Field label={t.authSuper.email}><Input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-          <Field label={t.authSuper.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
-          {modo === 'login' && (
-            <div className="text-right -mt-2 mb-3">
-              <button
-                type="button"
-                onClick={() => setMostrarRecuperar(true)}
-                className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
-              >
-                {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
-              </button>
-            </div>
-          )}
-          {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
-          <Btn variant="primary" className="w-full justify-center" disabled={loading}>
-            {loading ? t.authSuper.wait : modo === 'login' ? t.authSuper.enter : t.authSuper.claim}
-          </Btn>
-        </form>
-        <button
-          onClick={() => { setModo(modo === 'login' ? 'registro' : 'login'); setError(''); setAviso('') }}
-          className="w-full text-center text-[12px] text-creamsoft hover:text-gold mt-4"
-        >
-          {modo === 'login' ? t.authSuper.firstQuestion : t.authSuper.loginQuestion}
-        </button>
-      </Card>
+
+      {modo === 'login' && securityStatus.isLocked ? (
+        <SecurityLockCard
+          email={email}
+          status={securityStatus}
+          notify={notify}
+          onUnlocked={() => {
+            setSecurityStatus(getSecurityStatus(email))
+            setError('')
+          }}
+          onMostrarRecuperar={() => setMostrarRecuperar(true)}
+        />
+      ) : (
+        <Card className="p-6">
+          <form onSubmit={submit}>
+            <Field label={t.authSuper.email}><Input required type="email" value={email} onChange={handleEmailChange} /></Field>
+            <Field label={t.authSuper.password}><Input required type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+            {modo === 'login' && (
+              <div className="text-right -mt-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setMostrarRecuperar(true)}
+                  className="text-[11.5px] text-creamsoft hover:text-gold transition-colors"
+                >
+                  {t.authRecovery?.forgotPassword || '¿Olvidaste tu contraseña?'}
+                </button>
+              </div>
+            )}
+            {error && <p className="text-wine text-[12.5px] mb-3">{error}</p>}
+            <Btn variant="primary" className="w-full justify-center" disabled={loading}>
+              {loading ? t.authSuper.wait : modo === 'login' ? t.authSuper.enter : t.authSuper.claim}
+            </Btn>
+          </form>
+          <button
+            onClick={() => { setModo(modo === 'login' ? 'registro' : 'login'); setError(''); setAviso('') }}
+            className="w-full text-center text-[12px] text-creamsoft hover:text-gold mt-4"
+          >
+            {modo === 'login' ? t.authSuper.firstQuestion : t.authSuper.loginQuestion}
+          </button>
+        </Card>
+      )}
 
       {mostrarRecuperar && (
         <RecuperarPasswordModal

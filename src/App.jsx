@@ -15,9 +15,8 @@ import { DOWNLOAD_LINKS } from './lib/downloads'
 import { LANGUAGES, useLanguage } from './lib/i18n.jsx'
 
 const ROLES = [
-  ['super', '🛠️', 'admin'],
-  ['admin', '👑', 'business'],
-  ['empleado', '🛎️', 'team'],
+  ['admin', '👑', 'adminRole'],
+  ['empleado', '🛎️', 'employeeRole'],
   ['cliente', '🛒', 'customerRole'],
 ]
 
@@ -258,16 +257,16 @@ export default function App() {
           </div>
         )}
 
-        {/* ---------------- SUPERADMIN ---------------- */}
+        {/* ---------------- SUPERADMIN (redirigido o fallback) ---------------- */}
         {role === 'super' && (
           session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
-          !session ? <SuperadminAuth onDone={loadPerfil} /> :
+          !session ? <AdminAuth modoInicial="login" onDone={loadPerfil} notify={notify} /> :
           !perfil ? <p className="text-creamsoft text-sm text-center mt-10">{t.loadingProfile}</p> :
-          perfil.rol !== 'superadmin' ? <SinPermiso mensaje="Esta cuenta no tiene permisos de superadministrador. Ese rol se asigna a mano, no se puede obtener desde la app." /> :
-          <SuperadminView negocios={negocios} onChanged={loadNegocios} notify={notify} />
+          perfil.rol === 'superadmin' ? <SuperadminView negocios={negocios} onChanged={loadNegocios} notify={notify} onExit={handleSignOut} /> :
+          <SinPermiso mensaje="Esta cuenta no tiene permisos de superadministrador." />
         )}
 
-        {/* ---------------- ADMIN DE NEGOCIO ---------------- */}
+        {/* ---------------- ADMIN DE NEGOCIO Y SUPERADMIN UNIFICADO ---------------- */}
         {role === 'admin' && (
           session === undefined ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
           !session ? (
@@ -276,8 +275,10 @@ export default function App() {
               : <AdminAuth modoInicial={adminIntent === 'registrar' ? 'registro' : 'login'} onDone={loadPerfil} notify={notify} onVolver={() => setAdminIntent(null)} />
           ) :
           !perfil ? <p className="text-creamsoft text-sm text-center mt-10">{t.loadingProfile}</p> :
+          perfil.rol === 'superadmin' ? (
+            <SuperadminView negocios={negocios} onChanged={loadNegocios} notify={notify} onExit={handleSignOut} />
+          ) :
           perfil.rol === 'pendiente' ? <CrearNegocioForm notify={notify} onCreated={() => { loadPerfil(); loadNegocios() }} /> :
-          perfil.rol === 'superadmin' ? <SinPermiso mensaje="Esta cuenta es de superadministrador, no administra un negocio individual." /> :
           perfil.rol !== 'admin' ? <SinPermiso mensaje="Esta cuenta no está registrada como administradora de un negocio." /> :
           !miNegocio ? <p className="text-creamsoft text-sm text-center mt-10">{t.loading}</p> :
           <AdminView

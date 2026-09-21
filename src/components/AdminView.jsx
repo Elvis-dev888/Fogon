@@ -12,7 +12,7 @@ import { FeedbackModal } from './FeedbackModal'
 import { ShareMenuModal } from './ShareMenuModal'
 import { TabErrorBoundary } from './ui'
 import { supabase } from '../lib/supabaseClient'
-import { playPedidoNuevo, fmt$ } from '../lib/helpers'
+import { notificarPedidoNuevoConVoz, fmt$ } from '../lib/helpers'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
 import { useLanguage } from '../lib/i18n.jsx'
 
@@ -64,7 +64,7 @@ export default function AdminView({ negocio, onExit, notify, onNegocioUpdated })
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `negocio_id=eq.${negocio.id}` },
         (payload) => {
-          playPedidoNuevo()
+          notificarPedidoNuevoConVoz(payload.new)
           notify(`🔔 Pedido nuevo de ${payload.new.cliente} — ${fmt$(payload.new.total)}`)
           reload()
         }

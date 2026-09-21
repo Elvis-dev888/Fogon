@@ -3,7 +3,7 @@ import { Btn, NegocioLogo } from './ui'
 import { TabPedidos } from './AdminTabs'
 import { fetchPedidos, fetchProductos } from '../lib/api'
 import { supabase } from '../lib/supabaseClient'
-import { playPedidoNuevo, fmt$ } from '../lib/helpers'
+import { notificarPedidoNuevoConVoz, playCampanaRestaurante, fmt$ } from '../lib/helpers'
 
 // Cuánto tiempo suena/parpadea la alerta si nadie la reconoce (spec: 15–30s).
 const ALERTA_DURACION_MS = 25000
@@ -15,6 +15,29 @@ export default function EmpleadoView({ negocio, onExit, notify }) {
   const [loading, setLoading] = useState(true)
   const [alertas, setAlertas] = useState([]) // pedidos nuevos sin reconocer: [{id, numero, cliente, total}]
   const timers = useRef({}) // pedidoId -> { interval, timeout }
+  const [sonidoHabilitado, setSonidoHabilitado] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.localStorage?.getItem('kiosko_sonido_habilitado') !== 'false'
+  })
+
+  function toggleSonido() {
+    const nuevo = !sonidoHabilitado
+    setSonidoHabilitado(nuevo)
+    if (typeof window !== 'undefined') {
+      window.localStorage?.setItem('kiosko_sonido_habilitado', String(nuevo))
+    }
+    notify?.(nuevo ? '🔔 Sonido y voz activados' : '🔕 Sonido silenciado')
+  }
+
+  function probarSonido() {
+    notificarPedidoNuevoConVoz({
+      cliente: 'Carlos Mesa 3',
+      notas_entrega: '🍽️ Mesa 3 · 💵 Pago en Efectivo',
+      total: 25000,
+      tipo_entrega: 'local',
+    }, true)
+    notify?.('🔊 Probando campana y voz...')
+  }
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -44,12 +67,12 @@ export default function EmpleadoView({ negocio, onExit, notify }) {
         { event: 'INSERT', schema: 'public', table: 'pedidos', filter: `negocio_id=eq.${negocio.id}` },
         (payload) => {
           const nuevo = payload.new
-          playPedidoNuevo()
+          notificarPedidoNuevoConVoz(nuevo)
           notify(`🔔 Pedido nuevo de ${nuevo.cliente} — ${fmt$(nuevo.total)}`)
           setAlertas((a) => [...a, { id: nuevo.id, numero: nuevo.numero, cliente: nuevo.cliente, total: nuevo.total }])
 
           // repite el timbre cada 2.5s hasta que lo reconozcan, o hasta ~25s
-          const interval = setInterval(() => playPedidoNuevo(), ALERTA_INTERVALO_MS)
+          const interval = setInterval(() => playCampanaRestaurante(), ALERTA_INTERVALO_MS)
           const timeout = setTimeout(() => {
             clearInterval(interval)
             setAlertas((a) => a.filter((x) => x.id !== nuevo.id))
@@ -75,7 +98,31 @@ export default function EmpleadoView({ negocio, onExit, notify }) {
           <h2 className="font-serif text-2xl font-semibold flex items-center gap-2"><NegocioLogo negocio={negocio} size={30} /> {negocio.nombre}</h2>
           <p className="text-creamsoft text-sm">Estás atendiendo pedidos — se actualizan solos.</p>
         </div>
-        <Btn variant="ghost" onClick={onExit}>⏻ Cerrar sesión</Btn>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleSonido}
+            title={sonidoHabilitado ? 'Silenciar timbre y voz de pedidos' : 'Activar timbre y voz de pedidos'}
+            className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-all flex items-center gap-1.5 ${
+              sonidoHabilitado
+                ? 'bg-wine/20 border-wine text-wine hover:bg-wine/30'
+                : 'bg-cream/10 border-line text-creamsoft hover:text-cream'
+            }`}
+          >
+            <span>{sonidoHabilitado ? '🔔' : '🔕'}</span>
+            <span className="hidden sm:inline text-xs">{sonidoHabilitado ? 'Sonido activo' : 'Silenciado'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={probarSonido}
+            title="Probar timbre y voz"
+            className="px-2.5 py-1.5 rounded-lg border border-line bg-surface/50 text-creamsoft hover:text-cream text-xs font-medium transition-all flex items-center gap-1"
+          >
+            <span>🔊</span>
+            <span className="hidden sm:inline">Probar</span>
+          </button>
+          <Btn variant="ghost" onClick={onExit}>⏻ Cerrar sesión</Btn>
+        </div>
       </div>
 
       {alertas.length > 0 && (

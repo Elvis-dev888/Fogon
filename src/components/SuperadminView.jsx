@@ -3,15 +3,18 @@ import { Btn, StatCard, Pill, NegocioLogo, Card, Empty, Select, Modal } from './
 import { fmt$, fmtDateLong } from '../lib/helpers'
 import { toggleNegocioEstado, toggleNegocioVip, eliminarNegocio, fetchSugerencias, actualizarEstadoSugerencia, eliminarSugerencia } from '../lib/api'
 import { getTierForProductCount } from '../lib/subscription'
+import { SUPPORT_EMAIL, MASTER_UNLOCK_CODE, getUnlockCodeForEmail } from '../lib/security'
 import { useLanguage } from '../lib/i18n.jsx'
 
-export default function SuperadminView({ negocios, onChanged, notify }) {
+export default function SuperadminView({ negocios, onChanged, notify, onExit }) {
   const { t } = useLanguage()
-  const [seccion, setSeccion] = useState('negocios') // 'negocios' | 'sugerencias'
+  const [seccion, setSeccion] = useState('negocios') // 'negocios' | 'sugerencias' | 'seguridad'
   const [sugerencias, setSugerencias] = useState([])
   const [cargandoSugerencias, setCargandoSugerencias] = useState(false)
   const [negocioAEliminar, setNegocioAEliminar] = useState(null)
   const [eliminando, setEliminando] = useState(false)
+  const [emailClienteDesbloqueo, setEmailClienteDesbloqueo] = useState('')
+  const [copiadoCod, setCopiadoCod] = useState(false)
 
   const totalVentasMes = negocios.reduce((s, n) => s + (n.ventasMes || 0), 0)
   const totalPedidos = negocios.reduce((s, n) => s + (n.pedidosCount || 0), 0)
@@ -89,36 +92,51 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
 
   return (
     <div>
-      <div className="mb-6 pb-6 border-b border-line">
-        <h2 className="font-serif text-3xl font-semibold mb-2">Panel del Superadministrador</h2>
-        <p className="text-creamsoft text-sm max-w-xl leading-relaxed">
-          Centro de control global de la plataforma. Supervisa negocios en producción y revisa las ideas y sugerencias enviadas directamente por los propietarios.
-        </p>
-
-        {/* Pestañas de navegación de Superadmin */}
-        <div className="flex gap-2 mt-5">
-          <button
-            onClick={() => setSeccion('negocios')}
-            className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors flex items-center gap-2 ${
-              seccion === 'negocios' ? 'bg-gold text-paper' : 'bg-paper2 border border-line text-creamsoft hover:text-cream'
-            }`}
-          >
-            🏢 Negocios registrados ({negocios.length})
-          </button>
-          <button
-            onClick={() => setSeccion('sugerencias')}
-            className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors flex items-center gap-2 ${
-              seccion === 'sugerencias' ? 'bg-gold text-paper' : 'bg-paper2 border border-line text-creamsoft hover:text-cream'
-            }`}
-          >
-            📬 {t.feedback.inboxTitle}
-            {pendientesCount > 0 && (
-              <span className="bg-wine text-paper text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {pendientesCount} nuevas
-              </span>
-            )}
-          </button>
+      <div className="mb-6 pb-6 border-b border-line flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div>
+          <h2 className="font-serif text-3xl font-semibold mb-2">Panel del Superadministrador</h2>
+          <p className="text-creamsoft text-sm max-w-xl leading-relaxed">
+            Centro de control global de la plataforma. Supervisa negocios en producción, revisa ideas y sugerencias, y gestiona la seguridad y desbloqueos.
+          </p>
         </div>
+        {onExit && (
+          <Btn size="sm" variant="ghost" onClick={onExit} className="self-start">
+            {t.signOut || 'Cerrar sesión'}
+          </Btn>
+        )}
+      </div>
+
+      {/* Pestañas de navegación de Superadmin */}
+      <div className="flex gap-2 mb-6 flex-wrap">
+        <button
+          onClick={() => setSeccion('negocios')}
+          className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors flex items-center gap-2 ${
+            seccion === 'negocios' ? 'bg-gold text-paper' : 'bg-paper2 border border-line text-creamsoft hover:text-cream'
+          }`}
+        >
+          🏢 Negocios registrados ({negocios.length})
+        </button>
+        <button
+          onClick={() => setSeccion('sugerencias')}
+          className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors flex items-center gap-2 ${
+            seccion === 'sugerencias' ? 'bg-gold text-paper' : 'bg-paper2 border border-line text-creamsoft hover:text-cream'
+          }`}
+        >
+          📬 {t.feedback?.inboxTitle || 'Sugerencias'}
+          {pendientesCount > 0 && (
+            <span className="bg-wine text-paper text-[10px] font-bold px-2 py-0.5 rounded-full">
+              {pendientesCount} nuevas
+            </span>
+          )}
+        </button>
+        <button
+          onClick={() => setSeccion('seguridad')}
+          className={`px-4 py-2 rounded-full text-xs font-semibold transition-colors flex items-center gap-2 ${
+            seccion === 'seguridad' ? 'bg-gold text-paper' : 'bg-paper2 border border-line text-creamsoft hover:text-cream'
+          }`}
+        >
+          🛡️ {t.security?.superSecurityTitle || 'Seguridad y Desbloqueos'}
+        </button>
       </div>
 
       {seccion === 'negocios' && (
@@ -224,6 +242,105 @@ export default function SuperadminView({ negocios, onChanged, notify }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {seccion === 'seguridad' && (
+        <div className="space-y-6 max-w-2xl">
+          <Card className="p-6">
+            <h3 className="font-serif text-xl font-semibold mb-2 flex items-center gap-2">
+              🛡️ {t.security?.superSecurityTitle || 'Seguridad y Control de Accesos'}
+            </h3>
+            <p className="text-creamsoft text-sm leading-relaxed mb-4">
+              {t.security?.superSecurityDesc || 'Sistema de protección anti-fuerza bruta: tras 6 intentos fallidos, el acceso se bloquea durante 6 horas. Aquí puedes generar códigos de desbloqueo para clientes que lo soliciten a kkiosko440@gmail.com.'}
+            </p>
+            <div className="bg-paper2 p-4 rounded border border-line/60 space-y-2 text-xs text-creamsoft">
+              <p><strong className="text-cream">• Límite de intentos:</strong> 6 intentos consecutivos con contraseña incorrecta.</p>
+              <p><strong className="text-cream">• Duración del bloqueo:</strong> 6 horas automáticas desde el último intento fallido.</p>
+              <p><strong className="text-cream">• Correo oficial de soporte:</strong> <span className="text-gold font-mono">{SUPPORT_EMAIL}</span></p>
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <h4 className="font-serif text-lg font-semibold mb-1 flex items-center gap-2">
+              🔑 {t.security?.clientEmailLabel || 'Generador de Código de Desbloqueo'}
+            </h4>
+            <p className="text-creamsoft text-xs mb-4">
+              Ingresa el correo del cliente que te ha escrito solicitando el desbloqueo para obtener su código único instantáneo.
+            </p>
+            <div className="space-y-3">
+              <input
+                type="email"
+                value={emailClienteDesbloqueo}
+                onChange={(e) => setEmailClienteDesbloqueo(e.target.value)}
+                placeholder={t.security?.clientEmailPlaceholder || 'ejemplo@correo.com'}
+                className="w-full bg-paper border border-line rounded px-3 py-2.5 text-sm text-cream focus:outline-none focus:border-gold"
+              />
+
+              {emailClienteDesbloqueo.trim() && (
+                <div className="p-4 bg-paper2 border border-gold/40 rounded space-y-3">
+                  <div>
+                    <p className="text-xs text-creamsoft mb-1">{t.security?.generatedUnlockCode || 'Código de desbloqueo para este cliente:'}</p>
+                    <p className="text-2xl font-mono font-bold text-gold tracking-wider">
+                      {getUnlockCodeForEmail(emailClienteDesbloqueo)}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard?.writeText(getUnlockCodeForEmail(emailClienteDesbloqueo))
+                        setCopiadoCod(true)
+                        notify(t.security?.emailCopied ? 'Código copiado al portapapeles' : 'Código copiado')
+                        setTimeout(() => setCopiadoCod(false), 3000)
+                      }}
+                      className="bg-gold text-paper font-semibold text-xs py-2 px-3.5 rounded hover:bg-golddark transition-colors"
+                    >
+                      {copiadoCod ? '✓ Copiado' : '📋 Copiar código'}
+                    </button>
+                    <a
+                      href={`mailto:${emailClienteDesbloqueo.trim()}?subject=${encodeURIComponent('Tu código de desbloqueo de Kiosko')}&body=${encodeURIComponent(`Hola,\n\nHemos recibido tu solicitud de soporte. Tu código oficial de desbloqueo para volver a ingresar a tu cuenta de Kiosko es:\n\n${getUnlockCodeForEmail(emailClienteDesbloqueo)}\n\nIngrésalo en la casilla de desbloqueo en la app.\n\nSaludos,\nEquipo de Soporte Kiosko (${SUPPORT_EMAIL})`)}`}
+                      className="bg-paper border border-line text-cream hover:border-gold font-semibold text-xs py-2 px-3.5 rounded transition-colors"
+                    >
+                      {t.security?.sendEmailToClient || '✉️ Enviar correo al cliente'}
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card className="p-6">
+            <h4 className="font-serif text-lg font-semibold mb-2 flex items-center gap-2">
+              {t.security?.masterUnlockTitle || '🔑 Clave Maestra de Desbloqueo'}
+            </h4>
+            <p className="text-creamsoft text-xs mb-3">
+              {t.security?.masterUnlockDesc || 'Esta clave maestra desbloquea cualquier bloqueo en cualquier dispositivo:'}
+            </p>
+            <div className="inline-block p-3 bg-paper border border-wine/40 rounded font-mono font-bold text-base text-gold">
+              {MASTER_UNLOCK_CODE}
+            </div>
+
+            <div className="mt-5 pt-4 border-t border-line/60">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.localStorage) {
+                    const keys = []
+                    for (let i = 0; i < window.localStorage.length; i++) {
+                      const k = window.localStorage.key(i)
+                      if (k && k.startsWith('kiosko_sec_lock_')) keys.push(k)
+                    }
+                    keys.forEach((k) => window.localStorage.removeItem(k))
+                    notify(t.security?.localLocksCleared || 'Bloqueos locales eliminados en este dispositivo')
+                  }
+                }}
+                className="text-xs text-creamsoft hover:text-wine bg-transparent border border-line rounded px-3 py-1.5 transition-colors"
+              >
+                🧹 {t.security?.clearLocalLocks || 'Limpiar bloqueos locales de este dispositivo'}
+              </button>
+            </div>
+          </Card>
         </div>
       )}
 

@@ -106,6 +106,8 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
   const { t } = useLanguage()
   const [nombre, setNombre] = useState('')
   const [tipoEntrega, setTipoEntrega] = useState('local') // 'local' | 'domicilio'
+  const [numeroMesa, setNumeroMesa] = useState('')
+  const [metodoPagoLocal, setMetodoPagoLocal] = useState('efectivo') // 'efectivo' | 'transferencia'
   const [direccion, setDireccion] = useState('')
   const [telefono, setTelefono] = useState('')
   const [metodoPago, setMetodoPago] = useState('efectivo') // 'efectivo' | 'transferencia'
@@ -141,6 +143,7 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
     setSaving(true)
     try {
       let resumenPago = ''
+      let tagMesa = ''
       if (tipoEntrega === 'domicilio') {
         if (metodoPago === 'efectivo') {
           if (pagoExacto || montoPagaCon === total) {
@@ -153,9 +156,15 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
         } else {
           resumenPago = '📲 Pago por Transferencia'
         }
+      } else {
+        if (numeroMesa.trim()) {
+          const numLimpio = numeroMesa.trim().replace(/^mesa\s*#?/i, '')
+          tagMesa = `🍽️ Mesa ${numLimpio}`
+        }
+        resumenPago = metodoPagoLocal === 'efectivo' ? '💵 Pago en Efectivo' : '📲 Pago por Transferencia'
       }
 
-      const fullNotas = [resumenPago, notasEntrega.trim()].filter(Boolean).join(' · ')
+      const fullNotas = [tagMesa, resumenPago, notasEntrega.trim()].filter(Boolean).join(' · ')
 
       const pedido = await crearPedido(negocio.id, {
         cliente: nombre.trim() || 'Cliente',
@@ -240,6 +249,52 @@ function CartDrawer({ negocio, cart, onClose, onRemove, onQty, onConfirmed }) {
               <Field label={t.customer.name}>
                 <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder={t.customer.namePlaceholder} />
               </Field>
+
+              {tipoEntrega === 'local' && (
+                <div className="space-y-3 p-3.5 bg-paper2 border border-line rounded">
+                  <p className="text-[11.5px] text-gold font-semibold flex items-center gap-1.5">
+                    🍽️ Consumo en el local / mesa
+                  </p>
+                  <Field label={t.customer?.tableNumber || 'Número de mesa (opcional si estás en mesa)'}>
+                    <Input
+                      value={numeroMesa}
+                      onChange={(e) => setNumeroMesa(e.target.value)}
+                      placeholder={t.customer?.tablePlaceholder || 'Ej: Mesa 4, Barra, o llevar'}
+                    />
+                  </Field>
+
+                  {/* Método de Pago para el Local */}
+                  <div className="pt-2 border-t border-line/60">
+                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-creamsoft mb-1.5">
+                      💳 ¿Cómo vas a pagar?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setMetodoPagoLocal('efectivo')}
+                        className={`py-2 px-2 rounded text-center text-xs font-semibold border transition-colors ${
+                          metodoPagoLocal === 'efectivo'
+                            ? 'border-gold bg-gold/15 text-gold'
+                            : 'border-line bg-paper text-creamsoft hover:text-cream'
+                        }`}
+                      >
+                        💵 Efectivo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMetodoPagoLocal('transferencia')}
+                        className={`py-2 px-2 rounded text-center text-xs font-semibold border transition-colors ${
+                          metodoPagoLocal === 'transferencia'
+                            ? 'border-gold bg-gold/15 text-gold'
+                            : 'border-line bg-paper text-creamsoft hover:text-cream'
+                        }`}
+                      >
+                        📲 Transferencia
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {tipoEntrega === 'domicilio' && (
                 <div className="space-y-3 p-3.5 bg-paper2 border border-line rounded">

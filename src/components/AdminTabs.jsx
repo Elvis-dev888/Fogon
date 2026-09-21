@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Btn, Card, StatCard, Pill, Modal, Field, Input, Select, Textarea, Empty } from './ui'
-import { fmt$, fmtDate, fmtTime, fmtDateTime, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor, formatWhatsAppNumber } from '../lib/helpers'
+import { fmt$, fmtDate, fmtTime, fmtDateTime, fmtDateLong, fmtMonthLabel, sameMonth, dateStr, monthStr, todayStr, ESTADOS, thumbFor, formatWhatsAppNumber, extractMesaFromPedido, notificarPedidoNuevoConVoz } from '../lib/helpers'
 import { getSubscriptionSummary, formatDaysLeft, getTiersForMode } from '../lib/subscription'
 import { fetchCodigoNegocio, regenerarCodigoNegocio } from '../lib/auth'
 import {
@@ -1397,7 +1397,30 @@ export function TabPedidos({ negocio, data, reload, notify, simple, onAvanzar })
   const [editando, setEditando] = useState(null) // pedido que se está editando
   const [cancelando, setCancelando] = useState(null) // pedido que se va a cancelar
   const [busqueda, setBusqueda] = useState('')
+  const [sonidoHabilitado, setSonidoHabilitado] = useState(() => {
+    if (typeof window === 'undefined') return true
+    return window.localStorage?.getItem('kiosko_sonido_habilitado') !== 'false'
+  })
   const productos = data.productos || []
+
+  function toggleSonido() {
+    const nuevo = !sonidoHabilitado
+    setSonidoHabilitado(nuevo)
+    if (typeof window !== 'undefined') {
+      window.localStorage?.setItem('kiosko_sonido_habilitado', String(nuevo))
+    }
+    notify?.(nuevo ? '🔔 Sonido y voz activados' : '🔕 Sonido silenciado')
+  }
+
+  function probarSonido() {
+    notificarPedidoNuevoConVoz({
+      cliente: 'Carlos Mesa 3',
+      notas_entrega: '🍽️ Mesa 3 · 💵 Pago en Efectivo',
+      total: 25000,
+      tipo_entrega: 'local',
+    }, true)
+    notify?.('🔊 Probando campana y voz...')
+  }
 
   const term = busqueda.trim().toLowerCase()
   const pedidosFiltrados = (data.pedidos || []).filter((p) => {
@@ -1460,31 +1483,58 @@ export function TabPedidos({ negocio, data, reload, notify, simple, onAvanzar })
   )
 
   const barraBusqueda = (
-    <div className="mb-4 flex items-center gap-2.5">
-      <div className="relative flex-1 max-w-md">
-        <input
-          type="text"
-          value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
-          placeholder={t.ordersTab?.searchPlaceholder || '🔍 Buscar pedido por cliente (nombre, apellido, #pedido, teléfono)...'}
-          className="w-full bg-paper border border-line rounded-lg pl-3 pr-8 py-2 text-xs text-cream placeholder:text-creamsoft focus:outline-none focus:border-gold transition-colors"
-        />
+    <div className="mb-4 flex items-center justify-between gap-2.5 flex-wrap">
+      <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
+        <div className="relative flex-1 max-w-md">
+          <input
+            type="text"
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder={t.ordersTab?.searchPlaceholder || '🔍 Buscar pedido por cliente (nombre, apellido, #pedido, teléfono)...'}
+            className="w-full bg-paper border border-line rounded-lg pl-3 pr-8 py-2 text-xs text-cream placeholder:text-creamsoft focus:outline-none focus:border-gold transition-colors"
+          />
+          {busqueda && (
+            <button
+              type="button"
+              onClick={() => setBusqueda('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-creamsoft hover:text-cream"
+              title={t.ordersTab?.clearSearch || 'Limpiar búsqueda'}
+            >
+              ✕
+            </button>
+          )}
+        </div>
         {busqueda && (
-          <button
-            type="button"
-            onClick={() => setBusqueda('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-creamsoft hover:text-cream"
-            title={t.ordersTab?.clearSearch || 'Limpiar búsqueda'}
-          >
-            ✕
-          </button>
+          <span className="text-xs text-creamsoft font-mono">
+            {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? (t.ordersTab?.singleMatch || 'coincidencia') : (t.ordersTab?.matches || 'coincidencias')}
+          </span>
         )}
       </div>
-      {busqueda && (
-        <span className="text-xs text-creamsoft font-mono">
-          {pedidosFiltrados.length} {pedidosFiltrados.length === 1 ? (t.ordersTab?.singleMatch || 'coincidencia') : (t.ordersTab?.matches || 'coincidencias')}
-        </span>
-      )}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={toggleSonido}
+          title={sonidoHabilitado ? 'Silenciar timbre y voz de pedidos' : 'Activar timbre y voz de pedidos'}
+          className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 ${
+            sonidoHabilitado
+              ? 'bg-wine/20 border-wine text-wine hover:bg-wine/30'
+              : 'bg-paper border-line text-creamsoft hover:text-cream'
+          }`}
+        >
+          <span>{sonidoHabilitado ? '🔔' : '🔕'}</span>
+          <span className="text-[11px]">{sonidoHabilitado ? 'Sonido activo' : 'Silenciado'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={probarSonido}
+          title="Probar timbre y voz"
+          className="px-2.5 py-1.5 rounded-lg border border-line bg-paper hover:bg-paper2 text-creamsoft hover:text-cream text-xs font-medium transition-all flex items-center gap-1"
+        >
+          <span>🔊</span>
+          <span className="text-[11px]">Probar</span>
+        </button>
+      </div>
     </div>
   )
 
@@ -1504,57 +1554,73 @@ export function TabPedidos({ negocio, data, reload, notify, simple, onAvanzar })
               </h4>
               {items.length === 0 ? (
                 <p className="text-[12px] text-creamsoft px-1.5">{busqueda ? (t.ordersTab?.noSearchResults || 'Sin coincidencias') : (t.ordersTab?.noOrders || 'Sin pedidos')}</p>
-              ) : items.map((p) => (
-                <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="font-semibold text-cream truncate">
-                      <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
-                    </span>
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
-                      p.tipo_entrega === 'domicilio'
-                        ? 'bg-gold/15 text-gold border-gold/30'
-                        : 'bg-paper2 text-creamsoft border-line'
-                    }`}>
-                      {p.tipo_entrega === 'domicilio' ? (t.ordersTab?.delivery || '🛵 Domicilio') : (t.ordersTab?.local || '🍽️ Local')}
-                    </span>
-                  </div>
-
-                  {p.tipo_entrega === 'domicilio' && (
-                    <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
-                      {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
-                      {p.telefono && (
-                        <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                          <span className="font-mono">📞 {p.telefono}</span>
-                          <a
-                            href={`https://wa.me/${formatWhatsAppNumber(p.telefono)}?text=${encodeURIComponent(
-                              (t.ordersTab?.contactCustomerMessage || '¡Hola {name}! 👋 Te contactamos de {business} respecto a tu pedido #{number}.')
-                                .replace('{name}', p.cliente || 'Cliente')
-                                .replace('{business}', negocio?.nombre || 'Kiosko')
-                                .replace('{number}', p.numero || '')
-                            )}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[10.5px] font-medium hover:bg-emerald-600/30 transition-colors"
-                            title={t.ordersTab?.contactCustomerTooltip || 'Contactar al cliente por WhatsApp'}
-                          >
-                            <span>{t.ordersTab?.whatsappCustomerBadge || '💬 WhatsApp'}</span>
-                          </a>
-                        </div>
-                      )}
-                      {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+              ) : items.map((p) => {
+                const mesa = extractMesaFromPedido(p)
+                return (
+                  <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="font-semibold text-cream truncate">
+                        <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {mesa && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-500/15 text-amber-300 border-amber-500/30">
+                            🍽️ Mesa {mesa}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                          p.tipo_entrega === 'domicilio'
+                            ? 'bg-gold/15 text-gold border-gold/30'
+                            : 'bg-paper2 text-creamsoft border-line'
+                        }`}>
+                          {p.tipo_entrega === 'domicilio' ? (t.ordersTab?.delivery || '🛵 Domicilio') : (t.ordersTab?.local || '🍽️ Local')}
+                        </span>
+                      </div>
                     </div>
-                  )}
 
-                  <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
-                    {p.estado === 'Pendiente' && <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>{t.ordersTab?.acceptOrder || '✅ Pedido aceptado'}</Btn>}
-                    {(p.estado === 'En preparación' || p.estado === 'Listo') && <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>{t.ordersTab?.deliverOrder || '📦 Entregado'}</Btn>}
-                    {p.estado === 'Entregado' && <span className="text-[11px]">{t.ordersTab?.deliveredIcon || '✅'}</span>}
+                    {p.tipo_entrega === 'domicilio' ? (
+                      <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
+                        {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
+                        {p.telefono && (
+                          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                            <span className="font-mono">📞 {p.telefono}</span>
+                            <a
+                              href={`https://wa.me/${formatWhatsAppNumber(p.telefono)}?text=${encodeURIComponent(
+                                (t.ordersTab?.contactCustomerMessage || '¡Hola {name}! 👋 Te contactamos de {business} respecto a tu pedido #{number}.')
+                                  .replace('{name}', p.cliente || 'Cliente')
+                                  .replace('{business}', negocio?.nombre || 'Kiosko')
+                                  .replace('{number}', p.numero || '')
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[10.5px] font-medium hover:bg-emerald-600/30 transition-colors"
+                              title={t.ordersTab?.contactCustomerTooltip || 'Contactar al cliente por WhatsApp'}
+                            >
+                              <span>{t.ordersTab?.whatsappCustomerBadge || '💬 WhatsApp'}</span>
+                            </a>
+                          </div>
+                        )}
+                        {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+                      </div>
+                    ) : (
+                      p.notas_entrega ? (
+                        <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft">
+                          <div className="text-cream font-medium">{p.notas_entrega}</div>
+                        </div>
+                      ) : null
+                    )}
+
+                    <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
+                      {p.estado === 'Pendiente' && <Btn size="sm" variant="avocado" onClick={() => aceptar(p)}>{t.ordersTab?.acceptOrder || '✅ Pedido aceptado'}</Btn>}
+                      {(p.estado === 'En preparación' || p.estado === 'Listo') && <Btn size="sm" variant="avocado" onClick={() => entregar(p)}>{t.ordersTab?.deliverOrder || '📦 Entregado'}</Btn>}
+                      {p.estado === 'Entregado' && <span className="text-[11px]">{t.ordersTab?.deliveredIcon || '✅'}</span>}
+                    </div>
+                    {p.estado !== 'Entregado' && acciones(p)}
                   </div>
-                  {p.estado !== 'Entregado' && acciones(p)}
-                </div>
-              ))}
+                )
+              })}
             </div>
           ))}
         </div>
@@ -1579,57 +1645,73 @@ export function TabPedidos({ negocio, data, reload, notify, simple, onAvanzar })
               </h4>
               {items.length === 0 ? (
                 <p className="text-[12px] text-creamsoft px-1.5">{busqueda ? (t.ordersTab?.noSearchResults || 'Sin coincidencias') : (t.ordersTab?.noOrders || 'Sin pedidos')}</p>
-              ) : items.map((p) => (
-                <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <span className="font-semibold text-cream truncate">
-                      <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
-                    </span>
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border shrink-0 ${
-                      p.tipo_entrega === 'domicilio'
-                        ? 'bg-gold/15 text-gold border-gold/30'
-                        : 'bg-paper2 text-creamsoft border-line'
-                    }`}>
-                      {p.tipo_entrega === 'domicilio' ? (t.ordersTab?.delivery || '🛵 Domicilio') : (t.ordersTab?.local || '🍽️ Local')}
-                    </span>
-                  </div>
-
-                  {p.tipo_entrega === 'domicilio' && (
-                    <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
-                      {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
-                      {p.telefono && (
-                        <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                          <span className="font-mono">📞 {p.telefono}</span>
-                          <a
-                            href={`https://wa.me/${formatWhatsAppNumber(p.telefono)}?text=${encodeURIComponent(
-                              (t.ordersTab?.contactCustomerMessage || '¡Hola {name}! 👋 Te contactamos de {business} respecto a tu pedido #{number}.')
-                                .replace('{name}', p.cliente || 'Cliente')
-                                .replace('{business}', negocio?.nombre || 'Kiosko')
-                                .replace('{number}', p.numero || '')
-                            )}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[10.5px] font-medium hover:bg-emerald-600/30 transition-colors"
-                            title={t.ordersTab?.contactCustomerTooltip || 'Contactar al cliente por WhatsApp'}
-                          >
-                            <span>{t.ordersTab?.whatsappCustomerBadge || '💬 WhatsApp'}</span>
-                          </a>
-                        </div>
-                      )}
-                      {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+              ) : items.map((p) => {
+                const mesa = extractMesaFromPedido(p)
+                return (
+                  <div key={p.id} className="bg-paper rounded-sm p-3 mb-2 border border-line border-l-2 border-l-gold text-[12px]">
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="font-semibold text-cream truncate">
+                        <b className="font-mono text-gold">#{p.numero}</b> · {p.cliente}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {mesa && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-500/15 text-amber-300 border-amber-500/30">
+                            🍽️ Mesa {mesa}
+                          </span>
+                        )}
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${
+                          p.tipo_entrega === 'domicilio'
+                            ? 'bg-gold/15 text-gold border-gold/30'
+                            : 'bg-paper2 text-creamsoft border-line'
+                        }`}>
+                          {p.tipo_entrega === 'domicilio' ? (t.ordersTab?.delivery || '🛵 Domicilio') : (t.ordersTab?.local || '🍽️ Local')}
+                        </span>
+                      </div>
                     </div>
-                  )}
 
-                  <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
-                  <div className="flex justify-between items-center mt-2">
-                    <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
-                    {est !== 'Entregado'
-                      ? <Btn size="sm" variant="avocado" onClick={() => advance(p)}>{t.ordersTab?.advanceTo ? t.ordersTab.advanceTo.replace('{status}', ESTADOS[ESTADOS.indexOf(est) + 1]) : `Pasar a ${ESTADOS[ESTADOS.indexOf(est) + 1]}`}</Btn>
-                      : <span className="text-[11px]">{t.ordersTab?.deliveredIcon || '✅'}</span>}
+                    {p.tipo_entrega === 'domicilio' ? (
+                      <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft space-y-0.5">
+                        {p.direccion && <div className="text-cream font-medium">📍 {p.direccion}</div>}
+                        {p.telefono && (
+                          <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                            <span className="font-mono">📞 {p.telefono}</span>
+                            <a
+                              href={`https://wa.me/${formatWhatsAppNumber(p.telefono)}?text=${encodeURIComponent(
+                                (t.ordersTab?.contactCustomerMessage || '¡Hola {name}! 👋 Te contactamos de {business} respecto a tu pedido #{number}.')
+                                  .replace('{name}', p.cliente || 'Cliente')
+                                  .replace('{business}', negocio?.nombre || 'Kiosko')
+                                  .replace('{number}', p.numero || '')
+                              )}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[10.5px] font-medium hover:bg-emerald-600/30 transition-colors"
+                              title={t.ordersTab?.contactCustomerTooltip || 'Contactar al cliente por WhatsApp'}
+                            >
+                              <span>{t.ordersTab?.whatsappCustomerBadge || '💬 WhatsApp'}</span>
+                            </a>
+                          </div>
+                        )}
+                        {p.notas_entrega && <div className="italic text-[10.5px]">"{p.notas_entrega}"</div>}
+                      </div>
+                    ) : (
+                      p.notas_entrega ? (
+                        <div className="my-1.5 p-2 bg-paper2/80 rounded border border-line text-[11px] text-creamsoft">
+                          <div className="text-cream font-medium">{p.notas_entrega}</div>
+                        </div>
+                      ) : null
+                    )}
+
+                    <div className="my-1.5 text-creamsoft">{(p.pedido_items || []).map((it) => `${it.cantidad}× ${it.nombre}`).join(', ')}</div>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="font-mono text-gold font-semibold">{fmt$(p.total)}</span>
+                      {est !== 'Entregado'
+                        ? <Btn size="sm" variant="avocado" onClick={() => advance(p)}>{t.ordersTab?.advanceTo ? t.ordersTab.advanceTo.replace('{status}', ESTADOS[ESTADOS.indexOf(est) + 1]) : `Pasar a ${ESTADOS[ESTADOS.indexOf(est) + 1]}`}</Btn>
+                        : <span className="text-[11px]">{t.ordersTab?.deliveredIcon || '✅'}</span>}
+                    </div>
+                    {est !== 'Entregado' && acciones(p)}
                   </div>
-                  {est !== 'Entregado' && acciones(p)}
-                </div>
-              ))}
+                )
+              })}
             </div>
           )
         })}
