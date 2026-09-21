@@ -120,3 +120,22 @@ test('Pedidos: extracción correcta de número de mesa desde notas o propiedad',
   assert.equal(extractMesaFromPedido({ notas_entrega: 'Pedido para llevar sin mesa' }), null)
 })
 
+test('Voz inteligente: prioriza voces femeninas en español y descarta voces robóticas masculinas', async () => {
+  const { seleccionarVozFemeninaEspanol } = await import('./helpers.js')
+  const vocesMock = [
+    { name: 'Microsoft David Desktop - English (United States)', lang: 'en-US' },
+    { name: 'Microsoft Raul - Spanish (Mexico)', lang: 'es-MX' },
+    { name: 'Microsoft Sabina - Spanish (Mexico)', lang: 'es-MX' },
+    { name: 'Microsoft Pablo - Spanish (Spain)', lang: 'es-ES' },
+  ]
+  const seleccionada = seleccionarVozFemeninaEspanol(vocesMock)
+  assert.equal(seleccionada?.name, 'Microsoft Sabina - Spanish (Mexico)', 'Debe priorizar Sabina frente a Raul o Pablo')
+
+  const vocesSoloGoogle = [
+    { name: 'Google US English', lang: 'en-US' },
+    { name: 'Google español', lang: 'es-ES' },
+  ]
+  assert.equal(seleccionarVozFemeninaEspanol(vocesSoloGoogle)?.name, 'Google español')
+})
+
+

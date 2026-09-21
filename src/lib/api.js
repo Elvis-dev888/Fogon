@@ -250,7 +250,7 @@ export async function fetchPedidos(negocioId) {
     .from('pedidos')
     .select('*, pedido_items(*)')
     .eq('negocio_id', negocioId)
-    .order('numero', { ascending: false })
+    .order('creado_en', { ascending: false })
   if (error) throw error
   return data
 }

@@ -129,7 +129,45 @@ export function extractMesaFromPedido(pedido) {
   return null
 }
 
-// Anuncio hablado con voz inteligente (Text-to-Speech)
+// Selecciona la mejor voz femenina natural disponible en español
+export function seleccionarVozFemeninaEspanol(voicesList) {
+  const voices = voicesList || (typeof window !== 'undefined' && window.speechSynthesis ? window.speechSynthesis.getVoices() : []) || []
+  if (!voices.length) return null
+
+  const vocesEs = voices.filter((v) => v.lang && v.lang.toLowerCase().startsWith('es'))
+  if (!vocesEs.length) return null
+
+  // Voces femeninas reconocidas en Windows, Android, Chrome, Edge y Mac/iOS
+  const nombresFemeninos = [
+    'sabina', 'elena', 'laura', 'paulina', 'monica', 'mónica', 'lucia', 'lucía',
+    'sofia', 'sofía', 'camila', 'valeria', 'ximena', 'jimena', 'penelope', 'penélope',
+    'francisca', 'victoria', 'female', 'mujer', 'zira'
+  ]
+
+  for (const nombre of nombresFemeninos) {
+    const encontrada = vocesEs.find((v) => (v.name || '').toLowerCase().includes(nombre))
+    if (encontrada) return encontrada
+  }
+
+  // Voces naturales de Google o Microsoft Online / Neural
+  const vozCalidad = vocesEs.find((v) => {
+    const n = (v.name || '').toLowerCase()
+    return n.includes('google') || n.includes('natural') || n.includes('online') || n.includes('neural')
+  })
+  if (vozCalidad) return vozCalidad
+
+  // Descartar voces masculinas explícitas
+  const nombresMasculinos = ['raul', 'raúl', 'pablo', 'david', 'jorge', 'male', 'hombre', 'miguel', 'carlos']
+  const noMasculina = vocesEs.find((v) => {
+    const n = (v.name || '').toLowerCase()
+    return !nombresMasculinos.some((m) => n.includes(m))
+  })
+  if (noMasculina) return noMasculina
+
+  return vocesEs[0]
+}
+
+// Anuncio hablado con voz inteligente femenina (Text-to-Speech)
 export function speakAnuncioPedido(pedido) {
   try {
     if (typeof window === 'undefined' || !window.speechSynthesis) return
@@ -141,24 +179,23 @@ export function speakAnuncioPedido(pedido) {
 
     let texto = ''
     if (mesa) {
-      texto = `¡Nuevo pedido! Mesa ${mesa}, ${cliente}.`
+      texto = `¡Nuevo pedido! En la mesa ${mesa}, para ${cliente}.`
     } else if (esDomicilio) {
-      texto = `¡Nuevo pedido para domicilio! ${cliente}.`
+      texto = `¡Nuevo pedido a domicilio, para ${cliente}.`
     } else {
-      texto = `¡Nuevo pedido en el local! ${cliente}.`
+      texto = `¡Nuevo pedido en el local, para ${cliente}.`
     }
 
     const utterance = new SpeechSynthesisUtterance(texto)
     utterance.lang = 'es-CO'
     utterance.volume = 1.0
-    utterance.rate = 1.02
-    utterance.pitch = 1.05
+    utterance.rate = 0.96 // cadencia natural, clara y agradable
+    utterance.pitch = 1.0 // tono cálido y natural, sin efecto metálico
 
-    // Intentar asignar una voz en español disponible
-    const voices = window.speechSynthesis.getVoices() || []
-    const vozEs = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith('es'))
-    if (vozEs) {
-      utterance.voice = vozEs
+    const voz = seleccionarVozFemeninaEspanol()
+    if (voz) {
+      utterance.voice = voz
+      if (voz.lang) utterance.lang = voz.lang
     }
 
     window.speechSynthesis.speak(utterance)
