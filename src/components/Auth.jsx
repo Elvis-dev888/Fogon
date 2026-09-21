@@ -115,6 +115,65 @@ export function SecurityLockCard({ email, status, onUnlocked, onMostrarRecuperar
   )
 }
 
+/* ---------------- Banner informativo de actualización del sistema para dueños ---------------- */
+export function ActualizacionNegociosBanner({ className = '' }) {
+  const { t } = useLanguage()
+  const u = t.updateNotice || {}
+
+  return (
+    <div className={`border border-gold/40 bg-gold/10 rounded-xl p-4 sm:p-5 shadow-sm relative overflow-hidden ${className}`}>
+      <div className="flex items-start gap-3 sm:gap-4">
+        <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center text-xl shrink-0 text-gold border border-gold/30">
+          📢
+        </div>
+        <div className="flex-1 text-[13px] sm:text-sm text-cream leading-relaxed">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <h4 className="font-semibold text-gold text-sm sm:text-base">
+              {u.title || '¡Actualización del sistema!'}
+            </h4>
+            <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-gold/20 text-champagne border border-gold/30">
+              Importante
+            </span>
+          </div>
+          <p className="text-creamsoft mb-2.5">
+            {u.subtitle || 'Hemos mejorado la seguridad y privacidad de tu negocio:'}
+          </p>
+          <ul className="space-y-1.5 list-none pl-0 mb-3 text-cream/90">
+            <li className="flex items-start gap-2">
+              <span className="text-gold shrink-0 font-bold">✓</span>
+              <span>
+                {u.point1Prefix || 'Si ya tenías tu negocio creado,'}{' '}
+                <strong className="text-white font-semibold">
+                  {u.point1Bold || 'toda tu información, ventas y productos siguen intactos y guardados.'}
+                </strong>
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-gold shrink-0 font-bold">✓</span>
+              <span>
+                {u.point2Prefix || 'Haz clic en'}{' '}
+                <strong className="text-gold font-semibold underline underline-offset-2">
+                  {u.point2Bold || '«Iniciar sesión»'}
+                </strong>{' '}
+                {u.point2Suffix || 'con tu correo registrado.'}
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-gold shrink-0 font-bold">✓</span>
+              <span>
+                {u.point3 || 'La app te llevará de inmediato al control privado de tu negocio.'}
+              </span>
+            </li>
+          </ul>
+          <p className="text-xs text-creamsoft italic border-t border-gold/20 pt-2">
+            {u.footer || '(Si eres nuevo en la plataforma, puedes crear tu negocio tocando en «Registrar nuevo negocio»).'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ---------------- Login / registro para Admin de negocio ---------------- */
 export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
   const { t } = useLanguage()
@@ -207,6 +266,8 @@ export function AdminAuth({ onDone, notify, modoInicial, onVolver }) {
           ➕ {t.authAdmin.register}
         </button>
       </div>
+
+      {modo === 'login' && <ActualizacionNegociosBanner className="mb-5" />}
 
       {aviso && <div className="mb-4 border border-gold bg-gold/10 text-champagne text-[12.5px] rounded p-3">{aviso}</div>}
 

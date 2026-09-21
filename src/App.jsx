@@ -6,7 +6,7 @@ import SuperadminView from './components/SuperadminView'
 import AdminView from './components/AdminView'
 import EmpleadoView from './components/EmpleadoView'
 import ClienteView from './components/ClienteView'
-import { AdminAuth, SuperadminAuth, EmpleadoAuth, UnirseNegocioForm, CrearNegocioForm, SinPermiso, EstablecerNuevaPasswordModal } from './components/Auth'
+import { AdminAuth, SuperadminAuth, EmpleadoAuth, UnirseNegocioForm, CrearNegocioForm, SinPermiso, EstablecerNuevaPasswordModal, ActualizacionNegociosBanner } from './components/Auth'
 import { PrivacyModal } from './components/PrivacyModal'
 import { supabase } from './lib/supabaseClient'
 import { fetchPerfil, fetchNegocioPorId, signOut } from './lib/auth'
@@ -399,6 +399,9 @@ function PickNegocioAdmin({ negocios, onEntrar, onRegistrar }) {
           <p className="text-creamsoft text-sm md:text-base leading-relaxed max-w-2xl">{t.heroAdminDescription}</p>
         </div>
       </section>
+
+      <ActualizacionNegociosBanner className="mb-7" />
+
       <div className="mb-7 flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="font-serif text-3xl font-semibold mb-2">{t.businessPanel}</h2>
