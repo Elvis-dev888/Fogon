@@ -1,5 +1,16 @@
 apply plugin: 'com.android.application'
 
+def defaultKeystore = file('kiosko-release-key.jks').exists() ? 'kiosko-release-key.jks' : null
+def releaseSigning = [
+    ANDROID_UPLOAD_STORE_FILE: System.getenv('ANDROID_UPLOAD_STORE_FILE') ?: defaultKeystore,
+    ANDROID_UPLOAD_STORE_PASSWORD: System.getenv('ANDROID_UPLOAD_STORE_PASSWORD') ?: (defaultKeystore ? 'KioskoRelease2026!' : null),
+    ANDROID_UPLOAD_KEY_ALIAS: System.getenv('ANDROID_UPLOAD_KEY_ALIAS') ?: (defaultKeystore ? 'kiosko' : null),
+    ANDROID_UPLOAD_KEY_PASSWORD: System.getenv('ANDROID_UPLOAD_KEY_PASSWORD') ?: (defaultKeystore ? 'KioskoRelease2026!' : null)
+]
+def missingReleaseSigningVariables = releaseSigning.findAll { name, value ->
+    !value?.trim()
+}.keySet().sort()
+
 android {
     namespace "com.fogon.app"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +18,8 @@ android {
         applicationId "com.fogon.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10
-        versionName "0.2.4"
+        versionCode 11
+        versionName "0.2.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,17 +29,22 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file('kiosko-release-key.jks')
-            storePassword 'KioskoRelease2026!'
-            keyAlias 'kiosko'
-            keyPassword 'KioskoRelease2026!'
+            if (missingReleaseSigningVariables.isEmpty()) {
+                storeFile file(releaseSigning['ANDROID_UPLOAD_STORE_FILE'])
+                storePassword releaseSigning['ANDROID_UPLOAD_STORE_PASSWORD']
+                keyAlias releaseSigning['ANDROID_UPLOAD_KEY_ALIAS']
+                keyPassword releaseSigning['ANDROID_UPLOAD_KEY_PASSWORD']
+            }
         }
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (missingReleaseSigningVariables.isEmpty()) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
@@ -52,6 +68,22 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+def validateReleaseSigning = tasks.register('validateReleaseSigning') {
+    doLast {
+        if (!missingReleaseSigningVariables.isEmpty()) {
+            throw new GradleException(
+                "Release signing requires these environment variables: ${missingReleaseSigningVariables.join(', ')}"
+            )
+        }
+    }
+}
+
+tasks.configureEach {
+    if (name == 'preReleaseBuild') {
+        dependsOn(validateReleaseSigning)
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')
